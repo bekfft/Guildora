@@ -21,9 +21,12 @@ export default function Modal({ title, children, onClose, labelledBy = 'modal-ti
     const previousFocus = document.activeElement;
     const dialog = dialogRef.current;
     const focusable = dialog?.querySelectorAll('button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])');
-    focusable?.[0]?.focus();
+    const preferredFocus = dialog?.querySelector('[autofocus]');
+    (preferredFocus || focusable?.[0])?.focus();
 
     function handleKeyDown(event) {
+      const openDialogs = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
+      if (openDialogs[openDialogs.length - 1] !== dialog) return;
       if (event.key === 'Escape') requestClose();
       if (event.key !== 'Tab' || !focusable?.length) return;
       const first = focusable[0];

@@ -15,6 +15,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { socket } from '../lib/socket.js';
+import { useGuildoraDialog } from '../context/GuildoraDialogContext.jsx';
 
 const GROUP_WINDOW = 5 * 60 * 1000;
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '👀', '🔥'];
@@ -84,6 +85,7 @@ export default function ChannelView({
   onRead,
   onToast
 }) {
+  const dialog = useGuildoraDialog();
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -337,7 +339,14 @@ export default function ChannelView({
   }
 
   async function reportMessage(message) {
-    const reason = window.prompt('Warum möchtest du diese Nachricht melden?');
+    const reason = await dialog.prompt({
+      title: 'Nachricht melden',
+      message: 'Beschreibe kurz, warum diese Nachricht geprüft werden soll.',
+      label: 'Grund der Meldung',
+      placeholder: 'Grund eingeben …',
+      required: true,
+      confirmLabel: 'Meldung senden'
+    });
     if (!reason) return;
     try {
       await api.report(channel.guild_id, { messageId: message.id, reportedUserId: message.author.id, reason });

@@ -1,6 +1,7 @@
 import { Folder, Save, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
+import { useGuildoraDialog } from '../context/GuildoraDialogContext.jsx';
 
 export default function CategorySettingsModal({
   guildData,
@@ -9,6 +10,7 @@ export default function CategorySettingsModal({
   onRefresh,
   onToast
 }) {
+  const dialog = useGuildoraDialog();
   const [name, setName] = useState(category.name);
   const [busy, setBusy] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -52,7 +54,11 @@ export default function CategorySettingsModal({
   }
 
   async function deleteCategory() {
-    if (busy || !window.confirm(`Kategorie „${category.name}“ löschen? Die enthaltenen Channels bleiben erhalten.`)) return;
+    if (busy || !await dialog.confirm({
+      title: 'Kategorie löschen?',
+      message: `Die Kategorie „${category.name}“ wird gelöscht. Die enthaltenen Channels bleiben erhalten.`,
+      confirmLabel: 'Kategorie löschen'
+    })) return;
     setBusy(true);
     try {
       await api.deleteCategory(guildData.guild.id, category.id);

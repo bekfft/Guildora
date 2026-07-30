@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
+import { useGuildoraDialog } from '../context/GuildoraDialogContext.jsx';
 
 const EMPTY_PERMISSIONS = {
   manageServer: false,
@@ -78,6 +79,7 @@ export default function ServerSettingsModal({
   onRefresh,
   onToast
 }) {
+  const dialog = useGuildoraDialog();
   const availableTabs = TABS.filter((item) => (
     (item.id === 'overview' && capabilities.manageServer)
     || (item.id === 'invites' && capabilities.manageServer)
@@ -208,7 +210,11 @@ export default function ServerSettingsModal({
   }
 
   async function deleteInvite(invite) {
-    if (!window.confirm('Diese Einladung dauerhaft deaktivieren?')) return;
+    if (!await dialog.confirm({
+      title: 'Einladung deaktivieren?',
+      message: 'Der Einladungslink kann danach nicht mehr verwendet werden.',
+      confirmLabel: 'Einladung deaktivieren'
+    })) return;
     setBusy(`invite-${invite.id}`);
     try {
       await api.deleteGuildInvite(guildData.guild.id, invite.id);
@@ -250,7 +256,11 @@ export default function ServerSettingsModal({
   }
 
   async function removeCategory(category) {
-    if (!window.confirm(`Kategorie „${category.name}“ löschen? Die Channels bleiben ohne Kategorie erhalten.`)) return;
+    if (!await dialog.confirm({
+      title: 'Kategorie löschen?',
+      message: `Die Kategorie „${category.name}“ wird gelöscht. Die Channels bleiben ohne Kategorie erhalten.`,
+      confirmLabel: 'Kategorie löschen'
+    })) return;
     await run(
       `category-${category.id}`,
       () => api.deleteCategory(guildData.guild.id, category.id),
@@ -282,7 +292,11 @@ export default function ServerSettingsModal({
   }
 
   async function removeChannel(channel) {
-    if (!window.confirm(`Channel „${channel.name}“ dauerhaft löschen?`)) return;
+    if (!await dialog.confirm({
+      title: 'Channel löschen?',
+      message: `Der Channel „${channel.name}“ wird dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.`,
+      confirmLabel: 'Channel löschen'
+    })) return;
     await run(
       `channel-${channel.id}`,
       () => api.deleteChannel(guildData.guild.id, channel.id),
@@ -310,7 +324,11 @@ export default function ServerSettingsModal({
   }
 
   async function removeRole() {
-    if (!selectedRole || !window.confirm(`Rolle „${selectedRole.name}“ löschen?`)) return;
+    if (!selectedRole || !await dialog.confirm({
+      title: 'Rolle löschen?',
+      message: `Die Rolle „${selectedRole.name}“ wird dauerhaft gelöscht und allen Mitgliedern entzogen.`,
+      confirmLabel: 'Rolle löschen'
+    })) return;
     const nextRole = guildData.roles.find((role) => role.id !== selectedRole.id);
     const result = await run(
       `role-${selectedRole.id}`,
@@ -339,7 +357,11 @@ export default function ServerSettingsModal({
   }
 
   async function kick(member) {
-    if (!window.confirm(`${memberName(member)} wirklich vom Server entfernen?`)) return;
+    if (!await dialog.confirm({
+      title: 'Mitglied entfernen?',
+      message: `${memberName(member)} wird vom Server entfernt und muss erneut eingeladen werden, um zurückzukehren.`,
+      confirmLabel: 'Mitglied entfernen'
+    })) return;
     const result = await run(
       `member-${member.id}`,
       () => api.kickMember(guildData.guild.id, member.id),
@@ -353,13 +375,43 @@ export default function ServerSettingsModal({
   }
 
   async function moderateMember(member, type) {
-    const reason = window.prompt(type === 'ban' ? 'Grund für die Serversperre:' : 'Grund für den Timeout:') || '';
+    const reason = await dialog.prompt({
+      title: type === 'ban' ? 'Mitglied sperren' : 'Timeout vergeben',
+      message: type === 'ban'
+        ? 'Gib optional einen Grund für die Serversperre an.'
+        : 'Gib optional einen Grund für den Timeout an.',
+      label: 'Grund',
+      placeholder: 'Optionaler Grund …',
+      confirmLabel: 'Weiter'
+    });
+    if (reason === null) return;
     if (type === 'ban') {
-      if (!window.confirm(`${memberName(member)} sperren und vom Server entfernen?`)) return;
+      if (!await dialog.confirm({
+        title: `${memberName(member)} sperren?`,
+        message: 'Das Mitglied wird gesperrt und sofort vom Server entfernt.',
+        confirmLabel: 'Mitglied sperren'
+      })) return;
       await run(`moderate-${member.id}`, () => api.banMember(guildData.guild.id, member.user_id, reason), 'Mitglied gesperrt.');
       setSelectedMemberId(null);
     } else {
-      const minutes = Number(window.prompt('Timeout in Minuten:', '10'));
+      const timeoutValue = await dialog.prompt({
+        title: 'Dauer des Timeouts',
+        message: 'Lege fest, wie viele Minuten das Mitglied keine Aktionen ausführen darf.',
+        label: 'Minuten',
+        inputType: 'number',
+        inputMode: 'numeric',
+        initialValue: '10',
+        min: 1,
+        step: 1,
+        required: true,
+        confirmLabel: 'Timeout setzen',
+        validate: (value) => {
+          const minutes = Number(value);
+          return Number.isInteger(minutes) && minutes >= 1 ? '' : 'Bitte gib eine ganze Zahl ab 1 ein.';
+        }
+      });
+      if (timeoutValue === null) return;
+      const minutes = Number(timeoutValue);
       if (!Number.isInteger(minutes) || minutes < 1) return;
       await run(`moderate-${member.id}`, () => api.timeoutMember(guildData.guild.id, member.user_id, minutes, reason), 'Timeout gesetzt.');
     }

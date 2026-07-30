@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Button from '../components/Button.jsx';
 import { api } from '../lib/api.js';
+import { useGuildoraDialog } from '../context/GuildoraDialogContext.jsx';
 
 export function Switch({ label, description, checked, onChange }) {
   return (
@@ -21,6 +22,7 @@ function SaveBar({ saving, onSave }) {
 }
 
 export function AccountSection({ user, refreshUser, logout, onClose, onToast }) {
+  const dialog = useGuildoraDialog();
   const [identity, setIdentity] = useState({ username: user.username, email: user.email, currentPassword: '' });
   const [password, setPassword] = useState({ currentPassword: '', newPassword: '', repeat: '' });
   const [sessions, setSessions] = useState([]);
@@ -89,16 +91,41 @@ export function AccountSection({ user, refreshUser, logout, onClose, onToast }) 
   }
 
   async function deactivate() {
-    const currentPassword = window.prompt('Gib dein aktuelles Passwort ein, um den Account zu deaktivieren:');
+    const currentPassword = await dialog.prompt({
+      title: 'Account deaktivieren?',
+      message: 'Du wirst auf allen Geräten abgemeldet. Der Account kann später wieder aktiviert werden.',
+      label: 'Aktuelles Passwort',
+      inputType: 'password',
+      required: true,
+      tone: 'danger',
+      confirmLabel: 'Account deaktivieren'
+    });
     if (!currentPassword) return;
     await api.deactivateAccount(currentPassword);
     await logout(); onClose();
   }
 
   async function removeAccount() {
-    const confirmation = window.prompt('Diese Aktion ist endgültig. Gib LÖSCHEN ein:');
+    const confirmation = await dialog.prompt({
+      title: 'Account endgültig löschen?',
+      message: 'Diese Aktion kann nicht rückgängig gemacht werden. Gib zur Bestätigung LÖSCHEN ein.',
+      label: 'Bestätigung',
+      placeholder: 'LÖSCHEN',
+      required: true,
+      tone: 'danger',
+      confirmLabel: 'Weiter',
+      validate: (value) => value === 'LÖSCHEN' ? '' : 'Bitte gib exakt LÖSCHEN ein.'
+    });
     if (confirmation !== 'LÖSCHEN') return;
-    const currentPassword = window.prompt('Gib dein aktuelles Passwort ein:');
+    const currentPassword = await dialog.prompt({
+      title: 'Löschung bestätigen',
+      message: 'Bestätige die endgültige Löschung mit deinem aktuellen Passwort.',
+      label: 'Aktuelles Passwort',
+      inputType: 'password',
+      required: true,
+      tone: 'danger',
+      confirmLabel: 'Account endgültig löschen'
+    });
     if (!currentPassword) return;
     await api.deleteAccount(currentPassword, confirmation);
     await logout(); onClose();

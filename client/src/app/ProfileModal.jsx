@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api.js';
 import { socket } from '../lib/socket.js';
 import Modal from './Modal.jsx';
+import { useGuildoraDialog } from '../context/GuildoraDialogContext.jsx';
 
 const BADGE_ICONS = {
   'badge-check': BadgeCheck,
@@ -55,6 +56,7 @@ export default function ProfileModal({
   onSocialChanged,
   onToast
 }) {
+  const dialog = useGuildoraDialog();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(null);
@@ -146,14 +148,25 @@ export default function ProfileModal({
     }
   }
 
-  function reportProfile() {
-    const reason = window.prompt('Warum möchtest du dieses Profil melden?');
+  async function reportProfile() {
+    const reason = await dialog.prompt({
+      title: 'Profil melden',
+      message: 'Beschreibe kurz, warum dieses Profil vom Guildora-Team geprüft werden soll.',
+      label: 'Grund der Meldung',
+      placeholder: 'Grund eingeben …',
+      required: true,
+      confirmLabel: 'Meldung senden'
+    });
     if (!reason) return;
     socialAction(() => api.reportProfile(profile.id, reason), 'Profil wurde dem Guildora-Team gemeldet.');
   }
 
-  function blockProfile() {
-    if (!window.confirm(`${nameOf(profile)} blockieren? Freundschaft und Direktnachrichten werden dadurch beendet.`)) return;
+  async function blockProfile() {
+    if (!await dialog.confirm({
+      title: `${nameOf(profile)} blockieren?`,
+      message: 'Die Freundschaft und bestehende Direktnachrichten werden dadurch beendet.',
+      confirmLabel: 'Nutzer blockieren'
+    })) return;
     socialAction(() => api.blockUser(profile.id), 'Nutzer blockiert.');
   }
 

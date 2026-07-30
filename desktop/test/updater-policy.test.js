@@ -28,3 +28,9 @@ test('Renderer kann den letzten Updater-Status nach dem Laden abrufen', () => {
   assert.match(preload, /getUpdateState: \(\) => ipcRenderer\.invoke\(IPC\.UPDATE_GET_STATE\)/);
   assert.match(updater, /function getUpdateState\(\)/);
 });
+
+test('Desktop-Releases verwenden den vorgeschriebenen Guildora-Tag', () => {
+  const builderConfig = read('electron-builder.yml');
+  assert.match(builderConfig, /tagNamePrefix:\s*desktop-v/);
+  assert.match(builderConfig, /releaseType:\s*release/);
+});

@@ -15,6 +15,7 @@ publish:
   owner: bekfft
   repo: Guildora
   releaseType: release
+  tagNamePrefix: desktop-v
 win:
   target:
     - target: nsis

@@ -21,6 +21,7 @@ import Toast from '../app/Toast.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useGuilds } from '../context/GuildContext.jsx';
 import { useVoice } from '../context/VoiceContext.jsx';
+import { useGuildoraDialog } from '../context/GuildoraDialogContext.jsx';
 import { api } from '../lib/api.js';
 import { socket } from '../lib/socket.js';
 import '../styles/app.css';
@@ -40,6 +41,7 @@ export default function AppPage() {
   const { user, settings } = useAuth();
   const { guilds, loading: guildsLoading, leaveGuild, refreshGuilds } = useGuilds();
   const voice = useVoice();
+  const dialog = useGuildoraDialog();
   const { guildId, channelId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -336,7 +338,11 @@ export default function AppPage() {
   }
 
   async function handleQuickDeleteChannel(channel) {
-    if (!window.confirm(`Channel „${channel.name}“ dauerhaft löschen?`)) return;
+    if (!await dialog.confirm({
+      title: 'Channel löschen?',
+      message: `Der Channel „${channel.name}“ wird dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.`,
+      confirmLabel: 'Channel löschen'
+    })) return;
     try {
       if (voice.channel?.id === channel.id) await voice.leave();
       await api.deleteChannel(guildId, channel.id);
@@ -352,7 +358,11 @@ export default function AppPage() {
   }
 
   async function handleQuickDeleteCategory(category) {
-    if (!window.confirm(`Kategorie „${category.name}“ löschen? Die enthaltenen Channels bleiben erhalten.`)) return;
+    if (!await dialog.confirm({
+      title: 'Kategorie löschen?',
+      message: `Die Kategorie „${category.name}“ wird gelöscht. Die enthaltenen Channels bleiben erhalten.`,
+      confirmLabel: 'Kategorie löschen'
+    })) return;
     try {
       await api.deleteCategory(guildId, category.id);
       await refreshGuildData();

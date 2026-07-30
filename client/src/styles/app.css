@@ -2635,6 +2635,124 @@ html.is-desktop .modal-overlay {
   background: var(--bg-sidebar);
 }
 
+.app-modal--guildora-dialog {
+  width: min(100%, 460px);
+  padding: 28px 30px 0;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 7%);
+}
+
+.app-modal--guildora-dialog > h2 {
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.guildora-dialog {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  column-gap: 14px;
+}
+
+.guildora-dialog__icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  grid-row: 1 / span 2;
+  border-radius: 14px;
+  color: var(--brand-light);
+  background: color-mix(in srgb, var(--brand) 18%, transparent);
+  place-items: center;
+}
+
+.guildora-dialog__icon--danger {
+  color: #ff8b8b;
+  background: rgb(237 66 69 / 16%);
+}
+
+.guildora-dialog > p {
+  align-self: center;
+  margin: 0;
+  color: var(--channel-hover);
+  line-height: 1.55;
+}
+
+.guildora-dialog__field {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.guildora-dialog__field > span {
+  color: var(--channel-hover);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.guildora-dialog__field input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--divider);
+  border-radius: 7px;
+  outline: 0;
+  color: var(--text-primary);
+  background: var(--bg-input);
+}
+
+.guildora-dialog__field input:focus {
+  border-color: var(--brand-light);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 22%, transparent);
+}
+
+.guildora-dialog__field small {
+  color: #ff9b9d;
+}
+
+.guildora-dialog__actions {
+  display: flex;
+  width: calc(100% + 60px);
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  gap: 9px;
+  margin: 24px -30px 0;
+  padding: 16px 30px;
+  background: var(--bg-sidebar);
+}
+
+.guildora-dialog__danger.button--primary {
+  background: var(--danger);
+}
+
+.guildora-dialog__danger.button--primary:hover:not(:disabled) {
+  background: #c93f42;
+}
+
+@media (max-width: 520px) {
+  .app-modal--guildora-dialog {
+    padding-inline: 22px;
+  }
+
+  .guildora-dialog {
+    grid-template-columns: 38px 1fr;
+    column-gap: 12px;
+  }
+
+  .guildora-dialog__icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+  }
+
+  .guildora-dialog__actions {
+    width: calc(100% + 44px);
+    margin-inline: -22px;
+    padding-inline: 22px;
+  }
+}
+
 .settings-layout {
   display: grid;
   grid-template-columns: 150px 1fr;

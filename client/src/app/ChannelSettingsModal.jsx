@@ -2,6 +2,7 @@ import { Hash, Lock, Save, Trash2, Volume2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { ChannelPermissionEditor } from './ServerSettingsModal.jsx';
+import { useGuildoraDialog } from '../context/GuildoraDialogContext.jsx';
 
 export default function ChannelSettingsModal({
   guildData,
@@ -11,6 +12,7 @@ export default function ChannelSettingsModal({
   onToast,
   onDeleted
 }) {
+  const dialog = useGuildoraDialog();
   const [tab, setTab] = useState('overview');
   const [closing, setClosing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -62,7 +64,11 @@ export default function ChannelSettingsModal({
   }
 
   async function deleteChannel() {
-    if (busy || !window.confirm(`Channel „${channel.name}“ dauerhaft löschen?`)) return;
+    if (busy || !await dialog.confirm({
+      title: 'Channel löschen?',
+      message: `Der Channel „${channel.name}“ wird dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.`,
+      confirmLabel: 'Channel löschen'
+    })) return;
     setBusy(true);
     try {
       await api.deleteChannel(guildData.guild.id, channel.id);

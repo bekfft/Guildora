@@ -13,6 +13,7 @@ import DesktopTitlebar from './components/DesktopTitlebar.jsx';
 import DesktopToasts from './components/DesktopToasts.jsx';
 import { DesktopProvider, useDesktop } from './context/DesktopContext.jsx';
 import { VoiceProvider } from './context/VoiceContext.jsx';
+import { GuildoraDialogProvider } from './context/GuildoraDialogContext.jsx';
 
 function HomeRoute() {
   const desktop = useDesktop();
@@ -39,7 +40,8 @@ export default function App() {
         <DesktopTitlebar />
         <DesktopToasts />
         <AuthProvider>
-          <Routes>
+          <GuildoraDialogProvider>
+            <Routes>
           <Route path="/" element={<HomeRoute />} />
           <Route path="/download" element={<WebDownloadRoute />} />
           <Route path="/login" element={<LoginPage />} />
@@ -59,7 +61,8 @@ export default function App() {
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+            </Routes>
+          </GuildoraDialogProvider>
         </AuthProvider>
       </DesktopProvider>
     </BrowserRouter>
