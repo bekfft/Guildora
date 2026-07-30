@@ -1,7 +1,7 @@
 import { X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export default function Modal({ title, children, onClose, labelledBy = 'modal-title' }) {
+export default function Modal({ title, children, onClose, labelledBy = 'modal-title', className = '' }) {
   const dialogRef = useRef(null);
   const closeTimerRef = useRef(null);
   const closingRef = useRef(false);
@@ -46,7 +46,7 @@ export default function Modal({ title, children, onClose, labelledBy = 'modal-ti
 
   return (
     <div className={`modal-overlay ${closing ? 'is-closing' : ''}`} onMouseDown={(event) => event.target === event.currentTarget && requestClose()}>
-      <section className="app-modal" role="dialog" aria-modal="true" aria-labelledby={labelledBy} ref={dialogRef}>
+      <section className={`app-modal ${className}`.trim()} role="dialog" aria-modal="true" aria-labelledby={labelledBy} ref={dialogRef}>
         <button className="icon-button app-modal__close" type="button" onClick={requestClose} aria-label="Dialog schließen"><X size={21} /></button>
         <h2 id={labelledBy}>{title}</h2>
         {children}

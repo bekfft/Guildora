@@ -4,8 +4,12 @@ import {
   Eye,
   EyeOff,
   ImagePlus,
+  Info,
   LoaderCircle,
   LogOut,
+  Palette,
+  UserPen,
+  UserRound,
   Trash2
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -16,7 +20,11 @@ import { useDesktop } from '../context/DesktopContext.jsx';
 import { api } from '../lib/api.js';
 import Modal from './Modal.jsx';
 
-const TABS = ['Mein Konto', 'Profil', 'Erscheinungsbild'];
+const TABS = [
+  { id: 'Mein Konto', label: 'Mein Konto', icon: UserRound },
+  { id: 'Profil', label: 'Profile', icon: UserPen },
+  { id: 'Erscheinungsbild', label: 'Erscheinungsbild', icon: Palette }
+];
 
 function moveItem(items, index, direction) {
   const target = index + direction;
@@ -149,7 +157,9 @@ export default function SettingsModal({ onClose, onToast, initialTab = 'Mein Kon
   const { user, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
   const desktop = useDesktop();
-  const tabs = desktop?.isDesktop ? [...TABS, 'Über'] : TABS;
+  const tabs = desktop?.isDesktop
+    ? [...TABS, { id: 'Über', label: 'Über Guildora', icon: Info }]
+    : TABS;
 
   function updateStatus() {
     const state = desktop.update;
@@ -168,26 +178,67 @@ export default function SettingsModal({ onClose, onToast, initialTab = 'Mein Kon
   }
 
   return (
-    <Modal title="Einstellungen" onClose={onClose}>
+    <Modal title="Einstellungen" className="app-modal--settings" onClose={onClose}>
       <div className="settings-layout">
-        <nav aria-label="Einstellungsbereiche">{tabs.map((item) => <button className={tab === item ? 'is-active' : ''} type="button" onClick={() => setTab(item)} key={item}>{item}</button>)}</nav>
-        <div className="settings-content">
-          <h3>{tab}</h3>
-          {tab === 'Mein Konto' && <div className="account-card"><div>{user.avatar_url ? <img src={user.avatar_url} alt="" /> : user.username[0].toUpperCase()}</div><span><strong>{user.display_name || user.username}</strong><small>@{user.username}</small><small>{user.email}</small></span></div>}
-          {tab === 'Profil' && <ProfileSettings user={user} refreshUser={refreshUser} onToast={onToast} />}
-          {tab === 'Erscheinungsbild' && <p>Guildora verwendet aktuell das optimierte dunkle Erscheinungsbild.</p>}
-          {tab === 'Über' && desktop?.isDesktop && (
-            <div className="desktop-about">
-              <p><strong>Guildora Desktop</strong><span>Version {desktop.version}</span></p>
-              <Button variant="primary" onClick={desktop.checkForUpdates}>Nach Updates suchen</Button>
-              <small>{updateStatus()}</small>
-              {desktop.update.type === 'progress' && <div className="desktop-about__progress"><span style={{ width: `${desktop.update.percent}%` }} /></div>}
-              <label><input type="checkbox" checked={Boolean(desktop.settings?.autostart)} onChange={(event) => desktop.setSettings({ autostart: event.target.checked })} /> Guildora beim Anmelden starten</label>
-              <label><input type="checkbox" checked={desktop.settings?.minimizeToTray !== false} onChange={(event) => desktop.setSettings({ minimizeToTray: event.target.checked })} /> Beim Schließen in den Infobereich minimieren</label>
-            </div>
-          )}
-          {tab !== 'Über' && <Button variant="ghost" className="logout-action" onClick={handleLogout}><LogOut size={18} /> Abmelden</Button>}
-        </div>
+        <aside className="settings-sidebar">
+          <button className="settings-user-summary" type="button" onClick={() => setTab('Profil')}>
+            <span>{user.avatar_url ? <img src={user.avatar_url} alt="" /> : user.username[0].toUpperCase()}</span>
+            <span><strong>{user.display_name || user.username}</strong><small>Profil bearbeiten</small></span>
+          </button>
+          <span className="settings-nav-label">Benutzereinstellungen</span>
+          <nav aria-label="Einstellungsbereiche">
+            {tabs.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button className={tab === item.id ? 'is-active' : ''} type="button" onClick={() => setTab(item.id)} key={item.id}>
+                  <Icon size={18} /><span>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+          <button className="settings-sidebar__logout" type="button" onClick={handleLogout}><LogOut size={18} /> Abmelden</button>
+        </aside>
+        <main className="settings-content">
+          <div className="settings-content__inner">
+            <header className="settings-content__header">
+              <span>Benutzereinstellungen</span>
+              <h3>{tabs.find((item) => item.id === tab)?.label || tab}</h3>
+            </header>
+            {tab === 'Mein Konto' && (
+              <>
+                <div className="account-card">
+                  <div>{user.avatar_url ? <img src={user.avatar_url} alt="" /> : user.username[0].toUpperCase()}</div>
+                  <span><strong>{user.display_name || user.username}</strong><small>@{user.username}</small></span>
+                  <Button variant="primary" onClick={() => setTab('Profil')}>Profil bearbeiten</Button>
+                </div>
+                <section className="account-info-panel">
+                  <h4>Account-Info</h4>
+                  <div><span><small>Anzeigename</small><strong>{user.display_name || user.username}</strong></span><button type="button" onClick={() => setTab('Profil')}>Bearbeiten</button></div>
+                  <div><span><small>Benutzername</small><strong>@{user.username}</strong></span></div>
+                  <div><span><small>E-Mail-Adresse</small><strong>{user.email}</strong></span></div>
+                </section>
+              </>
+            )}
+            {tab === 'Profil' && <ProfileSettings user={user} refreshUser={refreshUser} onToast={onToast} />}
+            {tab === 'Erscheinungsbild' && (
+              <section className="settings-large-panel">
+                <h4>Dunkles Erscheinungsbild</h4>
+                <p>Guildora verwendet das optimierte dunkle Design für eine ruhige und kontrastreiche Darstellung.</p>
+                <div className="appearance-preview"><span /><span /><span /></div>
+              </section>
+            )}
+            {tab === 'Über' && desktop?.isDesktop && (
+              <div className="desktop-about settings-large-panel">
+                <p><strong>Guildora Desktop</strong><span>Version {desktop.version}</span></p>
+                <Button variant="primary" onClick={desktop.checkForUpdates}>Nach Updates suchen</Button>
+                <small>{updateStatus()}</small>
+                {desktop.update.type === 'progress' && <div className="desktop-about__progress"><span style={{ width: `${desktop.update.percent}%` }} /></div>}
+                <label><input type="checkbox" checked={Boolean(desktop.settings?.autostart)} onChange={(event) => desktop.setSettings({ autostart: event.target.checked })} /> Guildora beim Anmelden starten</label>
+                <label><input type="checkbox" checked={desktop.settings?.minimizeToTray !== false} onChange={(event) => desktop.setSettings({ minimizeToTray: event.target.checked })} /> Beim Schließen in den Infobereich minimieren</label>
+              </div>
+            )}
+          </div>
+        </main>
       </div>
     </Modal>
   );
