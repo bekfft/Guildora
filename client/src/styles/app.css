@@ -1,6 +1,10 @@
 .guildora-app {
   position: fixed;
-  inset: var(--titlebar-height) 0 0;
+  inset:
+    calc(var(--titlebar-height) + var(--safe-area-top))
+    var(--safe-area-right)
+    var(--safe-area-bottom)
+    var(--safe-area-left);
   display: grid;
   grid-template-columns: 312px minmax(0, 1fr) 240px;
   overflow: hidden;
@@ -3012,10 +3016,11 @@ html.is-desktop .modal-overlay {
   .app-navigation {
     position: fixed;
     z-index: 80;
-    top: 0;
-    bottom: 0;
-    left: 0;
+    top: calc(var(--titlebar-height) + var(--safe-area-top));
+    bottom: var(--safe-area-bottom);
+    left: var(--safe-area-left);
     width: 312px;
+    height: auto;
     box-shadow: 12px 0 35px rgb(0 0 0 / 35%);
     transform: translateX(-105%);
     transition: transform 180ms ease-out;
@@ -3032,7 +3037,11 @@ html.is-desktop .modal-overlay {
   .drawer-backdrop {
     position: fixed;
     z-index: 70;
-    inset: 0;
+    inset:
+      calc(var(--titlebar-height) + var(--safe-area-top))
+      var(--safe-area-right)
+      var(--safe-area-bottom)
+      var(--safe-area-left);
     display: block;
     border: 0;
     opacity: 0;
@@ -6042,7 +6051,11 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
   .member-backdrop {
     position: fixed;
     z-index: 84;
-    inset: var(--titlebar-height) 0 0;
+    inset:
+      calc(var(--titlebar-height) + var(--safe-area-top))
+      var(--safe-area-right)
+      var(--safe-area-bottom)
+      var(--safe-area-left);
     display: block;
     border: 0;
     background: rgb(0 0 0 / 58%);
@@ -6052,12 +6065,13 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
   .member-list {
     position: fixed;
     z-index: 90;
-    top: var(--titlebar-height);
-    right: 0;
+    top: calc(var(--titlebar-height) + var(--safe-area-top));
+    right: var(--safe-area-right);
+    bottom: var(--safe-area-bottom);
     display: block;
     width: min(340px, calc(100vw - 42px));
-    height: calc(100dvh - var(--titlebar-height));
-    padding: 0 8px max(18px, env(safe-area-inset-bottom));
+    height: auto;
+    padding: 0 8px 18px;
     box-shadow: -16px 0 42px rgb(0 0 0 / 42%);
     animation: mobile-members-in 180ms ease-out both;
   }
@@ -6093,7 +6107,7 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
 
 @media (max-width: 768px) {
   .guildora-app {
-    height: calc(100dvh - var(--titlebar-height));
+    height: auto;
   }
 
   .app-navigation {

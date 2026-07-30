@@ -42,11 +42,26 @@
   --offline: #80848e;
   --titlebar-height: 0px;
   --content-viewport-height: 100dvh;
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
 }
 
 html.is-desktop {
   --titlebar-height: 30px;
   --content-viewport-height: calc(100dvh - var(--titlebar-height));
+  --safe-area-top: 0px;
+  --safe-area-right: 0px;
+  --safe-area-bottom: 0px;
+  --safe-area-left: 0px;
+}
+
+html[data-standalone-preview] {
+  --safe-area-top: 47px;
+  --safe-area-right: 0px;
+  --safe-area-bottom: 34px;
+  --safe-area-left: 0px;
 }
 
 html[data-theme="light"] {

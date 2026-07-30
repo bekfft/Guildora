@@ -1,0 +1,37 @@
+{
+  "id": "/app",
+  "name": "Guildora",
+  "short_name": "Guildora",
+  "description": "Guildora bringt Freundeskreise und Communities an einen gemeinsamen Ort.",
+  "lang": "de-DE",
+  "dir": "ltr",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "standalone"
+  ],
+  "orientation": "any",
+  "background_color": "#1e1f22",
+  "theme_color": "#1e1f22",
+  "icons": [
+    {
+      "src": "/icons/guildora-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/guildora-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/guildora-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
