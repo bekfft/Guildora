@@ -181,7 +181,7 @@ test('Login verrät keine Details und akzeptiert E-Mail oder Benutzername', asyn
   assert.equal((await wrong.json()).error.code, 'INVALID_CREDENTIALS');
 
   const correct = await request('/api/auth/login', {
-    body: { identifier: 'MIRA.TEST', password: 'SicheresPasswort42' }
+    body: { identifier: 'MIRA.TEST', password: 'SicheresPasswort42', totpCode: '' }
   });
   assert.equal(correct.status, 200);
   authCookie = cookiesFrom(correct);

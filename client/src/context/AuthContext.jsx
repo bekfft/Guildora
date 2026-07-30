@@ -3,15 +3,60 @@ import { api } from '../lib/api.js';
 
 const AuthContext = createContext(null);
 
+const DEFAULT_SETTINGS = Object.freeze({
+  friend_requests: 'everyone',
+  direct_messages: 'friends',
+  content_filter: 'non_friends',
+  desktop_notifications: true,
+  notification_sounds: true,
+  notify_mentions: true,
+  notify_direct_messages: true,
+  notify_friend_requests: true,
+  quiet_hours_start: null,
+  quiet_hours_end: null,
+  theme: 'dark',
+  accent_color: '#7c5cff',
+  message_density: 'cozy',
+  font_scale: 100,
+  app_zoom: 100,
+  reduce_motion: false,
+  high_contrast: false,
+  color_vision: 'none',
+  screen_reader: false,
+  captions: false,
+  language: 'de',
+  date_format: 'de-DE',
+  time_format: '24h',
+  timezone: 'Europe/Berlin',
+  spellcheck: true,
+  voice_input_device: null,
+  voice_output_device: null,
+  voice_camera_device: null,
+  voice_input_mode: 'voice_activity',
+  voice_sensitivity: 50,
+  voice_noise_suppression: true,
+  voice_echo_cancellation: true,
+  voice_auto_gain: true,
+  push_to_talk_key: 'Space'
+});
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState(null);
 
   const loadSettings = useCallback(async () => {
-    const result = await api.accountSettings();
-    setSettings(result.settings);
-    return result.settings;
+    try {
+      const result = await api.accountSettings();
+      setSettings(result.settings);
+      return result.settings;
+    } catch (error) {
+      // Kontoeinstellungen sind ergänzend. Ein Ausfall dieses Endpunkts darf
+      // eine gültige Anmeldung oder Sitzungswiederherstellung nie blockieren.
+      console.warn('Kontoeinstellungen konnten nicht geladen werden.', error);
+      setSettings(DEFAULT_SETTINGS);
+      return DEFAULT_SETTINGS;
+    }
   }, []);
 
   const restoreSession = useCallback(async () => {
