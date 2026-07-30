@@ -192,17 +192,43 @@ export async function getGuildMembers(req, res) {
      ORDER BY r.position DESC`,
     [guild.id]
   );
+  const userIds = members.map((member) => member.user_id);
+  const badgeRows = userIds.length ? await db.all(
+    `SELECT ub.user_id, ub.awarded_at, b.id, b.slug, b.name, b.description,
+            b.icon, b.color_start, b.color_end
+     FROM user_badges ub
+     JOIN profile_badges b ON b.id = ub.badge_id
+     WHERE ub.user_id IN (${userIds.map(() => '?').join(', ')})
+     ORDER BY ub.display_order ASC, b.sort_order ASC, ub.awarded_at ASC`,
+    userIds
+  ) : [];
   const rolesByMember = new Map();
   for (const role of roleRows) {
     const list = rolesByMember.get(role.member_id) || [];
     list.push(roleResponse(role));
     rolesByMember.set(role.member_id, list);
   }
+  const badgesByUser = new Map();
+  for (const badge of badgeRows) {
+    const list = badgesByUser.get(badge.user_id) || [];
+    list.push({
+      id: badge.id,
+      slug: badge.slug,
+      name: badge.name,
+      description: badge.description,
+      icon: badge.icon,
+      color_start: badge.color_start,
+      color_end: badge.color_end,
+      awarded_at: badge.awarded_at
+    });
+    badgesByUser.set(badge.user_id, list);
+  }
   return res.json({
     members: members.map((member) => ({
       ...member,
       is_owner: member.user_id === guild.owner_id,
       roles: rolesByMember.get(member.id) || [],
+      badges: badgesByUser.get(member.user_id) || [],
       status: isUserOnline(member.user_id) ? 'online' : 'offline'
     }))
   });

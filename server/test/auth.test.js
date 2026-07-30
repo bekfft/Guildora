@@ -348,7 +348,9 @@ test('Serververwaltung ändert Profil, Kategorien, Channels, Rollen und Mitglied
   assert.equal(roleBody.role.permissions.manageChannels, true);
 
   const membersResponse = await request(`/api/guilds/${createdGuildId}/members`, { cookie: authCookie });
-  const ownerMember = (await membersResponse.json()).members.find((member) => member.user_id === registeredUserId);
+  const membersBody = await membersResponse.json();
+  const ownerMember = membersBody.members.find((member) => member.user_id === registeredUserId);
+  assert.deepEqual(ownerMember.badges, []);
   const assigned = await request(`/api/guilds/${createdGuildId}/members/${ownerMember.id}/roles`, {
     method: 'PUT',
     cookie: authCookie,

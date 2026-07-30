@@ -115,6 +115,14 @@ test('Migrationen laufen nur einmal und erhalten Server-, Rollen- und Channel-Zu
     [channelId, roleId]
   );
   const migrationCount = await db.get('SELECT COUNT(*) AS count FROM schema_migrations');
+  const bekfftBadges = await db.all(
+    `SELECT b.slug
+     FROM user_badges ub
+     JOIN profile_badges b ON b.id = ub.badge_id
+     WHERE ub.user_id = ?
+     ORDER BY ub.display_order`,
+    [ownerId]
+  );
 
   assert.deepEqual({ ...guild }, {
     name: 'Meine Guildora-Konfiguration',
@@ -140,7 +148,15 @@ test('Migrationen laufen nur einmal und erhalten Server-, Rollen- und Channel-Zu
     attach_files: 1,
     manage_messages: 1
   });
-  assert.equal(migrationCount.count, 11);
+  assert.equal(migrationCount.count, 12);
+  assert.deepEqual(bekfftBadges.map((badge) => badge.slug), [
+    'guildora-team',
+    'founding-member',
+    'supporter',
+    'bug-hunter',
+    'community-helper',
+    'verified-creator'
+  ]);
   const backups = fs.readdirSync(path.join(temporaryDirectory, 'backups'));
   assert.equal(backups.length, 2);
   assert.ok(backups.some((backup) => /^guildora-before-migration-baseline-.+\.sqlite$/.test(backup)));

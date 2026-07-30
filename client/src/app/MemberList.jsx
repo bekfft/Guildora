@@ -1,9 +1,36 @@
-import { Check, Plus, Search, ShieldCheck, Users, X } from 'lucide-react';
+import {
+  BadgeCheck,
+  Bug,
+  Check,
+  Crown,
+  Gem,
+  Handshake,
+  Heart,
+  Plus,
+  Search,
+  ShieldCheck,
+  Users,
+  X
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api.js';
 
 function memberName(member) {
   return member.nickname || member.display_name || member.username;
+}
+
+const BADGE_ICONS = {
+  'badge-check': BadgeCheck,
+  bug: Bug,
+  crown: Crown,
+  gem: Gem,
+  handshake: Handshake,
+  heart: Heart
+};
+
+function BadgeIcon({ name }) {
+  const Icon = BADGE_ICONS[name] || ShieldCheck;
+  return <Icon aria-hidden="true" size={17} strokeWidth={2.25} />;
 }
 
 export default function MemberList({
@@ -21,7 +48,10 @@ export default function MemberList({
   const [roleBusy, setRoleBusy] = useState(null);
   const [rolePickerOpen, setRolePickerOpen] = useState(false);
   const [roleQuery, setRoleQuery] = useState('');
+  const [activeBadgeId, setActiveBadgeId] = useState(null);
   const selected = members.find((member) => member.id === selectedId) || null;
+  const selectedBadges = selected?.badges?.slice(0, 6) || [];
+  const activeBadge = selectedBadges.find((badge) => badge.id === activeBadgeId) || null;
   const customRoles = roles.filter((role) => !role.is_default);
   const filteredRoles = customRoles.filter((role) => role.name.toLowerCase().includes(roleQuery.trim().toLowerCase()));
 
@@ -29,6 +59,7 @@ export default function MemberList({
     if (!selected || closing) return;
     setRolePickerOpen(false);
     setRoleQuery('');
+    setActiveBadgeId(null);
     setClosing(true);
     const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 160;
     window.setTimeout(() => {
@@ -54,6 +85,7 @@ export default function MemberList({
   useEffect(() => {
     setRolePickerOpen(false);
     setRoleQuery('');
+    setActiveBadgeId(null);
   }, [selectedId]);
 
   const groups = useMemo(() => {
@@ -114,6 +146,49 @@ export default function MemberList({
           <div className="profile-popover__avatar">{memberName(selected)[0].toUpperCase()}</div>
           <h3>{memberName(selected)}</h3>
           <p>@{selected.username}</p>
+          {selectedBadges.length > 0 && (
+            <section className="profile-badges" aria-label="Globale Profilabzeichen">
+              <header>
+                <strong>PROFILABZEICHEN</strong>
+                <span>{selectedBadges.length}</span>
+              </header>
+              <div className="profile-badges__row">
+                {selectedBadges.map((badge) => (
+                  <button
+                    type="button"
+                    className={activeBadgeId === badge.id ? 'is-active' : ''}
+                    style={{
+                      '--badge-start': badge.color_start,
+                      '--badge-end': badge.color_end
+                    }}
+                    aria-label={`${badge.name}: ${badge.description}`}
+                    aria-pressed={activeBadgeId === badge.id}
+                    title={badge.name}
+                    onClick={() => setActiveBadgeId((current) => current === badge.id ? null : badge.id)}
+                    key={badge.id}
+                  >
+                    <BadgeIcon name={badge.icon} />
+                  </button>
+                ))}
+              </div>
+              {activeBadge && (
+                <div className="profile-badge-detail" aria-live="polite">
+                  <span
+                    style={{
+                      '--badge-start': activeBadge.color_start,
+                      '--badge-end': activeBadge.color_end
+                    }}
+                  >
+                    <BadgeIcon name={activeBadge.icon} />
+                  </span>
+                  <div>
+                    <strong>{activeBadge.name}</strong>
+                    <p>{activeBadge.description}</p>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
           <div className="profile-popover__section">
             <strong>Mitglied seit</strong>
             <span>{new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium' }).format(new Date(selected.joined_at))}</span>
