@@ -8,6 +8,22 @@ html {
   scroll-behavior: smooth;
 }
 
+html.reduce-motion {
+  scroll-behavior: auto;
+}
+
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+html.high-contrast {
+  filter: contrast(1.16);
+}
+
 body {
   margin: 0;
   min-width: 320px;

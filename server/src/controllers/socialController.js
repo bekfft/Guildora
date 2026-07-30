@@ -42,6 +42,30 @@ async function notifySocial(userIds) {
   emitToUsers(userIds, 'social:refresh', {});
 }
 
+async function shareGuild(first, second) {
+  const row = await db.get(
+    `SELECT 1 AS value FROM guild_members first
+     JOIN guild_members second ON second.guild_id = first.guild_id
+     WHERE first.user_id = ? AND second.user_id = ? LIMIT 1`,
+    [first, second]
+  );
+  return Boolean(row);
+}
+
+async function setting(userId, field, fallback) {
+  const row = await db.get(`SELECT ${field} AS value FROM user_settings WHERE user_id = ?`, [userId]);
+  return row?.value || fallback;
+}
+
+async function canDirectMessage(senderId, recipientId) {
+  const preference = await setting(recipientId, 'direct_messages', 'friends');
+  if (preference === 'none') return false;
+  if (preference === 'everyone') return true;
+  if (preference === 'shared_servers') return shareGuild(senderId, recipientId);
+  const relationship = await relationshipBetween(senderId, recipientId);
+  return relationship?.status === 'accepted';
+}
+
 export async function searchUsers(req, res) {
   const { q } = userSearchSchema.parse(req.query);
   const term = `%${q.toLowerCase()}%`;
@@ -102,6 +126,10 @@ export async function createFriendRequest(req, res) {
       return res.json({ accepted: true });
     }
     throw new ApiError(409, 'REQUEST_EXISTS', 'Die Freundschaftsanfrage ist bereits offen.');
+  }
+  const preference = await setting(target.id, 'friend_requests', 'everyone');
+  if (preference === 'none' || (preference === 'shared_servers' && !(await shareGuild(req.userId, target.id)))) {
+    throw new ApiError(403, 'FRIEND_REQUESTS_DISABLED', 'Dieser Nutzer nimmt von dir keine Freundschaftsanfragen an.');
   }
   const id = crypto.randomUUID();
   await db.run(
@@ -249,8 +277,8 @@ export async function listConversations(req, res) {
 export async function createConversation(req, res) {
   const targetId = req.params.userId;
   const relationship = await relationshipBetween(req.userId, targetId);
-  if (!relationship || relationship.status !== 'accepted') {
-    throw new ApiError(403, 'NOT_FRIENDS', 'Direktnachrichten sind nur zwischen Freunden möglich.');
+  if (relationship?.status === 'blocked' || !(await canDirectMessage(req.userId, targetId))) {
+    throw new ApiError(403, 'DM_PRIVACY', 'Die Datenschutzeinstellungen dieses Nutzers erlauben keine Direktnachricht.');
   }
   const existing = await db.get(
     `SELECT first.conversation_id AS id FROM dm_members first
@@ -293,8 +321,8 @@ export async function createDmMessage(req, res) {
   const participants = await dmParticipants(req.params.id);
   const other = participants.find((participant) => participant.id !== req.userId);
   const friendship = other && await relationshipBetween(req.userId, other.id);
-  if (!friendship || friendship.status !== 'accepted') {
-    throw new ApiError(403, 'NOT_FRIENDS', 'Direktnachrichten sind nur zwischen Freunden möglich.');
+  if (friendship?.status === 'blocked' || !other || !(await canDirectMessage(req.userId, other.id))) {
+    throw new ApiError(403, 'DM_PRIVACY', 'Die Datenschutzeinstellungen dieses Nutzers erlauben keine Direktnachricht.');
   }
   const attachments = data.attachmentIds.length ? await db.all(
     `SELECT id FROM attachments WHERE owner_id = ? AND message_id IS NULL AND dm_message_id IS NULL

@@ -8,6 +8,7 @@ import {
   useState
 } from 'react';
 import { api } from '../lib/api.js';
+import { useAuth } from './AuthContext.jsx';
 
 const VoiceContext = createContext(null);
 let liveKitModulePromise;
@@ -70,6 +71,7 @@ function deviceView(device, index, type) {
 }
 
 export function VoiceProvider({ children }) {
+  const { settings } = useAuth();
   const roomRef = useRef(null);
   const participantListenerCleanupRef = useRef(() => {});
   const participantSyncTimerRef = useRef(null);
@@ -87,8 +89,8 @@ export function VoiceProvider({ children }) {
   const [deafened, setDeafened] = useState(deafenedRef.current);
   const [inputs, setInputs] = useState([]);
   const [outputs, setOutputs] = useState([]);
-  const [inputDeviceId, setInputDeviceId] = useState(storedValue('guildora:voice-input'));
-  const [outputDeviceId, setOutputDeviceId] = useState(storedValue('guildora:voice-output'));
+  const [inputDeviceId, setInputDeviceId] = useState(settings?.voice_input_device || storedValue('guildora:voice-input'));
+  const [outputDeviceId, setOutputDeviceId] = useState(settings?.voice_output_device || storedValue('guildora:voice-output'));
   const [needsAudioStart, setNeedsAudioStart] = useState(false);
   const [lastError, setLastError] = useState('');
   const [cameraEnabled, setCameraEnabled] = useState(false);
@@ -246,9 +248,13 @@ export function VoiceProvider({ children }) {
       reconnectPolicy: new DefaultReconnectPolicy([0, 500, 1000, 2000, 5000, 10_000, 15_000, 30_000]),
       disconnectOnPageLeave: true,
       audioCaptureDefaults: {
-        autoGainControl: true,
-        echoCancellation: true,
-        noiseSuppression: true
+        autoGainControl: settings?.voice_auto_gain !== false,
+        echoCancellation: settings?.voice_echo_cancellation !== false,
+        noiseSuppression: settings?.voice_noise_suppression !== false,
+        deviceId: inputDeviceId || undefined
+      },
+      videoCaptureDefaults: {
+        deviceId: settings?.voice_camera_device || undefined
       }
     });
     roomRef.current = room;
@@ -370,7 +376,9 @@ export function VoiceProvider({ children }) {
         }
       }
       try {
-        await room.localParticipant.setMicrophoneEnabled(!mutedRef.current && !deafenedRef.current);
+        await room.localParticipant.setMicrophoneEnabled(
+          settings?.voice_input_mode !== 'push_to_talk' && !mutedRef.current && !deafenedRef.current
+        );
       } catch {
         mutedRef.current = true;
         setMuted(true);
@@ -409,7 +417,8 @@ export function VoiceProvider({ children }) {
     outputDeviceId,
     refreshDevices,
     refreshParticipants,
-    startParticipantSync
+    startParticipantSync,
+    settings
   ]);
 
   const toggleMuted = useCallback(async () => {
@@ -516,6 +525,34 @@ export function VoiceProvider({ children }) {
       }
     }
   }, [attachAudioTrack, detachAudioTrack, screenShareEnabled]);
+
+  useEffect(() => {
+    if (!settings) return;
+    if (settings.voice_input_device !== undefined) setInputDeviceId(settings.voice_input_device || '');
+    if (settings.voice_output_device !== undefined) setOutputDeviceId(settings.voice_output_device || '');
+  }, [settings?.voice_input_device, settings?.voice_output_device]);
+
+  useEffect(() => {
+    if (settings?.voice_input_mode !== 'push_to_talk') return undefined;
+    const expected = settings.push_to_talk_key || 'Space';
+    const matches = (event) => event.code === expected || event.key === expected;
+    const down = (event) => {
+      if (!matches(event) || event.repeat || deafenedRef.current || mutedRef.current) return;
+      event.preventDefault();
+      void roomRef.current?.localParticipant.setMicrophoneEnabled(true);
+    };
+    const up = (event) => {
+      if (!matches(event)) return;
+      event.preventDefault();
+      void roomRef.current?.localParticipant.setMicrophoneEnabled(false);
+    };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+    };
+  }, [settings?.push_to_talk_key, settings?.voice_input_mode]);
 
   useEffect(() => {
     const syncParticipants = () => {

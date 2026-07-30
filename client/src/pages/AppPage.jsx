@@ -25,8 +25,19 @@ import { api } from '../lib/api.js';
 import { socket } from '../lib/socket.js';
 import '../styles/app.css';
 
+function inQuietHours(settings) {
+  if (!settings?.quiet_hours_start || !settings?.quiet_hours_end) return false;
+  const now = new Date();
+  const current = now.getHours() * 60 + now.getMinutes();
+  const [startHour, startMinute] = settings.quiet_hours_start.split(':').map(Number);
+  const [endHour, endMinute] = settings.quiet_hours_end.split(':').map(Number);
+  const start = startHour * 60 + startMinute;
+  const end = endHour * 60 + endMinute;
+  return start <= end ? current >= start && current < end : current >= start || current < end;
+}
+
 export default function AppPage() {
-  const { user } = useAuth();
+  const { user, settings } = useAuth();
   const { guilds, loading: guildsLoading, leaveGuild, refreshGuilds } = useGuilds();
   const voice = useVoice();
   const { guildId, channelId } = useParams();
@@ -131,7 +142,7 @@ export default function AppPage() {
       refresh();
       if (conversationId === channelId && isDirect) return;
       showToast(`${message.author.display_name || message.author.username} hat dir geschrieben.`, 'info');
-      if (localStorage.getItem('guildora:desktop-notifications') === 'enabled' && 'Notification' in window && Notification.permission === 'granted') {
+      if (settings?.desktop_notifications && settings?.notify_direct_messages && !inQuietHours(settings) && 'Notification' in window && Notification.permission === 'granted') {
         new Notification('Neue Direktnachricht', { body: `${message.author.display_name || message.author.username}: ${message.content || 'Anhang'}` });
       }
     };
@@ -143,7 +154,7 @@ export default function AppPage() {
       socket.off('social:refresh', refresh);
       socket.off('dm:notification', notifyDm);
     };
-  }, [channelId, isDirect, refreshConversations, showToast]);
+  }, [channelId, isDirect, refreshConversations, settings, showToast]);
 
   useEffect(() => {
     if (location.pathname === '/app') navigate('/app/channels/@me', { replace: true });
@@ -192,7 +203,9 @@ export default function AppPage() {
         'info'
       );
       if (
-        localStorage.getItem('guildora:desktop-notifications') === 'enabled'
+        settings?.desktop_notifications
+        && (notification.type !== 'mention' || settings?.notify_mentions)
+        && !inQuietHours(settings)
         && 'Notification' in window
         && Notification.permission === 'granted'
       ) {
@@ -217,7 +230,7 @@ export default function AppPage() {
       socket.off('notification:create', onNotification);
       socket.off('unread:refresh', onUnreadRefresh);
     };
-  }, [guildId, refreshGuilds, showToast]);
+  }, [guildId, refreshGuilds, settings, showToast]);
 
   useEffect(() => {
     const onGuildRefresh = ({ guildId: changedGuildId }) => {

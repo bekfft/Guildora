@@ -32,5 +32,6 @@ export const registerSchema = z.object({
 
 export const loginSchema = z.object({
   identifier: z.string({ required_error: 'Bitte gib deine E-Mail oder deinen Benutzernamen ein.' }).trim().min(1),
-  password: z.string({ required_error: 'Bitte gib dein Passwort ein.' }).min(1)
+  password: z.string({ required_error: 'Bitte gib dein Passwort ein.' }).min(1),
+  totpCode: z.string().trim().regex(/^\d{6}$/).optional()
 });

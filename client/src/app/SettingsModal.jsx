@@ -1,4 +1,7 @@
 import {
+  Accessibility,
+  Bell,
+  Cable,
   ChevronDown,
   ChevronUp,
   Eye,
@@ -6,7 +9,10 @@ import {
   ImagePlus,
   Info,
   LoaderCircle,
+  Languages,
+  LockKeyhole,
   LogOut,
+  Mic2,
   Palette,
   UserPen,
   UserRound,
@@ -19,11 +25,24 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useDesktop } from '../context/DesktopContext.jsx';
 import { api } from '../lib/api.js';
 import Modal from './Modal.jsx';
+import {
+  AccountSection,
+  ConnectionsSection,
+  PreferencesSection,
+  PrivacySection,
+  VoiceSettingsSection
+} from './AccountSettingsSections.jsx';
 
 const TABS = [
   { id: 'Mein Konto', label: 'Mein Konto', icon: UserRound },
   { id: 'Profil', label: 'Profile', icon: UserPen },
-  { id: 'Erscheinungsbild', label: 'Erscheinungsbild', icon: Palette }
+  { id: 'Datenschutz', label: 'Datenschutz & Sicherheit', icon: LockKeyhole },
+  { id: 'Voice', label: 'Voice & Video', icon: Mic2 },
+  { id: 'Benachrichtigungen', label: 'Benachrichtigungen', icon: Bell },
+  { id: 'Erscheinungsbild', label: 'Erscheinungsbild', icon: Palette },
+  { id: 'Barrierefreiheit', label: 'Barrierefreiheit', icon: Accessibility },
+  { id: 'Sprache', label: 'Sprache & Region', icon: Languages },
+  { id: 'Verbindungen', label: 'Verbindungen', icon: Cable }
 ];
 
 function moveItem(items, index, direction) {
@@ -154,7 +173,7 @@ function ProfileSettings({ user, refreshUser, onToast }) {
 
 export default function SettingsModal({ onClose, onToast, initialTab = 'Mein Konto' }) {
   const [tab, setTab] = useState(initialTab);
-  const { user, logout, refreshUser } = useAuth();
+  const { user, logout, refreshUser, settings, saveSettings } = useAuth();
   const navigate = useNavigate();
   const desktop = useDesktop();
   const tabs = desktop?.isDesktop
@@ -175,6 +194,19 @@ export default function SettingsModal({ onClose, onToast, initialTab = 'Mein Kon
     await logout();
     onClose();
     navigate('/login', { replace: true });
+  }
+
+  async function savePreferences(next) {
+    try {
+      if (next.desktop_notifications && 'Notification' in window && Notification.permission === 'default') {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') next = { ...next, desktop_notifications: false };
+      }
+      await saveSettings(next);
+      onToast('Einstellungen gespeichert.', 'success');
+    } catch (error) {
+      onToast(error.message, 'error');
+    }
   }
 
   return (
@@ -205,28 +237,16 @@ export default function SettingsModal({ onClose, onToast, initialTab = 'Mein Kon
               <h3>{tabs.find((item) => item.id === tab)?.label || tab}</h3>
             </header>
             {tab === 'Mein Konto' && (
-              <>
-                <div className="account-card">
-                  <div>{user.avatar_url ? <img src={user.avatar_url} alt="" /> : user.username[0].toUpperCase()}</div>
-                  <span><strong>{user.display_name || user.username}</strong><small>@{user.username}</small></span>
-                  <Button variant="primary" onClick={() => setTab('Profil')}>Profil bearbeiten</Button>
-                </div>
-                <section className="account-info-panel">
-                  <h4>Account-Info</h4>
-                  <div><span><small>Anzeigename</small><strong>{user.display_name || user.username}</strong></span><button type="button" onClick={() => setTab('Profil')}>Bearbeiten</button></div>
-                  <div><span><small>Benutzername</small><strong>@{user.username}</strong></span></div>
-                  <div><span><small>E-Mail-Adresse</small><strong>{user.email}</strong></span></div>
-                </section>
-              </>
+              <AccountSection user={user} refreshUser={refreshUser} logout={logout} onClose={onClose} onToast={onToast} />
             )}
             {tab === 'Profil' && <ProfileSettings user={user} refreshUser={refreshUser} onToast={onToast} />}
-            {tab === 'Erscheinungsbild' && (
-              <section className="settings-large-panel">
-                <h4>Dunkles Erscheinungsbild</h4>
-                <p>Guildora verwendet das optimierte dunkle Design für eine ruhige und kontrastreiche Darstellung.</p>
-                <div className="appearance-preview"><span /><span /><span /></div>
-              </section>
-            )}
+            {settings && tab === 'Datenschutz' && <PrivacySection settings={settings} save={savePreferences} onToast={onToast} />}
+            {settings && tab === 'Voice' && <VoiceSettingsSection settings={settings} save={savePreferences} onToast={onToast} />}
+            {settings && tab === 'Benachrichtigungen' && <PreferencesSection kind="notifications" settings={settings} save={savePreferences} />}
+            {settings && tab === 'Erscheinungsbild' && <PreferencesSection kind="appearance" settings={settings} save={savePreferences} />}
+            {settings && tab === 'Barrierefreiheit' && <PreferencesSection kind="accessibility" settings={settings} save={savePreferences} />}
+            {settings && tab === 'Sprache' && <PreferencesSection kind="locale" settings={settings} save={savePreferences} />}
+            {tab === 'Verbindungen' && <ConnectionsSection onToast={onToast} />}
             {tab === 'Über' && desktop?.isDesktop && (
               <div className="desktop-about settings-large-panel">
                 <p><strong>Guildora Desktop</strong><span>Version {desktop.version}</span></p>

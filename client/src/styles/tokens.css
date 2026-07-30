@@ -48,3 +48,22 @@ html.is-desktop {
   --titlebar-height: 30px;
   --content-viewport-height: calc(100dvh - var(--titlebar-height));
 }
+
+html[data-theme="light"] {
+  --bg-darkest: #e3e5e8;
+  --bg-dark: #f2f3f5;
+  --bg-main: #ffffff;
+  --bg-elevated: #eef0f3;
+  --bg-rail: #dfe1e5;
+  --bg-sidebar: #f2f3f5;
+  --bg-content: #ffffff;
+  --bg-userpanel: #e9eaed;
+  --bg-hover: rgb(0 0 0 / 5%);
+  --bg-active: rgb(0 0 0 / 9%);
+  --text-primary: #202225;
+  --text-muted: #4e5058;
+  --channel-idle: #5c5e66;
+  --channel-hover: #2e3035;
+  --channel-active: #111214;
+  --divider: rgb(0 0 0 / 9%);
+}

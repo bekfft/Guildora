@@ -9,7 +9,8 @@ export default function LoginPage() {
   const { user, loading: authLoading, login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [form, setForm] = useState({ identifier: '', password: '' });
+  const [form, setForm] = useState({ identifier: '', password: '', totpCode: '' });
+  const [needsTwoFactor, setNeedsTwoFactor] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -30,6 +31,11 @@ export default function LoginPage() {
       await login(form);
       navigate(destination, { replace: true });
     } catch (error) {
+      if (error.code === 'TWO_FACTOR_REQUIRED') {
+        setNeedsTwoFactor(true);
+        setErrors({ totpCode: error.message });
+        return;
+      }
       setErrors(error.field ? { [error.field]: error.message } : { general: error.message });
     } finally {
       setLoading(false);
@@ -66,6 +72,17 @@ export default function LoginPage() {
             error={errors.password}
             onChange={(event) => setForm({ ...form, password: event.target.value })}
           />
+          {needsTwoFactor && (
+            <TextField
+              id="totpCode"
+              label="Authenticator-Code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={form.totpCode}
+              error={errors.totpCode}
+              onChange={(event) => setForm({ ...form, totpCode: event.target.value.replace(/\D/g, '').slice(0, 6) })}
+            />
+          )}
           <Link className="form-link form-link--small" to="/passwort-vergessen">Passwort vergessen?</Link>
           <Button className="button--full auth-submit" loading={loading} type="submit">Anmelden</Button>
         </form>

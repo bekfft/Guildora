@@ -9,6 +9,7 @@ import {
   revokeRefreshToken,
   setAuthCookies
 } from '../utils/tokens.js';
+import { decryptSecret, verifyTotp } from '../utils/totp.js';
 
 const PUBLIC_USER_FIELDS = `u.id, u.email, u.username, u.display_name, u.avatar_url, u.created_at,
   p.banner_url, COALESCE(p.bio, '') AS bio, COALESCE(p.custom_status, '') AS custom_status`;
@@ -100,6 +101,19 @@ export async function login(req, res) {
 
   if (!user || !(await bcrypt.compare(data.password, user.password_hash))) {
     throw new ApiError(401, 'INVALID_CREDENTIALS', 'E-Mail, Benutzername oder Passwort ist falsch.');
+  }
+
+  const security = await db.get('SELECT * FROM user_security WHERE user_id = ?', [user.id]);
+  if (security?.deactivated_at) {
+    throw new ApiError(403, 'ACCOUNT_DEACTIVATED', 'Dieser Account ist deaktiviert.');
+  }
+  if (security?.two_factor_enabled) {
+    if (!data.totpCode) {
+      throw new ApiError(401, 'TWO_FACTOR_REQUIRED', 'Gib den sechsstelligen Code deiner Authenticator-App ein.', 'totpCode');
+    }
+    if (!verifyTotp(decryptSecret(security.totp_secret_encrypted), data.totpCode)) {
+      throw new ApiError(401, 'TWO_FACTOR_INVALID', 'Der Authenticator-Code ist ungültig.', 'totpCode');
+    }
   }
 
   await setAuthCookies(res, user.id);

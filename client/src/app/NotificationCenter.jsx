@@ -1,6 +1,7 @@
 import { AtSign, Bell, CheckCheck, CornerUpLeft, LoaderCircle, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 function actorName(actor) {
   return actor?.display_name || actor?.username || 'Unbekannt';
@@ -19,12 +20,10 @@ function notificationTime(value) {
 }
 
 export default function NotificationCenter({ onClose, onNavigate, onCountChange, onToast }) {
+  const { settings, saveSettings } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalUnread, setTotalUnread] = useState(0);
-  const [desktopEnabled, setDesktopEnabled] = useState(
-    localStorage.getItem('guildora:desktop-notifications') === 'enabled'
-  );
   useEffect(() => {
     let active = true;
     api.notifications()
@@ -77,8 +76,7 @@ export default function NotificationCenter({ onClose, onNavigate, onCountChange,
     }
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
-      localStorage.setItem('guildora:desktop-notifications', 'enabled');
-      setDesktopEnabled(true);
+      await saveSettings({ desktop_notifications: true });
       onToast('Desktop-Benachrichtigungen sind aktiviert.', 'success');
     } else {
       onToast('Die Berechtigung für Desktop-Benachrichtigungen wurde nicht erteilt.', 'error');
@@ -98,7 +96,7 @@ export default function NotificationCenter({ onClose, onNavigate, onCountChange,
         </header>
         <div className="engagement-toolbar">
           <span>Erwähnungen und Antworten</span>
-          {!desktopEnabled && <button type="button" onClick={enableDesktopNotifications}><Bell size={15} /> Desktop aktivieren</button>}
+          {!settings?.desktop_notifications && <button type="button" onClick={enableDesktopNotifications}><Bell size={15} /> Desktop aktivieren</button>}
           <button type="button" onClick={readAll} disabled={totalUnread === 0}>
             <CheckCheck size={16} /> Alle gelesen
           </button>

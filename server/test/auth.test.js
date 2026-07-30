@@ -113,6 +113,40 @@ test('/me liefert nur das öffentliche Nutzerobjekt', async () => {
   assert.equal('birthdate' in body.user, false);
 });
 
+test('Kontoeinstellungen und Sitzungen werden serverseitig gespeichert', async () => {
+  const initial = await request('/api/account/settings', { cookie: authCookie });
+  assert.equal(initial.status, 200);
+  assert.equal((await initial.json()).settings.theme, 'dark');
+
+  const updated = await request('/api/account/settings', {
+    method: 'PATCH',
+    cookie: authCookie,
+    body: {
+      theme: 'light',
+      accent_color: '#3366ff',
+      direct_messages: 'none',
+      voice_noise_suppression: false,
+      quiet_hours_start: '22:00',
+      quiet_hours_end: '07:00'
+    }
+  });
+  assert.equal(updated.status, 200);
+  const settings = (await updated.json()).settings;
+  assert.equal(settings.theme, 'light');
+  assert.equal(settings.direct_messages, 'none');
+  assert.equal(settings.voice_noise_suppression, false);
+
+  const sessions = await request('/api/account/sessions', { cookie: authCookie });
+  assert.equal(sessions.status, 200);
+  assert.equal((await sessions.json()).sessions.some((session) => session.current), true);
+
+  await request('/api/account/settings', {
+    method: 'PATCH',
+    cookie: authCookie,
+    body: { theme: 'dark', direct_messages: 'friends' }
+  });
+});
+
 test('Doppelte E-Mail und doppelter Benutzername erzeugen Feldfehler', async () => {
   const duplicateEmail = await request('/api/auth/register', {
     body: {
