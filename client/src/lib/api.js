@@ -57,6 +57,9 @@ export const api = {
   leaveGuild: (id) => request(`/api/guilds/${id}/leave`, { method: 'DELETE' }),
   createGuild: (data) => request('/api/guilds', { method: 'POST', body: JSON.stringify(data) }),
   channel: (id) => request(`/api/channels/${id}`),
+  voiceStatus: () => request('/api/voice/status'),
+  voiceParticipants: (channelId) => request(`/api/voice/channels/${channelId}/participants`),
+  voiceToken: (channelId) => request(`/api/voice/channels/${channelId}/token`, { method: 'POST' }),
   messages: (channelId, { before, around, limit = 50 } = {}) => {
     const query = new URLSearchParams({ limit: String(limit) });
     if (before) query.set('before', before);

@@ -13,6 +13,7 @@ import guildsRouter from './routes/guilds.js';
 import invitesRouter from './routes/invites.js';
 import messagesRouter from './routes/messages.js';
 import releasesRouter from './routes/releases.js';
+import voiceRouter from './routes/voice.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { configureRealtime } from './realtime.js';
 import { clientOrigins } from './config/clientOrigins.js';
@@ -30,6 +31,7 @@ app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.use('/api', releasesRouter);
+app.use('/api/voice', voiceRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/invites', invitesRouter);
 app.use('/api/guilds', guildsRouter);

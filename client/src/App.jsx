@@ -12,6 +12,7 @@ import DownloadPage from './pages/DownloadPage.jsx';
 import DesktopTitlebar from './components/DesktopTitlebar.jsx';
 import DesktopToasts from './components/DesktopToasts.jsx';
 import { DesktopProvider, useDesktop } from './context/DesktopContext.jsx';
+import { VoiceProvider } from './context/VoiceContext.jsx';
 
 function HomeRoute() {
   const desktop = useDesktop();
@@ -48,7 +49,7 @@ export default function App() {
           <Route path="/nutzungsbedingungen" element={<PlaceholderPage title="Nutzungsbedingungen" />} />
           <Route path="/datenschutz" element={<PlaceholderPage title="Datenschutzerklärung" />} />
           <Route element={<ProtectedRoute />}>
-            <Route element={<GuildProvider><AppPage /></GuildProvider>}>
+            <Route element={<GuildProvider><VoiceProvider><AppPage /></VoiceProvider></GuildProvider>}>
               <Route path="/app" element={null} />
               <Route path="/app/channels/@me" element={null} />
               <Route path="/app/channels/:guildId" element={null} />

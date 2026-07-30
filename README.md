@@ -209,7 +209,26 @@ Serverbesitzer und Rollen mit Serververwaltung behalten administrativen Zugriff.
 - Typing-Indikatoren, Lesestatus und ungelesene Marker
 - Direktnachrichten und Benachrichtigungen
 
-Voice und Video bleiben für spätere Phasen vorgesehen.
+## Voice-Channels
+
+Guildora verwendet LiveKit für verschlüsselte Sprachübertragung. Nutzer können
+Voice-Channels betreten, Teilnehmer und aktive Sprecher sehen, Mikrofon und
+Wiedergabe stummschalten sowie Ein- und Ausgabegeräte wechseln. Der Server
+prüft vor jedem Beitritt die Guild- und Channel-Rechte und stellt anschließend
+einen kurzlebigen LiveKit-Token aus; API-Key und API-Secret gelangen nie in den
+Browser oder die Desktop-App.
+
+Für die Freischaltung werden im Serverprozess `LIVEKIT_URL`,
+`LIVEKIT_API_KEY` und `LIVEKIT_API_SECRET` gesetzt. In Produktion muss die URL
+eine vertrauenswürdig TLS-gesicherte `wss://`-Adresse sein. Ohne vollständige
+Konfiguration antwortet `/api/voice/status` mit `available: false` und ein
+Beitrittsversuch zeigt eine verständliche Fehlermeldung.
+
+Für einen lokalen Integrationstest kann ein LiveKit-Server im Dev-Modus
+gestartet und der Server mit den dazugehörigen lokalen Zugangsdaten ausgeführt
+werden. Für öffentliche Nutzung sind eine eigene LiveKit-Cloud-Instanz oder ein
+öffentlich erreichbarer SFU samt TURN erforderlich; der normale HTTP-ngrok-
+Tunnel transportiert die WebRTC-Medienports nicht.
 
 ## Windows-Desktop-App
 

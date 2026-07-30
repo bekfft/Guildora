@@ -12,11 +12,15 @@ process.env.NODE_ENV = 'test';
 process.env.SQLITE_PATH = path.join(temporaryDirectory, 'auth.sqlite');
 process.env.JWT_ACCESS_SECRET = 'test-access-secret-with-sufficient-length';
 process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret-with-sufficient-length';
+process.env.LIVEKIT_URL = 'ws://127.0.0.1:7880';
+process.env.LIVEKIT_API_KEY = 'test-livekit-key';
+process.env.LIVEKIT_API_SECRET = 'test-livekit-secret-with-more-than-thirty-two-characters';
 
 const { app } = await import('../src/index.js');
 const { db, runMigrations } = await import('../src/db/index.js');
 const { configureRealtime } = await import('../src/realtime.js');
 const { signAccessToken } = await import('../src/utils/tokens.js');
+const { TokenVerifier } = await import('livekit-server-sdk');
 
 let server;
 let baseUrl;
@@ -24,6 +28,7 @@ let authCookie;
 let registeredUserId;
 let createdGuildId;
 let createdChannelId;
+let createdVoiceChannelId;
 
 function cookiesFrom(response) {
   return response.headers.getSetCookie()
@@ -158,6 +163,7 @@ test('Server erstellen erzeugt Standards, Mitgliedschaft und geschützte Details
   const detailsBody = await details.json();
   assert.equal(detailsBody.categories.length, 2);
   assert.equal(detailsBody.channels.length, 2);
+  createdVoiceChannelId = detailsBody.channels.find((channel) => channel.type === 'voice').id;
   assert.equal(detailsBody.roles.length, 1);
   assert.equal(detailsBody.roles[0].name, '@everyone');
   assert.equal(detailsBody.roles[0].is_default, true);
@@ -171,6 +177,79 @@ test('Server erstellen erzeugt Standards, Mitgliedschaft und geschützte Details
   const ownerLeave = await request(`/api/guilds/${body.guild.id}/leave`, { method: 'DELETE', cookie: authCookie });
   assert.equal(ownerLeave.status, 403);
   assert.equal((await ownerLeave.json()).error.code, 'OWNER_CANNOT_LEAVE');
+});
+
+test('Voice-Tokens sind kurzlebig, rechtegeprüft und nur für Sprachkanäle gültig', async () => {
+  const status = await request('/api/voice/status', { cookie: authCookie });
+  assert.equal(status.status, 200);
+  assert.deepEqual(await status.json(), { provider: 'livekit', available: true });
+
+  const tokenResponse = await request(`/api/voice/channels/${createdVoiceChannelId}/token`, {
+    method: 'POST',
+    cookie: authCookie
+  });
+  assert.equal(tokenResponse.status, 201);
+  const body = await tokenResponse.json();
+  assert.equal(body.url, 'ws://127.0.0.1:7880/');
+  assert.equal(body.room.channel_id, createdVoiceChannelId);
+  assert.equal(body.participant.id, registeredUserId);
+  assert.ok(body.token.length > 100);
+
+  const verifier = new TokenVerifier(
+    process.env.LIVEKIT_API_KEY,
+    process.env.LIVEKIT_API_SECRET
+  );
+  const claims = await verifier.verify(body.token);
+  assert.equal(claims.sub, registeredUserId);
+  assert.equal(claims.video.roomJoin, true);
+  assert.equal(claims.video.room, body.room.name);
+  assert.equal(claims.video.canPublish, true);
+  assert.equal(claims.video.canSubscribe, true);
+  assert.equal(claims.video.canPublishData, false);
+
+  const textChannel = await request(`/api/voice/channels/${createdChannelId}/token`, {
+    method: 'POST',
+    cookie: authCookie
+  });
+  assert.equal(textChannel.status, 400);
+  assert.equal((await textChannel.json()).error.code, 'NOT_A_VOICE_CHANNEL');
+
+  const outsiderId = crypto.randomUUID();
+  await db.run(
+    `INSERT INTO users
+     (id, email, username, display_name, password_hash, birthdate)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [outsiderId, 'voice-outsider@example.de', 'voice.outsider', 'Voice Outsider', 'not-used', '1995-01-01']
+  );
+  const outsider = await request(`/api/voice/channels/${createdVoiceChannelId}/token`, {
+    method: 'POST',
+    cookie: `access_token=${signAccessToken(outsiderId)}`
+  });
+  assert.equal(outsider.status, 403);
+
+  const saved = {
+    url: process.env.LIVEKIT_URL,
+    key: process.env.LIVEKIT_API_KEY,
+    secret: process.env.LIVEKIT_API_SECRET
+  };
+  delete process.env.LIVEKIT_URL;
+  delete process.env.LIVEKIT_API_KEY;
+  delete process.env.LIVEKIT_API_SECRET;
+  const unavailable = await request(`/api/voice/channels/${createdVoiceChannelId}/token`, {
+    method: 'POST',
+    cookie: authCookie
+  });
+  const unavailableParticipants = await request(
+    `/api/voice/channels/${createdVoiceChannelId}/participants`,
+    { cookie: authCookie }
+  );
+  process.env.LIVEKIT_URL = saved.url;
+  process.env.LIVEKIT_API_KEY = saved.key;
+  process.env.LIVEKIT_API_SECRET = saved.secret;
+  assert.equal(unavailable.status, 503);
+  assert.equal((await unavailable.json()).error.code, 'VOICE_UNAVAILABLE');
+  assert.equal(unavailableParticipants.status, 503);
+  assert.equal((await unavailableParticipants.json()).error.code, 'VOICE_UNAVAILABLE');
 });
 
 test('Serververwaltung ändert Profil, Kategorien, Channels, Rollen und Mitglieder', async () => {

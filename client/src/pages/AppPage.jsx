@@ -18,6 +18,7 @@ import SettingsModal from '../app/SettingsModal.jsx';
 import Toast from '../app/Toast.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useGuilds } from '../context/GuildContext.jsx';
+import { useVoice } from '../context/VoiceContext.jsx';
 import { api } from '../lib/api.js';
 import { socket } from '../lib/socket.js';
 import '../styles/app.css';
@@ -25,6 +26,7 @@ import '../styles/app.css';
 export default function AppPage() {
   const { user } = useAuth();
   const { guilds, loading: guildsLoading, leaveGuild, refreshGuilds } = useGuilds();
+  const voice = useVoice();
   const { guildId, channelId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -201,6 +203,7 @@ export default function AppPage() {
 
   async function handleLeave() {
     try {
+      if (voice.channel?.guild_id === guildId) await voice.leave();
       await leaveGuild(guildId);
       navigate('/app/channels/@me');
       showToast('Du hast den Server verlassen.', 'success');
@@ -212,6 +215,7 @@ export default function AppPage() {
   async function handleQuickDeleteChannel(channel) {
     if (!window.confirm(`Channel „${channel.name}“ dauerhaft löschen?`)) return;
     try {
+      if (voice.channel?.id === channel.id) await voice.leave();
       await api.deleteChannel(guildId, channel.id);
       const fallback = guildData.channels.find((item) => item.id !== channel.id && item.type === 'text');
       await refreshGuildData();
@@ -273,6 +277,7 @@ export default function AppPage() {
             guildData={isHome ? null : guildData}
             channelId={channelId}
             user={user}
+            voice={voice}
             canManageServer={canManageServer}
             canManageChannels={capabilities.manageChannels}
             canManageInvites={capabilities.manageServer}

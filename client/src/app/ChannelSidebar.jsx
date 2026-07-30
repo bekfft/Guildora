@@ -5,15 +5,37 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink } from 'react-router-dom';
+import VoicePanel from './VoicePanel.jsx';
+
+function voiceParticipantName(participant) {
+  return participant.is_local ? `${participant.name} (Du)` : participant.name;
+}
+
+function VoiceParticipants({ voice, channelId }) {
+  if (voice.channel?.id !== channelId || !voice.participants.length) return null;
+  return (
+    <div className="voice-participant-list" aria-label="Teilnehmer im Sprachkanal">
+      {voice.participants.map((participant) => (
+        <div className={`voice-participant ${participant.is_speaking ? 'is-speaking' : ''}`} key={participant.id}>
+          <span className="voice-participant__avatar">
+            {participant.avatar_url
+              ? <img src={participant.avatar_url} alt="" />
+              : voiceParticipantName(participant)[0]?.toUpperCase()}
+          </span>
+          <span>{voiceParticipantName(participant)}</span>
+          {participant.is_muted && <MicOff size={14} aria-label="Stummgeschaltet" />}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function ChannelSidebar({
-  guildData, channelId, user, canManageServer, canManageChannels, canManageInvites, onToast, onLeave,
+  guildData, channelId, user, voice, canManageServer, canManageChannels, canManageInvites, onToast, onLeave,
   onOpenSettings, onOpenServerSettings, onOpenChannelSettings, onOpenCategorySettings,
   onDeleteChannel, onDeleteCategory, onMoveChannel, onNavigate
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [muted, setMuted] = useState(false);
-  const [deafened, setDeafened] = useState(false);
   const [collapsed, setCollapsed] = useState({});
   const [contextMenu, setContextMenu] = useState(null);
   const [draggingChannelId, setDraggingChannelId] = useState(null);
@@ -132,6 +154,24 @@ export default function ChannelSidebar({
     });
   }
 
+  async function joinVoice(channel) {
+    onNavigate();
+    try {
+      await voice.join(channel, guildData.guild);
+      onToast(`Mit „${channel.name}“ verbunden.`, 'success');
+    } catch (error) {
+      onToast(error.message, 'error');
+    }
+  }
+
+  async function toggleVoiceControl(action) {
+    try {
+      await action();
+    } catch (error) {
+      onToast(error.message || 'Das Audiogerät konnte nicht geändert werden.', 'error');
+    }
+  }
+
   function handleChannelKeys(event) {
     if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;
     const links = [...event.currentTarget.querySelectorAll('[data-channel-link]')];
@@ -193,7 +233,7 @@ export default function ChannelSidebar({
                   <div>
                     {guildData.channels.filter((channel) => !channel.category_id).map((channel) => (
                       <div
-                        className={`channel-row ${channelId === channel.id ? 'is-active' : ''} ${channel.unread_count > 0 ? 'is-unread' : ''} ${draggingChannelId === channel.id ? 'is-dragging' : ''}`}
+                        className={`channel-row ${channelId === channel.id ? 'is-active' : ''} ${voice.channel?.id === channel.id ? 'is-voice-active' : ''} ${channel.unread_count > 0 ? 'is-unread' : ''} ${draggingChannelId === channel.id ? 'is-dragging' : ''}`}
                         draggable={canManageChannels}
                         onDragStart={(event) => startChannelDrag(event, channel)}
                         onDragEnd={finishChannelDrag}
@@ -213,7 +253,14 @@ export default function ChannelSidebar({
                             {channel.unread_count > 0 && <strong className="channel-unread-count">{channel.unread_count > 99 ? '99+' : channel.unread_count}</strong>}
                           </NavLink>
                         ) : (
-                          <button className="channel-link" type="button" data-channel-link draggable={canManageChannels} onClick={() => onToast('Voice kommt in einer späteren Version.')}>
+                          <button
+                            className={`channel-link ${voice.channel?.id === channel.id ? 'is-active' : ''}`}
+                            type="button"
+                            data-channel-link
+                            draggable={canManageChannels}
+                            onClick={() => joinVoice(channel)}
+                            aria-label={`${channel.name} beitreten`}
+                          >
                             <Volume2 size={19} /><span>{channel.name}</span>
                           </button>
                         )}
@@ -229,6 +276,7 @@ export default function ChannelSidebar({
                             <Settings size={16} />
                           </button>
                         )}
+                        <VoiceParticipants voice={voice} channelId={channel.id} />
                       </div>
                     ))}
                   </div>
@@ -260,7 +308,7 @@ export default function ChannelSidebar({
                     <div>
                       {channels.map((channel) => (
                         <div
-                          className={`channel-row ${channelId === channel.id ? 'is-active' : ''} ${channel.unread_count > 0 ? 'is-unread' : ''} ${draggingChannelId === channel.id ? 'is-dragging' : ''}`}
+                          className={`channel-row ${channelId === channel.id ? 'is-active' : ''} ${voice.channel?.id === channel.id ? 'is-voice-active' : ''} ${channel.unread_count > 0 ? 'is-unread' : ''} ${draggingChannelId === channel.id ? 'is-dragging' : ''}`}
                           draggable={canManageChannels}
                           onDragStart={(event) => startChannelDrag(event, channel)}
                           onDragEnd={finishChannelDrag}
@@ -281,7 +329,15 @@ export default function ChannelSidebar({
                               {channel.unread_count > 0 && <strong className="channel-unread-count">{channel.unread_count > 99 ? '99+' : channel.unread_count}</strong>}
                             </NavLink>
                           ) : (
-                            <button className="channel-link" type="button" data-channel-link draggable={canManageChannels} tabIndex={collapsed[category.id] ? -1 : 0} onClick={() => onToast('Voice kommt in einer späteren Version.')}>
+                            <button
+                              className={`channel-link ${voice.channel?.id === channel.id ? 'is-active' : ''}`}
+                              type="button"
+                              data-channel-link
+                              draggable={canManageChannels}
+                              tabIndex={collapsed[category.id] ? -1 : 0}
+                              onClick={() => joinVoice(channel)}
+                              aria-label={`${channel.name} beitreten`}
+                            >
                               <Volume2 size={19} /><span>{channel.name}</span>
                             </button>
                           )}
@@ -297,6 +353,7 @@ export default function ChannelSidebar({
                               <Settings size={16} />
                             </button>
                           )}
+                          <VoiceParticipants voice={voice} channelId={channel.id} />
                         </div>
                       ))}
                     </div>
@@ -307,6 +364,7 @@ export default function ChannelSidebar({
           </div>
         </>
       )}
+      {voice.channel && <VoicePanel voice={voice} onToast={onToast} />}
       <div className="user-panel">
         <div className="mini-avatar">{(user.display_name || user.username)[0].toUpperCase()}<span className="status-dot" /></div>
         <div className="user-panel__identity">
@@ -314,11 +372,11 @@ export default function ChannelSidebar({
           <span>@{user.username}</span>
         </div>
         <div className="user-panel__actions">
-          <button className={muted ? 'is-danger' : ''} type="button" onClick={() => setMuted((value) => !value)} aria-label={muted ? 'Mikrofon aktivieren' : 'Mikrofon stummschalten'}>
-            {muted ? <MicOff size={17} /> : <Mic size={17} />}
+          <button className={voice.muted ? 'is-danger' : ''} type="button" onClick={() => toggleVoiceControl(voice.toggleMuted)} aria-label={voice.muted ? 'Mikrofon aktivieren' : 'Mikrofon stummschalten'}>
+            {voice.muted ? <MicOff size={17} /> : <Mic size={17} />}
           </button>
-          <button className={deafened ? 'is-danger' : ''} type="button" onClick={() => setDeafened((value) => !value)} aria-label={deafened ? 'Ton aktivieren' : 'Ton deaktivieren'}>
-            {deafened ? <VolumeX size={17} /> : <Headphones size={17} />}
+          <button className={voice.deafened ? 'is-danger' : ''} type="button" onClick={() => toggleVoiceControl(voice.toggleDeafened)} aria-label={voice.deafened ? 'Ton aktivieren' : 'Ton deaktivieren'}>
+            {voice.deafened ? <VolumeX size={17} /> : <Headphones size={17} />}
           </button>
           <button type="button" onClick={onOpenSettings} aria-label="Einstellungen"><Settings size={17} /></button>
         </div>
