@@ -1,11 +1,11 @@
-import { ShieldCheck, X } from 'lucide-react';
+import { ShieldCheck, Users, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 function memberName(member) {
   return member.nickname || member.display_name || member.username;
 }
 
-export default function MemberList({ members, loading }) {
+export default function MemberList({ members, loading, onClose }) {
   const [selected, setSelected] = useState(null);
   const [closing, setClosing] = useState(false);
 
@@ -45,6 +45,10 @@ export default function MemberList({ members, loading }) {
 
   return (
     <aside className="member-list" aria-label="Mitglieder">
+      <div className="member-list__header">
+        <span><Users size={18} /><strong>Mitglieder</strong></span>
+        <button className="icon-button" type="button" onClick={onClose} aria-label="Mitgliederliste schließen"><X size={20} /></button>
+      </div>
       {loading ? (
         <div className="member-skeleton">{[1, 2, 3, 4].map((item) => <span key={item} />)}</div>
       ) : groups.length ? groups.map((group) => (

@@ -35,7 +35,9 @@ export default function AppPage() {
   const [members, setMembers] = useState([]);
   const [conversations, setConversations] = useState([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
-  const [membersVisible, setMembersVisible] = useState(true);
+  const [membersVisible, setMembersVisible] = useState(
+    () => !window.matchMedia('(max-width: 1024px)').matches
+  );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [guildModalOpen, setGuildModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -86,6 +88,31 @@ export default function AppPage() {
     toastTimers.current.forEach((timer) => window.clearTimeout(timer));
     if (engagementRefreshTimer.current) window.clearTimeout(engagementRefreshTimer.current);
     if (guildRealtimeRefreshTimer.current) window.clearTimeout(guildRealtimeRefreshTimer.current);
+  }, []);
+
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 1024px)');
+    const updateLayout = (event) => setMembersVisible(!event.matches);
+    query.addEventListener('change', updateLayout);
+    return () => query.removeEventListener('change', updateLayout);
+  }, []);
+
+  useEffect(() => {
+    if (drawerOpen) setMembersVisible(false);
+  }, [drawerOpen]);
+
+  useEffect(() => {
+    if (window.matchMedia('(max-width: 1024px)').matches) setMembersVisible(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const closeMobilePanels = (event) => {
+      if (event.key !== 'Escape') return;
+      setDrawerOpen(false);
+      if (window.matchMedia('(max-width: 1024px)').matches) setMembersVisible(false);
+    };
+    document.addEventListener('keydown', closeMobilePanels);
+    return () => document.removeEventListener('keydown', closeMobilePanels);
   }, []);
 
   useEffect(() => {
@@ -379,7 +406,10 @@ export default function AppPage() {
             directUser={isDirect ? activeConversation?.user : null}
             membersVisible={membersVisible}
             notificationCount={notificationCount}
-            onToggleMembers={() => setMembersVisible((value) => !value)}
+            onToggleMembers={() => {
+              setDrawerOpen(false);
+              setMembersVisible((value) => !value);
+            }}
             onToast={showToast}
             onOpenDrawer={() => setDrawerOpen(true)}
             onOpenNotifications={() => setNotificationsOpen(true)}
@@ -413,7 +443,17 @@ export default function AppPage() {
         </section>
       )}
 
-      {!isDiscovery && !isHome && !isDirect && membersVisible && <MemberList members={members} loading={loadingDetails} />}
+      {!isDiscovery && !isHome && !isDirect && membersVisible && (
+        <>
+          <button
+            className="member-backdrop"
+            type="button"
+            aria-label="Mitgliederliste schließen"
+            onClick={() => setMembersVisible(false)}
+          />
+          <MemberList members={members} loading={loadingDetails} onClose={() => setMembersVisible(false)} />
+        </>
+      )}
 
       {(guildsLoading || (loadingDetails && !guildData && !isDirect)) && !isDiscovery && <div className="sidebar-loading" aria-hidden="true"><span /><span /><span /></div>}
       {guildModalOpen && <GuildModal onClose={() => setGuildModalOpen(false)} onToast={showToast} />}
