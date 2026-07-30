@@ -8,6 +8,12 @@ import {
   useState
 } from 'react';
 import { api } from '../lib/api.js';
+import {
+  createImmediateVoiceAnalyser,
+  playVoiceFeedback,
+  primeVoiceFeedback,
+  voiceActivityThreshold
+} from '../lib/voiceFeedback.js';
 import { useAuth } from './AuthContext.jsx';
 
 const VoiceContext = createContext(null);
@@ -76,6 +82,8 @@ export function VoiceProvider({ children }) {
   const participantListenerCleanupRef = useRef(() => {});
   const participantSyncTimerRef = useRef(null);
   const authoritativeParticipantIdsRef = useRef(null);
+  const fastSpeakingIdsRef = useRef(new Set());
+  const speakingAnalyzersRef = useRef(new Map());
   const deafenedRef = useRef(storedValue('guildora:voice-deafened') === 'true');
   const mutedRef = useRef(storedValue('guildora:voice-muted') === 'true');
   const audioElementsRef = useRef(new Set());
@@ -101,9 +109,13 @@ export function VoiceProvider({ children }) {
     if (!room || room !== roomRef.current) return;
     const authoritativeIds = authoritativeParticipantIdsRef.current;
     const nextParticipants = roomParticipants(room);
-    setParticipants(authoritativeIds
+    const visibleParticipants = authoritativeIds
       ? nextParticipants.filter((participant) => authoritativeIds.has(participant.id))
-      : nextParticipants);
+      : nextParticipants;
+    setParticipants(visibleParticipants.map((participant) => ({
+      ...participant,
+      is_speaking: participant.is_speaking || fastSpeakingIdsRef.current.has(participant.id)
+    })));
   }, []);
 
   const clearParticipantSync = useCallback(() => {
@@ -128,9 +140,14 @@ export function VoiceProvider({ children }) {
         const liveParticipant = liveParticipants.get(participant.id);
         return liveParticipant ? {
           ...participant,
-          is_speaking: Boolean(liveParticipant.isSpeaking),
+          is_speaking: Boolean(liveParticipant.isSpeaking)
+            || fastSpeakingIdsRef.current.has(participant.id),
           connection_quality: liveParticipant.connectionQuality || participant.connection_quality
-        } : participant;
+        } : {
+          ...participant,
+          is_speaking: Boolean(participant.is_speaking)
+            || fastSpeakingIdsRef.current.has(participant.id)
+        };
       })));
     } catch (error) {
       console.warn('Voice-Teilnehmer konnten nicht synchronisiert werden.', error);
@@ -171,13 +188,25 @@ export function VoiceProvider({ children }) {
     videoElementsRef.current.clear();
   }, []);
 
-  const leave = useCallback(async () => {
+  const clearSpeakingAnalyzers = useCallback(() => {
+    for (const analyzer of speakingAnalyzersRef.current.values()) {
+      window.cancelAnimationFrame(analyzer.frame);
+      if (analyzer.releaseTimer) window.clearTimeout(analyzer.releaseTimer);
+      void analyzer.cleanup();
+    }
+    speakingAnalyzersRef.current.clear();
+    fastSpeakingIdsRef.current.clear();
+  }, []);
+
+  const leave = useCallback(async ({ withSound = true } = {}) => {
     clearParticipantSync();
     participantListenerCleanupRef.current();
     participantListenerCleanupRef.current = () => {};
     const room = roomRef.current;
+    const wasConnected = Boolean(room);
     roomRef.current = null;
     authoritativeParticipantIdsRef.current = null;
+    clearSpeakingAnalyzers();
     setChannel(null);
     setParticipants([]);
     setConnectionState('idle');
@@ -190,7 +219,8 @@ export function VoiceProvider({ children }) {
       room.removeAllListeners();
       await room.disconnect().catch(() => {});
     }
-  }, [clearAudioElements, clearParticipantSync]);
+    if (withSound && wasConnected) void playVoiceFeedback('leave').catch(() => {});
+  }, [clearAudioElements, clearParticipantSync, clearSpeakingAnalyzers]);
 
   const attachAudioTrack = useCallback((track) => {
     if (track.kind === 'video') {
@@ -222,7 +252,8 @@ export function VoiceProvider({ children }) {
   const join = useCallback(async (nextChannel, guild) => {
     if (!nextChannel || nextChannel.type !== 'voice') return;
     if (roomRef.current && channel?.id === nextChannel.id) return;
-    await leave();
+    void primeVoiceFeedback().catch(() => {});
+    await leave({ withSound: false });
     setConnectionState('connecting');
     setLastError('');
     setChannel({
@@ -241,7 +272,12 @@ export function VoiceProvider({ children }) {
       throw error;
     }
 
-    const { DefaultReconnectPolicy, ParticipantEvent, Room, RoomEvent } = await liveKit();
+    const {
+      DefaultReconnectPolicy,
+      ParticipantEvent,
+      Room,
+      RoomEvent
+    } = await liveKit();
     const room = new Room({
       adaptiveStream: true,
       dynacast: true,
@@ -267,14 +303,87 @@ export function VoiceProvider({ children }) {
       if (!participant || room !== roomRef.current) return;
       const authoritativeIds = authoritativeParticipantIdsRef.current;
       if (authoritativeIds && !authoritativeIds.has(participant.identity)) return;
+      const view = participantView(participant, participant === room.localParticipant);
       setParticipants((current) => sortParticipants([
         ...current.filter((item) => item.id !== participant.identity),
-        participantView(participant, participant === room.localParticipant)
+        {
+          ...view,
+          is_speaking: view.is_speaking || fastSpeakingIdsRef.current.has(participant.identity)
+        }
       ]));
+    };
+    const setFastSpeaking = (participant, isSpeaking) => {
+      if (!participant || room !== roomRef.current) return;
+      if (isSpeaking) fastSpeakingIdsRef.current.add(participant.identity);
+      else fastSpeakingIdsRef.current.delete(participant.identity);
+      setParticipants((current) => current.map((item) => (
+        item.id === participant.identity
+          ? { ...item, is_speaking: Boolean(isSpeaking || participant.isSpeaking) }
+          : item
+      )));
+    };
+    const stopSpeakingAnalyzer = (participantId, track = null) => {
+      const analyzer = speakingAnalyzersRef.current.get(participantId);
+      if (!analyzer || (track && analyzer.track !== track)) return;
+      window.cancelAnimationFrame(analyzer.frame);
+      if (analyzer.releaseTimer) window.clearTimeout(analyzer.releaseTimer);
+      void analyzer.cleanup();
+      speakingAnalyzersRef.current.delete(participantId);
+      fastSpeakingIdsRef.current.delete(participantId);
+    };
+    const startSpeakingAnalyzer = (track, participant) => {
+      if (
+        !track
+        || track.kind !== 'audio'
+        || !participant
+        || (track.source && track.source !== 'microphone')
+      ) return;
+      stopSpeakingAnalyzer(participant.identity);
+      let analyzer;
+      try {
+        analyzer = createImmediateVoiceAnalyser(track);
+      } catch {
+        return;
+      }
+      const state = {
+        cleanup: analyzer.cleanup,
+        frame: 0,
+        releaseTimer: null,
+        speaking: false,
+        track
+      };
+      const threshold = voiceActivityThreshold(settings?.voice_sensitivity);
+      const measure = () => {
+        if (
+          room !== roomRef.current
+          || speakingAnalyzersRef.current.get(participant.identity) !== state
+        ) return;
+        const speakingNow = analyzer.calculateVolume() >= threshold;
+        if (speakingNow) {
+          if (state.releaseTimer) {
+            window.clearTimeout(state.releaseTimer);
+            state.releaseTimer = null;
+          }
+          if (!state.speaking) {
+            state.speaking = true;
+            setFastSpeaking(participant, true);
+          }
+        } else if (state.speaking && !state.releaseTimer) {
+          state.releaseTimer = window.setTimeout(() => {
+            state.releaseTimer = null;
+            state.speaking = false;
+            setFastSpeaking(participant, false);
+          }, 140);
+        }
+        state.frame = window.requestAnimationFrame(measure);
+      };
+      speakingAnalyzersRef.current.set(participant.identity, state);
+      state.frame = window.requestAnimationFrame(measure);
     };
     const removeParticipant = (participant) => {
       if (!participant || room !== roomRef.current) return;
       unbindParticipant(participant);
+      stopSpeakingAnalyzer(participant.identity);
       authoritativeParticipantIdsRef.current?.delete(participant.identity);
       setParticipants((current) => current.filter((item) => item.id !== participant.identity));
     };
@@ -283,9 +392,10 @@ export function VoiceProvider({ children }) {
       if (!participant || speakingListeners.has(participant.identity)) return;
       const onSpeakingChanged = (isSpeaking) => {
         if (room !== roomRef.current) return;
+        const isFastSpeaking = fastSpeakingIdsRef.current.has(participant.identity);
         setParticipants((current) => current.map((item) => (
           item.id === participant.identity
-            ? { ...item, is_speaking: Boolean(isSpeaking) }
+            ? { ...item, is_speaking: Boolean(isSpeaking || isFastSpeaking) }
             : item
         )));
       };
@@ -314,6 +424,16 @@ export function VoiceProvider({ children }) {
       .on(RoomEvent.ParticipantDisconnected, removeParticipant)
       .on(RoomEvent.TrackMuted, (_publication, participant) => upsertParticipant(participant))
       .on(RoomEvent.TrackUnmuted, (_publication, participant) => upsertParticipant(participant))
+      .on(RoomEvent.LocalTrackPublished, (publication, participant) => {
+        if (publication.track) startSpeakingAnalyzer(publication.track, participant);
+        upsertParticipant(participant);
+      })
+      .on(RoomEvent.LocalTrackUnpublished, (publication, participant) => {
+        if (publication.track && participant) {
+          stopSpeakingAnalyzer(participant.identity, publication.track);
+        }
+        upsertParticipant(participant);
+      })
       .on(RoomEvent.ConnectionQualityChanged, (_quality, participant) => upsertParticipant(participant))
       .on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
         if (track.kind === 'audio' && participant) {
@@ -321,10 +441,12 @@ export function VoiceProvider({ children }) {
           track.setVolume(Math.max(0, Math.min(200, stored)) / 100);
           setParticipantVolumes((current) => ({ ...current, [participant.identity]: stored }));
         }
+        startSpeakingAnalyzer(track, participant);
         attachAudioTrack(track);
         update();
       })
-      .on(RoomEvent.TrackUnsubscribed, (track) => {
+      .on(RoomEvent.TrackUnsubscribed, (track, _publication, participant) => {
+        if (participant) stopSpeakingAnalyzer(participant.identity, track);
         detachAudioTrack(track);
         update();
       })
@@ -349,6 +471,7 @@ export function VoiceProvider({ children }) {
         participantListenerCleanupRef.current = () => {};
         roomRef.current = null;
         authoritativeParticipantIdsRef.current = null;
+        clearSpeakingAnalyzers();
         setConnectionState('error');
         setParticipants([]);
         setLastError('Die Voice-Verbindung wurde getrennt.');
@@ -385,11 +508,15 @@ export function VoiceProvider({ children }) {
         localStorage.setItem('guildora:voice-muted', 'true');
         setLastError('Kein verwendbares Mikrofon gefunden. Du bist als Zuhörer verbunden.');
       }
+      for (const publication of room.localParticipant.audioTrackPublications.values()) {
+        if (publication.track) startSpeakingAnalyzer(publication.track, room.localParticipant);
+      }
       await refreshDevices(false);
       refreshParticipants(room);
       startParticipantSync(nextChannel.id, room);
       setConnectionState('connected');
       setNeedsAudioStart(!room.canPlaybackAudio);
+      void playVoiceFeedback('join').catch(() => {});
     } catch (error) {
       if (room === roomRef.current) {
         roomRef.current = null;
@@ -403,6 +530,7 @@ export function VoiceProvider({ children }) {
       participantListenerCleanupRef.current = () => {};
       await room.disconnect().catch(() => {});
       clearParticipantSync();
+      clearSpeakingAnalyzers();
       clearAudioElements();
       throw error;
     }
@@ -411,6 +539,7 @@ export function VoiceProvider({ children }) {
     channel?.id,
     clearAudioElements,
     clearParticipantSync,
+    clearSpeakingAnalyzers,
     detachAudioTrack,
     inputDeviceId,
     leave,
@@ -578,8 +707,9 @@ export function VoiceProvider({ children }) {
     authoritativeParticipantIdsRef.current = null;
     room?.removeAllListeners();
     room?.disconnect();
+    clearSpeakingAnalyzers();
     clearAudioElements();
-  }, [clearAudioElements, clearParticipantSync]);
+  }, [clearAudioElements, clearParticipantSync, clearSpeakingAnalyzers]);
 
   const value = useMemo(() => ({
     channel,

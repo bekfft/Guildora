@@ -726,7 +726,8 @@
 
 .voice-participant.is-speaking {
   color: #fff;
-  background: rgb(35 165 90 / 10%);
+  background: rgb(35 165 90 / 18%);
+  box-shadow: inset 2px 0 0 var(--online), 0 0 12px rgb(35 165 90 / 12%);
 }
 
 .voice-participant__avatar {
@@ -745,7 +746,7 @@
 
 .voice-participant.is-speaking .voice-participant__avatar {
   border-color: var(--online);
-  box-shadow: 0 0 0 2px rgb(35 165 90 / 18%);
+  box-shadow: 0 0 0 2px rgb(35 165 90 / 28%), 0 0 10px rgb(35 165 90 / 48%);
 }
 
 .voice-participant__avatar img {
