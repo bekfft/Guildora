@@ -96,6 +96,14 @@
   place-items: center;
 }
 
+.server-button img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  min-width: 0;
+  min-height: 0;
+}
+
 .server-button:hover,
 .server-button.is-active {
   border-radius: 12px;
@@ -2212,8 +2220,13 @@
 
 .featured-guild__icon img,
 .guild-card__icon img {
+  position: absolute;
+  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
   padding: 7px;
   border-radius: inherit;
   background: #fff;
@@ -2609,8 +2622,13 @@ html.is-desktop .modal-overlay {
 }
 
 .icon-upload img {
+  position: absolute;
+  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
   object-fit: cover;
 }
 
@@ -3304,6 +3322,7 @@ html.is-desktop .modal-overlay {
 }
 
 .server-profile-card__icon {
+  position: relative;
   display: grid;
   width: 64px;
   height: 64px;
@@ -3318,13 +3337,19 @@ html.is-desktop .modal-overlay {
 }
 
 .server-profile-card__icon img {
+  position: absolute;
+  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
   object-fit: cover;
 }
 
-.server-profile-card > div:last-child {
+.server-profile-card__copy {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 4px;
 }
@@ -3336,6 +3361,42 @@ html.is-desktop .modal-overlay {
 .server-profile-card span {
   color: #949ba4;
   font-size: 12px;
+}
+
+.server-profile-card__icon-actions {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.server-profile-card__icon-actions label,
+.server-profile-card__icon-actions button {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--text-normal);
+  background: #383a40;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.server-profile-card__icon-actions button {
+  color: #ff9b9d;
+  background: rgb(237 66 69 / 12%);
+}
+
+.server-profile-card__icon-actions input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
 }
 
 .settings-field {
@@ -6625,9 +6686,23 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
   place-items: center;
 }
 
-.full-profile__avatar img {
+.full-profile__avatar-media {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  place-items: center;
+}
+
+.full-profile__avatar-media > img {
+  display: block;
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
   border-radius: inherit;
   object-fit: cover;
 }
@@ -6639,6 +6714,7 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
   height: 19px;
   border-width: 4px;
   border-color: #111214;
+  z-index: 1;
 }
 
 .full-profile__identity h2 {
@@ -6959,9 +7035,23 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
   place-items: center;
 }
 
-.profile-settings-preview__avatar > img {
+.profile-settings-preview__avatar-media {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  place-items: center;
+}
+
+.profile-settings-preview__avatar-media > img {
+  display: block;
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
   border-radius: inherit;
   object-fit: cover;
 }
@@ -6979,6 +7069,7 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
   background: #2b2d31;
   cursor: pointer;
   place-items: center;
+  z-index: 1;
 }
 
 .profile-settings-preview__avatar label { right: -3px; bottom: 2px; }
@@ -7060,6 +7151,24 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
 }
 
 @media (max-width: 600px) {
+  .server-profile-card {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .server-profile-card__icon-actions {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: row;
+    margin-left: 0;
+  }
+
+  .server-profile-card__icon-actions label,
+  .server-profile-card__icon-actions button {
+    flex: 1;
+    justify-content: center;
+  }
+
   .app-modal:has(.full-profile) {
     width: 100%;
     max-height: var(--content-viewport-height);

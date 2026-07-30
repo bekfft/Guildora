@@ -5,7 +5,7 @@ export const createGuildSchema = z.object({
     .trim()
     .min(2, 'Der Servername muss mindestens 2 Zeichen lang sein.')
     .max(80, 'Der Servername darf höchstens 80 Zeichen lang sein.'),
-  iconUrl: z.string().url('Die Icon-Adresse ist ungültig.').nullable().optional()
+  iconAttachmentId: z.string().uuid().nullable().optional()
 });
 
 export const discoveryQuerySchema = z.object({

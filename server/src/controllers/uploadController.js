@@ -73,7 +73,13 @@ export async function getUpload(req, res) {
        LIMIT 1`,
       [`/api/uploads/${attachment.id}`, `/api/uploads/${attachment.id}`]
     );
-    if (!profileAsset) {
+    const guildAsset = await db.get(
+      `SELECT 1 AS allowed FROM guilds
+       WHERE icon_url = ? OR banner_url = ?
+       LIMIT 1`,
+      [`/api/uploads/${attachment.id}`, `/api/uploads/${attachment.id}`]
+    );
+    if (!profileAsset && !guildAsset) {
       throw new ApiError(403, 'ATTACHMENT_FORBIDDEN', 'Du darfst diesen Anhang nicht öffnen.');
     }
   }

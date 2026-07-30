@@ -1,5 +1,5 @@
 import { ArrowLeft, Camera, Link2, PlusCircle, Server } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/Button.jsx';
 import TextField from '../components/TextField.jsx';
@@ -15,16 +15,25 @@ export default function GuildModal({ onClose, onToast }) {
   const [step, setStep] = useState('choose');
   const [name, setName] = useState(`Servers von ${user.display_name || user.username}`);
   const [slug, setSlug] = useState('');
-  const [preview, setPreview] = useState(null);
+  const [iconFile, setIconFile] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const preview = useMemo(() => iconFile ? URL.createObjectURL(iconFile) : null, [iconFile]);
+
+  useEffect(() => () => {
+    if (preview) URL.revokeObjectURL(preview);
+  }, [preview]);
 
   async function handleCreate(event) {
     event.preventDefault();
     setLoading(true);
     setError('');
     try {
-      const result = await createGuild({ name });
+      const uploaded = iconFile ? await api.uploadFiles([iconFile]) : null;
+      const result = await createGuild({
+        name,
+        ...(uploaded ? { iconAttachmentId: uploaded.attachments[0].id } : {})
+      });
       onClose();
       navigate(`/app/channels/${result.guild.id}/${result.channel.id}`);
       onToast('Dein Server wurde erstellt.', 'success');
@@ -74,7 +83,7 @@ export default function GuildModal({ onClose, onToast }) {
           <label className="icon-upload">
             <input type="file" accept="image/*" onChange={(event) => {
               const file = event.target.files?.[0];
-              if (file) setPreview(URL.createObjectURL(file));
+              setIconFile(file || null);
             }} />
             {preview ? <img src={preview} alt="Lokale Icon-Vorschau" /> : <><Camera size={26} /><span>Icon</span></>}
           </label>

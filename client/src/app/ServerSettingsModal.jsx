@@ -1,6 +1,6 @@
 import {
   BadgeCheck, Check, ChevronRight, CircleUserRound, Copy, FolderPlus, Hash, LayoutDashboard,
-  Gavel, Link2, LoaderCircle, Lock, Minus, Plus, RotateCcw, Save, Settings2, Shield, Trash2,
+  Gavel, ImagePlus, Link2, LoaderCircle, Lock, Minus, Plus, RotateCcw, Save, Settings2, Shield, Trash2,
   UserMinus, Users, Volume2, X
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -98,6 +98,8 @@ export default function ServerSettingsModal({
     description: guildData.guild.description || '',
     category: guildData.guild.category || 'Community'
   });
+  const [iconFile, setIconFile] = useState(null);
+  const [removeIcon, setRemoveIcon] = useState(false);
   const [newCategory, setNewCategory] = useState('');
   const [newChannel, setNewChannel] = useState({
     name: '',
@@ -113,6 +115,8 @@ export default function ServerSettingsModal({
   const [inviteDraft, setInviteDraft] = useState({ expiresIn: '86400', maxUses: 'none' });
   const [moderation, setModeration] = useState({ bans: [], timeouts: [], reports: [], audit_logs: [] });
   const dialogRef = useRef(null);
+  const iconObjectUrl = useMemo(() => iconFile ? URL.createObjectURL(iconFile) : null, [iconFile]);
+  const iconPreview = iconObjectUrl || (!removeIcon ? guildData.guild.icon_url : null);
 
   const selectedRole = guildData.roles.find((role) => role.id === selectedRoleId);
   const selectedMember = members.find((member) => member.id === selectedMemberId);
@@ -145,6 +149,10 @@ export default function ServerSettingsModal({
     if (tab !== 'moderation') return;
     api.moderation(guildData.guild.id).then(setModeration).catch((error) => onToast(error.message, 'error'));
   }, [tab, guildData.guild.id, onToast]);
+
+  useEffect(() => () => {
+    if (iconObjectUrl) URL.revokeObjectURL(iconObjectUrl);
+  }, [iconObjectUrl]);
 
   function requestClose() {
     if (closing) return;
@@ -229,7 +237,18 @@ export default function ServerSettingsModal({
 
   async function saveProfile(event) {
     event.preventDefault();
-    await run('profile', () => api.updateGuild(guildData.guild.id, profile), 'Serverprofil gespeichert.');
+    const result = await run('profile', async () => {
+      const uploaded = iconFile ? await api.uploadFiles([iconFile]) : null;
+      return api.updateGuild(guildData.guild.id, {
+        ...profile,
+        ...(uploaded ? { iconAttachmentId: uploaded.attachments[0].id } : {}),
+        ...(removeIcon ? { iconAttachmentId: null } : {})
+      });
+    }, 'Serverprofil gespeichert.');
+    if (result) {
+      setIconFile(null);
+      setRemoveIcon(false);
+    }
   }
 
   async function createCategory(event) {
@@ -453,11 +472,25 @@ export default function ServerSettingsModal({
               <header><h2>Serverprofil</h2><p>Lege fest, wie dein Server in Guildora angezeigt wird.</p></header>
               <section className="server-profile-card">
                 <div className="server-profile-card__icon">
-                  {guildData.guild.icon_url
-                    ? <img src={guildData.guild.icon_url} alt="" />
+                  {iconPreview
+                    ? <img src={iconPreview} alt="" />
                     : guildData.guild.name.slice(0, 2).toUpperCase()}
                 </div>
-                <div><strong>{profile.name || guildData.guild.name}</strong><span>{members.length} Mitglied{members.length === 1 ? '' : 'er'}</span></div>
+                <div className="server-profile-card__copy"><strong>{profile.name || guildData.guild.name}</strong><span>{members.length} Mitglied{members.length === 1 ? '' : 'er'}</span></div>
+                <div className="server-profile-card__icon-actions">
+                  <label>
+                    <ImagePlus size={16} /> Logo auswählen
+                    <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => {
+                      setIconFile(event.target.files?.[0] || null);
+                      setRemoveIcon(false);
+                    }} />
+                  </label>
+                  {(guildData.guild.icon_url || iconFile) && (
+                    <button type="button" onClick={() => { setIconFile(null); setRemoveIcon(true); }}>
+                      <Trash2 size={15} /> Entfernen
+                    </button>
+                  )}
+                </div>
               </section>
               <label className="settings-field">
                 <span>Servername</span>

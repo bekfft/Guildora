@@ -189,7 +189,9 @@ export default function ProfileModal({
         />
         <div className="full-profile__identity">
           <div className="full-profile__avatar">
-            {profile.avatar_url ? <img src={profile.avatar_url} alt="" /> : nameOf(profile)[0].toUpperCase()}
+            <span className="full-profile__avatar-media">
+              {profile.avatar_url ? <img src={profile.avatar_url} alt="" /> : nameOf(profile)[0].toUpperCase()}
+            </span>
             <i className={`status-dot status-dot--${profile.status}`} />
           </div>
           <div>

@@ -136,7 +136,9 @@ function ProfileSettings({ user, refreshUser, onToast }) {
           {(profile.banner_url || bannerFile) && <button type="button" onClick={() => { setBannerFile(null); setRemoveBanner(true); }} aria-label="Banner entfernen"><Trash2 size={15} /></button>}
         </div>
         <div className="profile-settings-preview__avatar">
-          {avatarPreview ? <img src={avatarPreview} alt="" /> : (form.displayName || user.username)[0].toUpperCase()}
+          <span className="profile-settings-preview__avatar-media">
+            {avatarPreview ? <img src={avatarPreview} alt="" /> : (form.displayName || user.username)[0].toUpperCase()}
+          </span>
           <label aria-label="Avatar auswählen"><ImagePlus size={15} /><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => { setAvatarFile(event.target.files[0] || null); setRemoveAvatar(false); }} /></label>
           {(profile.avatar_url || avatarFile) && <button type="button" onClick={() => { setAvatarFile(null); setRemoveAvatar(true); }} aria-label="Avatar entfernen"><Trash2 size={13} /></button>}
         </div>

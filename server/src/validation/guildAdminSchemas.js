@@ -8,7 +8,8 @@ const name = (label, max = 80) => z.string({ required_error: `Bitte gib einen ${
 export const guildProfileSchema = z.object({
   name: name('Servernamen'),
   description: z.string().trim().max(1000, 'Die Beschreibung darf höchstens 1.000 Zeichen lang sein.'),
-  category: name('Kategorie', 40)
+  category: name('Kategorie', 40),
+  iconAttachmentId: z.string().uuid().nullable().optional()
 }).strict();
 
 export const categorySchema = z.object({

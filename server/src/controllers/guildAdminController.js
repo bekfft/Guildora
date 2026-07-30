@@ -11,6 +11,7 @@ import {
 } from '../validation/guildAdminSchemas.js';
 import { channelRolePermissionSchema } from '../validation/channelPermissionSchemas.js';
 import { emitGuildRefresh, emitGuildRemoved } from '../realtime.js';
+import { guildImageUrl } from '../utils/guildAssets.js';
 
 async function guildOrThrow(guildId) {
   const guild = await db.get('SELECT * FROM guilds WHERE id = ?', [guildId]);
@@ -107,11 +108,12 @@ async function refreshGuild(guildId, scopes = ['guild', 'members', 'list']) {
 }
 
 export async function updateGuildProfile(req, res) {
-  await requirePermission(req.params.id, req.userId, 'manageServer');
+  const current = await requirePermission(req.params.id, req.userId, 'manageServer');
   const data = guildProfileSchema.parse(req.body);
+  const iconUrl = await guildImageUrl(req.userId, data.iconAttachmentId);
   await db.run(
-    'UPDATE guilds SET name = ?, description = ?, category = ? WHERE id = ?',
-    [data.name, data.description, data.category, req.params.id]
+    'UPDATE guilds SET name = ?, description = ?, category = ?, icon_url = ? WHERE id = ?',
+    [data.name, data.description, data.category, iconUrl === undefined ? current.icon_url : iconUrl, req.params.id]
   );
   await refreshGuild(req.params.id, ['guild', 'list']);
   return res.json({ guild: await db.get('SELECT * FROM guilds WHERE id = ?', [req.params.id]) });

@@ -10,6 +10,7 @@ import {
   unreadCountsForChannels
 } from '../utils/unread.js';
 import { requireNotBanned } from '../utils/moderation.js';
+import { guildImageUrl } from '../utils/guildAssets.js';
 
 function bool(value) {
   return Boolean(value);
@@ -273,11 +274,12 @@ export async function createGuild(req, res) {
   const data = createGuildSchema.parse(req.body);
   const guildId = crypto.randomUUID();
   const slug = `${slugify(data.name)}-${guildId.slice(0, 6)}`;
+  const iconUrl = await guildImageUrl(req.userId, data.iconAttachmentId);
   await db.run(
     `INSERT INTO guilds
      (id, name, slug, description, icon_url, owner_id, is_public, category)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [guildId, data.name, slug, '', data.iconUrl || null, req.userId, false, 'Community']
+    [guildId, data.name, slug, '', iconUrl || null, req.userId, false, 'Community']
   );
 
   const memberId = crypto.randomUUID();

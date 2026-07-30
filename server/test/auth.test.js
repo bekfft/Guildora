@@ -30,6 +30,7 @@ let registeredUserId;
 let createdGuildId;
 let createdChannelId;
 let createdVoiceChannelId;
+let createdGuildIconAttachmentId;
 
 function cookiesFrom(response) {
   return response.headers.getSetCookie()
@@ -188,13 +189,23 @@ test('Login verrät keine Details und akzeptiert E-Mail oder Benutzername', asyn
 });
 
 test('Server erstellen erzeugt Standards, Mitgliedschaft und geschützte Details', async () => {
+  const guildIconForm = new FormData();
+  guildIconForm.append('files', new Blob(['guild-icon'], { type: 'image/png' }), 'server-logo.png');
+  const guildIconUpload = await fetch(`${baseUrl}/api/uploads`, {
+    method: 'POST',
+    headers: { Cookie: authCookie },
+    body: guildIconForm
+  });
+  assert.equal(guildIconUpload.status, 201);
+  createdGuildIconAttachmentId = (await guildIconUpload.json()).attachments[0].id;
   const created = await request('/api/guilds', {
     cookie: authCookie,
-    body: { name: 'Test Community' }
+    body: { name: 'Test Community', iconAttachmentId: createdGuildIconAttachmentId }
   });
   assert.equal(created.status, 201);
   const body = await created.json();
   assert.equal(body.guild.name, 'Test Community');
+  assert.equal(body.guild.icon_url, `/api/uploads/${createdGuildIconAttachmentId}`);
   assert.equal(body.channel.name, 'allgemein');
   createdGuildId = body.guild.id;
   createdChannelId = body.channel.id;
@@ -316,11 +327,13 @@ test('Serververwaltung ändert Profil, Kategorien, Channels, Rollen und Mitglied
     body: {
       name: 'Test Community Plus',
       description: 'Echte Verwaltung im Integrationstest',
-      category: 'Technik'
+      category: 'Technik',
+      iconAttachmentId: null
     }
   });
   assert.equal(profile.status, 200);
   assert.equal((await profile.json()).guild.name, 'Test Community Plus');
+  assert.equal((await db.get('SELECT icon_url FROM guilds WHERE id = ?', [createdGuildId])).icon_url, null);
   assert.deepEqual(await guildRefreshEvent, {
     guildId: createdGuildId,
     scopes: ['guild', 'list']
@@ -678,7 +691,8 @@ test('Discovery, Join und Leave funktionieren vollständig', async () => {
     body: {
       name: 'Nicht erlaubt',
       description: '',
-      category: 'Community'
+      category: 'Community',
+      iconAttachmentId: null
     }
   });
   assert.equal(ownerOnly.status, 403);
@@ -696,7 +710,8 @@ test('Discovery, Join und Leave funktionieren vollständig', async () => {
     body: {
       name: 'Delegiert verwaltet',
       description: 'Rollenrechte sind wirksam.',
-      category: 'Community'
+      category: 'Community',
+      iconAttachmentId: null
     }
   });
   assert.equal(delegated.status, 200);
