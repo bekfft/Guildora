@@ -64,6 +64,15 @@ html[data-standalone-preview] {
   --safe-area-left: 0px;
 }
 
+@media (orientation: landscape) {
+  html[data-standalone-preview] {
+    --safe-area-top: 0px;
+    --safe-area-right: 47px;
+    --safe-area-bottom: 21px;
+    --safe-area-left: 47px;
+  }
+}
+
 html[data-theme="light"] {
   --bg-darkest: #e3e5e8;
   --bg-dark: #f2f3f5;

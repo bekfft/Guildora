@@ -9,6 +9,10 @@ const manifest = JSON.parse(
   fs.readFileSync(path.join(clientRoot, 'public', 'manifest.webmanifest'), 'utf8')
 );
 const mainSource = fs.readFileSync(path.join(clientRoot, 'src', 'main.jsx'), 'utf8');
+const appSource = fs.readFileSync(path.join(clientRoot, 'src', 'App.jsx'), 'utf8');
+const channelView = fs.readFileSync(path.join(clientRoot, 'src', 'app', 'ChannelView.jsx'), 'utf8');
+const directMessageView = fs.readFileSync(path.join(clientRoot, 'src', 'app', 'DirectMessageView.jsx'), 'utf8');
+const globalCss = fs.readFileSync(path.join(clientRoot, 'src', 'styles', 'global.css'), 'utf8');
 const tokensCss = fs.readFileSync(path.join(clientRoot, 'src', 'styles', 'tokens.css'), 'utf8');
 const appCss = fs.readFileSync(path.join(clientRoot, 'src', 'styles', 'app.css'), 'utf8');
 
@@ -32,4 +36,20 @@ test('Standalone-Modus und iPhone-Safe-Areas werden im App-Layout berücksichtig
   assert.match(appCss, /calc\(var\(--titlebar-height\) \+ var\(--safe-area-top\)\)/);
   assert.match(appCss, /var\(--safe-area-bottom\)/);
   assert.match(appCss, /\.app-navigation\s*\{[\s\S]*?height:\s*auto;/);
+});
+
+test('Mobile Vollbildansichten, Formulare und Composer bleiben in den sicheren Bedienflächen', () => {
+  assert.match(appSource, /!desktop\?\.isDesktop && !isStandalone/);
+  assert.match(globalCss, /html\[data-display-mode="standalone"\] \.auth-shell/);
+  assert.match(globalCss, /\.field__toggle\s*\{[\s\S]*?width:\s*44px;[\s\S]*?height:\s*44px;/);
+  assert.match(globalCss, /\.navbar__action\s*\{[\s\S]*?min-height:\s*44px;/);
+  assert.match(appCss, /\.modal-overlay\s*\{[\s\S]*?var\(--safe-area-top\)[\s\S]*?var\(--safe-area-bottom\)/);
+  assert.match(appCss, /\.server-settings-overlay\s*\{[\s\S]*?var\(--safe-area-top\)[\s\S]*?var\(--safe-area-bottom\)/);
+  assert.match(appCss, /\.engagement-overlay\s*\{[\s\S]*?var\(--safe-area-top\)[\s\S]*?var\(--safe-area-bottom\)/);
+  assert.match(appCss, /\.channel-view\s*\{[\s\S]*?min-width:\s*0;/);
+  assert.match(appCss, /\.composer-area\s*\{[\s\S]*?min-width:\s*0;[\s\S]*?width:\s*100%;/);
+  assert.match(appCss, /\.character-count:empty\s*\{\s*display:\s*none;/);
+  assert.match(appCss, /@media \(max-width: 900px\) \{\s*\.guildora-app,/);
+  assert.match(channelView, /fitComposer\(composerRef\.current\)/);
+  assert.match(directMessageView, /fitComposer\(composer\.current\)/);
 });

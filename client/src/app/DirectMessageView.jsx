@@ -9,6 +9,14 @@ function nameOf(user) {
   return user?.display_name || user?.username || 'Direktnachricht';
 }
 
+function fitComposer(field) {
+  if (!field) return;
+  field.style.height = 'auto';
+  const height = Math.min(160, Math.max(36, field.scrollHeight));
+  field.style.height = `${height}px`;
+  field.style.overflowY = field.scrollHeight > 160 ? 'auto' : 'hidden';
+}
+
 function Attachment({ attachment }) {
   const image = attachment.mime_type?.startsWith('image/');
   return (
@@ -22,6 +30,7 @@ function Attachment({ attachment }) {
 export default function DirectMessageView({ conversation, currentUserId, onOpenProfile, onToast, onRefresh }) {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
+  const composer = useRef(null);
   const [pendingFiles, setPendingFiles] = useState([]);
   const [sending, setSending] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -77,6 +86,10 @@ export default function DirectMessageView({ conversation, currentUserId, onOpenP
       if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
     });
   }, [messages.length]);
+
+  useEffect(() => {
+    fitComposer(composer.current);
+  }, [draft, conversation?.id]);
 
   function updateDraft(value) {
     setDraft(value);
@@ -141,7 +154,7 @@ export default function DirectMessageView({ conversation, currentUserId, onOpenP
         <div className="composer-shell">
           <label className="composer-tool" title="Datei anhängen"><Paperclip size={19} /><input type="file" multiple hidden onChange={(event) => setPendingFiles([...event.target.files].slice(0, 5))} /></label>
           <button className="composer-tool" type="button" title="Emoji" onClick={() => setEmojiOpen((current) => !current)}><SmilePlus size={19} /></button>
-          <textarea value={draft} maxLength={2000} rows={1} placeholder={`Nachricht an ${nameOf(conversation.user)}`} onChange={(event) => updateDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} />
+          <textarea ref={composer} value={draft} maxLength={2000} rows={1} placeholder={`Nachricht an ${nameOf(conversation.user)}`} onChange={(event) => updateDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} />
           <button type="button" onClick={send} disabled={sending || (!draft.trim() && !pendingFiles.length)}>{sending ? <LoaderCircle className="spin" size={19} /> : <Send size={19} />}</button>
         </div>
       </div>

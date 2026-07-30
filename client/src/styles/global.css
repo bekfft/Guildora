@@ -40,6 +40,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
   overscroll-behavior: none;
+  overflow-x: hidden;
 }
 
 #root {
@@ -63,6 +64,21 @@ html[data-display-mode="standalone"] body {
 html[data-display-mode="standalone"] :is(input, textarea, [contenteditable="true"]) {
   user-select: text;
   -webkit-touch-callout: default;
+}
+
+html[data-display-mode="standalone"] :is(.auth-shell, .invite-shell, .placeholder-page) {
+  height: 100%;
+  min-height: 100%;
+  padding-top: calc(72px + var(--safe-area-top));
+  padding-right: max(24px, var(--safe-area-right));
+  padding-bottom: calc(72px + var(--safe-area-bottom));
+  padding-left: max(24px, var(--safe-area-left));
+  overflow-y: auto;
+}
+
+html[data-display-mode="standalone"] .auth-brand {
+  top: calc(28px + var(--safe-area-top));
+  left: max(34px, var(--safe-area-left));
 }
 
 .desktop-titlebar {
@@ -1439,6 +1455,11 @@ p {
     margin-right: 6px;
     padding: 8px 13px;
     font-size: 12px;
+    min-height: 44px;
+  }
+
+  .navbar .brand {
+    min-height: 44px;
   }
 
   .navbar__menu {
@@ -1549,6 +1570,14 @@ p {
     background: var(--bg-main);
   }
 
+  html[data-display-mode="standalone"] .auth-shell {
+    padding:
+      calc(88px + var(--safe-area-top))
+      var(--safe-area-right)
+      var(--safe-area-bottom)
+      var(--safe-area-left);
+  }
+
   .auth-shell::before {
     display: none;
   }
@@ -1558,11 +1587,38 @@ p {
     left: 22px;
   }
 
+  html[data-display-mode="standalone"] .auth-brand {
+    top: calc(24px + var(--safe-area-top));
+    left: calc(22px + var(--safe-area-left));
+  }
+
   .auth-card {
     width: 100%;
     padding: 28px 22px 36px;
     border: 0;
     box-shadow: none;
+  }
+
+  .field__toggle {
+    right: 2px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .field__control:has(.field__toggle) input {
+    padding-right: 48px;
+  }
+
+  .form-link--small {
+    min-height: 40px;
+    align-items: center;
+    margin-top: -13px;
+  }
+
+  .auth-switch a {
+    display: inline-flex;
+    min-height: 40px;
+    align-items: center;
   }
 
   .auth-card__header {

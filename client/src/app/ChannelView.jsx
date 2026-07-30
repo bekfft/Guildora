@@ -31,6 +31,14 @@ function messageTime(value) {
     : new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' }).format(date);
 }
 
+function fitComposer(field) {
+  if (!field) return;
+  field.style.height = 'auto';
+  const height = Math.min(160, Math.max(36, field.scrollHeight));
+  field.style.height = `${height}px`;
+  field.style.overflowY = field.scrollHeight > 160 ? 'auto' : 'hidden';
+}
+
 function messageDay(value) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
@@ -102,6 +110,10 @@ export default function ChannelView({
   const [typingUsers, setTypingUsers] = useState(new Set());
   const scrollerRef = useRef(null);
   const composerRef = useRef(null);
+
+  useEffect(() => {
+    fitComposer(composerRef.current);
+  }, [draft, channel?.id]);
   const typingTimerRef = useRef(null);
   const initialScrollDone = useRef(false);
   const draftKey = channel ? `guildora:draft:${channel.id}` : '';

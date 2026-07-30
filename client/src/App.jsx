@@ -18,8 +18,9 @@ import { GuildoraDialogProvider } from './context/GuildoraDialogContext.jsx';
 function HomeRoute() {
   const desktop = useDesktop();
   const { user, loading } = useAuth();
+  const isStandalone = document.documentElement.dataset.displayMode === 'standalone';
 
-  if (!desktop?.isDesktop) return <LandingPage />;
+  if (!desktop?.isDesktop && !isStandalone) return <LandingPage />;
   if (loading) return <div className="route-loader"><span className="spinner spinner--large" /></div>;
   return <Navigate to={user ? '/app' : '/login'} replace />;
 }
@@ -27,8 +28,9 @@ function HomeRoute() {
 function WebDownloadRoute() {
   const desktop = useDesktop();
   const { user, loading } = useAuth();
+  const isStandalone = document.documentElement.dataset.displayMode === 'standalone';
 
-  if (!desktop?.isDesktop) return <DownloadPage />;
+  if (!desktop?.isDesktop && !isStandalone) return <DownloadPage />;
   if (loading) return <div className="route-loader"><span className="spinner spinner--large" /></div>;
   return <Navigate to={user ? '/app' : '/login'} replace />;
 }
