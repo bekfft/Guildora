@@ -5145,3 +5145,89 @@ html.is-desktop .modal-overlay {
     touch-action: manipulation;
   }
 }
+
+.profile-role-editor {
+  margin: 14px 16px 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--divider);
+}
+
+.profile-role-editor > strong,
+.profile-role-editor > span {
+  display: block;
+}
+
+.profile-role-editor > strong {
+  font-size: 12px;
+}
+
+.profile-role-editor > span,
+.profile-role-editor small {
+  color: var(--channel-idle);
+  font-size: 10px;
+}
+
+.profile-role-editor > div {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  flex-direction: column;
+}
+
+.profile-role-editor label {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: #1e1f22;
+  cursor: pointer;
+}
+
+.profile-role-editor label:hover {
+  background: #2b2d31;
+}
+
+.profile-role-editor label > span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-role-editor label i {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.profile-role-editor input {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  accent-color: var(--brand);
+}
+
+.profile-popover:has(.profile-role-editor) {
+  max-height: calc(100dvh - var(--titlebar-height) - 100px);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+@media (max-width: 520px) {
+  .profile-role-editor label {
+    min-height: 44px;
+  }
+
+  .profile-popover:has(.profile-role-editor) {
+    bottom: max(12px, env(safe-area-inset-bottom));
+    max-height: none;
+  }
+}

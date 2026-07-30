@@ -1,20 +1,32 @@
 import { ShieldCheck, Users, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { api } from '../lib/api.js';
 
 function memberName(member) {
   return member.nickname || member.display_name || member.username;
 }
 
-export default function MemberList({ members, loading, onClose }) {
-  const [selected, setSelected] = useState(null);
+export default function MemberList({
+  guildId,
+  members,
+  roles,
+  canManageRoles,
+  loading,
+  onClose,
+  onRolesChanged,
+  onToast
+}) {
+  const [selectedId, setSelectedId] = useState(null);
   const [closing, setClosing] = useState(false);
+  const [roleBusy, setRoleBusy] = useState(false);
+  const selected = members.find((member) => member.id === selectedId) || null;
 
   function closeProfile() {
     if (!selected || closing) return;
     setClosing(true);
     const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 160;
     window.setTimeout(() => {
-      setSelected(null);
+      setSelectedId(null);
       setClosing(false);
     }, delay);
   }
@@ -43,6 +55,22 @@ export default function MemberList({ members, loading, onClose }) {
     return [...grouped.values()].sort((a, b) => (b.role.position || 0) - (a.role.position || 0));
   }, [members]);
 
+  async function toggleRole(roleId, checked) {
+    if (!selected || roleBusy || !canManageRoles) return;
+    const current = selected.roles.filter((role) => !role.is_default).map((role) => role.id);
+    const next = checked ? [...new Set([...current, roleId])] : current.filter((id) => id !== roleId);
+    setRoleBusy(true);
+    try {
+      await api.updateMemberRoles(guildId, selected.id, next);
+      await onRolesChanged();
+      onToast('Rollen aktualisiert.', 'success');
+    } catch (error) {
+      onToast(error.message, 'error');
+    } finally {
+      setRoleBusy(false);
+    }
+  }
+
   return (
     <aside className="member-list" aria-label="Mitglieder">
       <div className="member-list__header">
@@ -55,7 +83,7 @@ export default function MemberList({ members, loading, onClose }) {
         <section className="member-group" key={group.role.name}>
           <h3 style={{ color: group.role.color || 'var(--channel-idle)' }}>{group.role.name.toUpperCase()} — {group.members.length}</h3>
           {group.members.map((member) => (
-            <button className="member-row" type="button" key={member.id} onClick={() => { setClosing(false); setSelected(member); }}>
+            <button className="member-row" type="button" key={member.id} onClick={() => { setClosing(false); setSelectedId(member.id); }}>
               <span className="member-avatar">{memberName(member)[0].toUpperCase()}<i className={`status-dot status-dot--${member.status}`} /></span>
               <span style={{ color: group.role.color || 'var(--channel-hover)' }}>{memberName(member)}</span>
             </button>
@@ -77,6 +105,26 @@ export default function MemberList({ members, loading, onClose }) {
             {selected.roles.filter((role) => !role.is_default).map((role) => <span key={role.id}><i style={{ background: role.color || '#949ba4' }} />{role.name}</span>)}
             {!selected.roles.some((role) => !role.is_default) && <span><i style={{ background: '#949ba4' }} />@everyone</span>}
           </div>
+          {canManageRoles && (
+            <div className="profile-role-editor">
+              <strong>Rollen verwalten</strong>
+              <span>Änderungen werden sofort gespeichert.</span>
+              <div>
+                {roles.filter((role) => !role.is_default).map((role) => (
+                  <label key={role.id}>
+                    <span><i style={{ background: role.color || '#949ba4' }} />{role.name}</span>
+                    <input
+                      type="checkbox"
+                      checked={selected.roles.some((item) => item.id === role.id)}
+                      disabled={roleBusy}
+                      onChange={(event) => toggleRole(role.id, event.target.checked)}
+                    />
+                  </label>
+                ))}
+                {!roles.some((role) => !role.is_default) && <small>Noch keine benutzerdefinierten Rollen vorhanden.</small>}
+              </div>
+            </div>
+          )}
           <div className="profile-popover__note"><ShieldCheck size={15} /> Guildora-Mitglied</div>
         </div>
       )}

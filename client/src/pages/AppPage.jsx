@@ -451,7 +451,16 @@ export default function AppPage() {
             aria-label="Mitgliederliste schließen"
             onClick={() => setMembersVisible(false)}
           />
-          <MemberList members={members} loading={loadingDetails} onClose={() => setMembersVisible(false)} />
+          <MemberList
+            guildId={guildData?.guild.id}
+            members={members}
+            roles={guildData?.roles || []}
+            canManageRoles={capabilities.manageRoles}
+            loading={loadingDetails}
+            onClose={() => setMembersVisible(false)}
+            onRolesChanged={refreshGuildData}
+            onToast={showToast}
+          />
         </>
       )}
 
