@@ -1,11 +1,27 @@
 import {
-  ChevronDown, ChevronRight, FolderPen, Headphones, Hash, LogOut, Mic, MicOff,
-  Search, Settings, Trash2, UserRound, Volume2, VolumeX
+  BadgeCheck, Bug, ChevronDown, ChevronRight, Copy, Crown, Edit3, FolderPen, Gem,
+  Handshake, Headphones, Heart, Hash, LogOut, Mic, MicOff, Search, Settings,
+  ShieldCheck, Trash2, UserRound, Volume2, VolumeX
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink } from 'react-router-dom';
+import { api } from '../lib/api.js';
 import VoicePanel from './VoicePanel.jsx';
+
+const BADGE_ICONS = {
+  'badge-check': BadgeCheck,
+  bug: Bug,
+  crown: Crown,
+  gem: Gem,
+  handshake: Handshake,
+  heart: Heart
+};
+
+function ProfileBadgeIcon({ name }) {
+  const Icon = BADGE_ICONS[name] || ShieldCheck;
+  return <Icon aria-hidden="true" size={14} strokeWidth={2.2} />;
+}
 
 function voiceParticipantName(participant) {
   return participant.is_local ? `${participant.name} (Du)` : participant.name;
@@ -52,7 +68,11 @@ export default function ChannelSidebar({
   const [contextMenu, setContextMenu] = useState(null);
   const [draggingChannelId, setDraggingChannelId] = useState(null);
   const [dropTarget, setDropTarget] = useState(null);
+  const [profileCardOpen, setProfileCardOpen] = useState(false);
+  const [panelProfile, setPanelProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
   const contextMenuRef = useRef(null);
+  const userPanelRef = useRef(null);
   const draggingChannelRef = useRef(null);
   const isHome = !guildData;
 
@@ -84,6 +104,49 @@ export default function ChannelSidebar({
       window.removeEventListener('scroll', close, true);
     };
   }, [contextMenu]);
+
+  useEffect(() => {
+    if (!profileCardOpen) return undefined;
+    const close = (event) => {
+      if (event.type === 'keydown' && event.key !== 'Escape') return;
+      if (event.type === 'pointerdown' && userPanelRef.current?.contains(event.target)) return;
+      setProfileCardOpen(false);
+    };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', close);
+    window.addEventListener('resize', close);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', close);
+      window.removeEventListener('resize', close);
+    };
+  }, [profileCardOpen]);
+
+  async function toggleProfileCard() {
+    const nextOpen = !profileCardOpen;
+    setProfileCardOpen(nextOpen);
+    if (!nextOpen || profileLoading) return;
+    setProfileLoading(true);
+    try {
+      const result = await api.profile(user.id);
+      setPanelProfile(result.profile);
+    } catch (error) {
+      onToast(error.message, 'error');
+      setProfileCardOpen(false);
+    } finally {
+      setProfileLoading(false);
+    }
+  }
+
+  async function copyUserId() {
+    try {
+      await navigator.clipboard.writeText(user.id);
+      onToast('Nutzer-ID kopiert.', 'success');
+      setProfileCardOpen(false);
+    } catch {
+      onToast('Die Nutzer-ID konnte nicht kopiert werden.', 'error');
+    }
+  }
 
   function openContextMenu(event, kind, item) {
     if (!canManageChannels) return;
@@ -391,20 +454,82 @@ export default function ChannelSidebar({
         </>
       )}
       {voice.channel && <VoicePanel voice={voice} onToast={onToast} />}
-      <div className="user-panel">
-        <div className="mini-avatar">{(user.display_name || user.username)[0].toUpperCase()}<span className="status-dot" /></div>
-        <div className="user-panel__identity">
-          <strong>{user.display_name || user.username}</strong>
-          <span>@{user.username}</span>
-        </div>
-        <div className="user-panel__actions">
-          <button className={voice.muted ? 'is-danger' : ''} type="button" onClick={() => toggleVoiceControl(voice.toggleMuted)} aria-label={voice.muted ? 'Mikrofon aktivieren' : 'Mikrofon stummschalten'}>
-            {voice.muted ? <MicOff size={17} /> : <Mic size={17} />}
+      <div className="user-panel-wrap" ref={userPanelRef}>
+        {profileCardOpen && (
+          <article className="user-profile-card">
+            <div
+              className="user-profile-card__banner"
+              style={(panelProfile?.banner_url || user.banner_url)
+                ? { backgroundImage: `url("${panelProfile?.banner_url || user.banner_url}")` }
+                : undefined}
+            />
+            <div className="user-profile-card__body">
+              <div className="user-profile-card__avatar">
+                {(panelProfile?.avatar_url || user.avatar_url)
+                  ? <img src={panelProfile?.avatar_url || user.avatar_url} alt="" />
+                  : (user.display_name || user.username)[0].toUpperCase()}
+                <span className="status-dot" />
+              </div>
+              <div className="user-profile-card__heading">
+                <strong>{panelProfile?.display_name || user.display_name || user.username}</strong>
+                <span>@{user.username}</span>
+              </div>
+              {(panelProfile?.custom_status || user.custom_status) && (
+                <p className="user-profile-card__status">{panelProfile?.custom_status || user.custom_status}</p>
+              )}
+              {profileLoading ? (
+                <span className="user-profile-card__loading">Profil wird geladen …</span>
+              ) : panelProfile?.badges?.some((badge) => badge.is_visible) ? (
+                <div className="user-profile-card__badges" aria-label="Profilabzeichen">
+                  {panelProfile.badges.filter((badge) => badge.is_visible).map((badge) => (
+                    <span
+                      style={{ '--badge-start': badge.color_start, '--badge-end': badge.color_end }}
+                      title={badge.name}
+                      key={badge.id}
+                    >
+                      <ProfileBadgeIcon name={badge.icon} />
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              {panelProfile?.bio && <p className="user-profile-card__bio">{panelProfile.bio}</p>}
+              <div className="user-profile-card__actions">
+                <button type="button" onClick={() => { setProfileCardOpen(false); onOpenSettings('Profil'); }}>
+                  <Edit3 size={16} /> Profil bearbeiten
+                </button>
+                <button type="button" onClick={copyUserId}>
+                  <Copy size={16} /> Nutzer-ID kopieren
+                </button>
+              </div>
+            </div>
+          </article>
+        )}
+        <div className="user-panel">
+          <button
+            className={`user-panel__profile-trigger ${profileCardOpen ? 'is-open' : ''}`}
+            type="button"
+            onClick={toggleProfileCard}
+            aria-expanded={profileCardOpen}
+            aria-label="Eigenes Profil öffnen"
+          >
+            <span className="mini-avatar">
+              {user.avatar_url ? <img src={user.avatar_url} alt="" /> : (user.display_name || user.username)[0].toUpperCase()}
+              <span className="status-dot" />
+            </span>
+            <span className="user-panel__identity">
+              <strong>{user.display_name || user.username}</strong>
+              <span>@{user.username}</span>
+            </span>
           </button>
-          <button className={voice.deafened ? 'is-danger' : ''} type="button" onClick={() => toggleVoiceControl(voice.toggleDeafened)} aria-label={voice.deafened ? 'Ton aktivieren' : 'Ton deaktivieren'}>
-            {voice.deafened ? <VolumeX size={17} /> : <Headphones size={17} />}
-          </button>
-          <button type="button" onClick={onOpenSettings} aria-label="Einstellungen"><Settings size={17} /></button>
+          <div className="user-panel__actions">
+            <button className={voice.muted ? 'is-danger' : ''} type="button" onClick={() => toggleVoiceControl(voice.toggleMuted)} aria-label={voice.muted ? 'Mikrofon aktivieren' : 'Mikrofon stummschalten'}>
+              {voice.muted ? <MicOff size={17} /> : <Mic size={17} />}
+            </button>
+            <button className={voice.deafened ? 'is-danger' : ''} type="button" onClick={() => toggleVoiceControl(voice.toggleDeafened)} aria-label={voice.deafened ? 'Ton aktivieren' : 'Ton deaktivieren'}>
+              {voice.deafened ? <VolumeX size={17} /> : <Headphones size={17} />}
+            </button>
+            <button type="button" onClick={() => onOpenSettings('Mein Konto')} aria-label="Einstellungen"><Settings size={17} /></button>
+          </div>
         </div>
       </div>
       {contextMenu && createPortal(
