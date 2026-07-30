@@ -3,6 +3,7 @@ import { db } from '../db/index.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { emitToChannel, emitToUsers } from '../realtime.js';
 import { requireChannelPermission } from '../utils/channelPermissions.js';
+import { createNotification } from '../utils/notifications.js';
 import {
   createMessageSchema,
   messageQuerySchema,
@@ -10,7 +11,7 @@ import {
   updateMessageSchema
 } from '../validation/messageSchemas.js';
 
-const MESSAGE_SELECT = `
+export const MESSAGE_SELECT = `
   SELECT m.id, m.channel_id, m.author_id, m.content, m.created_at,
          m.updated_at, m.edited, u.username, u.display_name, u.avatar_url,
          replies.reply_to_id,
@@ -58,7 +59,7 @@ function baseMessageResponse(message) {
   };
 }
 
-async function hydrateMessages(rows) {
+export async function hydrateMessages(rows) {
   if (!rows.length) return [];
   const ids = rows.map((message) => message.id);
   const markerList = placeholders(ids);
@@ -179,6 +180,32 @@ async function reactionFor(messageId, emoji) {
 export async function getMessages(req, res) {
   await channelAccess(req.params.channelId, req.userId, 'readHistory');
   const query = messageQuerySchema.parse(req.query);
+  if (query.around) {
+    const target = await messageOrThrow(query.around);
+    if (target.channel_id !== req.params.channelId) {
+      throw new ApiError(400, 'INVALID_MESSAGE_TARGET', 'Die Zielnachricht gehört nicht zu diesem Channel.');
+    }
+    const beforeLimit = Math.ceil(query.limit / 2);
+    const beforeRows = await db.all(
+      `${MESSAGE_SELECT}
+       WHERE m.channel_id = ?
+         AND (m.created_at < ? OR (m.created_at = ? AND m.id <= ?))
+       ORDER BY m.created_at DESC, m.id DESC
+       LIMIT ?`,
+      [req.params.channelId, target.created_at, target.created_at, target.id, beforeLimit + 1]
+    );
+    const afterRows = await db.all(
+      `${MESSAGE_SELECT}
+       WHERE m.channel_id = ?
+         AND (m.created_at > ? OR (m.created_at = ? AND m.id > ?))
+       ORDER BY m.created_at ASC, m.id ASC
+       LIMIT ?`,
+      [req.params.channelId, target.created_at, target.created_at, target.id, Math.floor(query.limit / 2)]
+    );
+    const hasMore = beforeRows.length > beforeLimit;
+    const rows = [...beforeRows.slice(0, beforeLimit).reverse(), ...afterRows];
+    return res.json({ messages: await hydrateMessages(rows), has_more: hasMore });
+  }
   const params = [req.params.channelId];
   let beforeClause = '';
   if (query.before) {
@@ -201,8 +228,9 @@ export async function getMessages(req, res) {
 export async function createMessage(req, res) {
   await channelAccess(req.params.channelId, req.userId, 'sendMessages');
   const data = createMessageSchema.parse(req.body);
+  let replyTarget = null;
   if (data.replyToId) {
-    const replyTarget = await messageOrThrow(data.replyToId);
+    replyTarget = await messageOrThrow(data.replyToId);
     if (replyTarget.channel_id !== req.params.channelId) {
       throw new ApiError(400, 'INVALID_REPLY_TARGET', 'Du kannst nur auf Nachrichten im selben Channel antworten.');
     }
@@ -226,10 +254,40 @@ export async function createMessage(req, res) {
   const mentionSync = await syncMentions(id, req.params.channelId, data.content);
   const message = await hydratedMessage(id);
   emitToChannel(req.params.channelId, 'message:create', { message });
-  const notifiedUsers = mentionSync.newUserIds.filter((userId) => userId !== req.userId);
+  const notifiedUsers = mentionSync.newUserIds.filter(
+    (userId) => userId !== req.userId && userId !== replyTarget?.author_id
+  );
   if (notifiedUsers.length) {
     emitToUsers(notifiedUsers, 'mention:create', { message, channelId: req.params.channelId });
   }
+  for (const userId of notifiedUsers) {
+    await createNotification({
+      userId,
+      type: 'mention',
+      messageId: id,
+      channelId: req.params.channelId,
+      actorId: req.userId
+    });
+  }
+  if (replyTarget?.author_id && replyTarget.author_id !== req.userId) {
+    await createNotification({
+      userId: replyTarget.author_id,
+      type: 'reply',
+      messageId: id,
+      channelId: req.params.channelId,
+      actorId: req.userId
+    });
+  }
+  const channel = await db.get('SELECT guild_id FROM channels WHERE id = ?', [req.params.channelId]);
+  const guildMembers = await db.all(
+    'SELECT user_id FROM guild_members WHERE guild_id = ? AND user_id <> ?',
+    [channel.guild_id, req.userId]
+  );
+  emitToUsers(
+    guildMembers.map((member) => member.user_id),
+    'unread:refresh',
+    { guildId: channel.guild_id, channelId: req.params.channelId }
+  );
   return res.status(201).json({ message });
 }
 
@@ -251,6 +309,15 @@ export async function updateMessage(req, res) {
   const notifiedUsers = mentionSync.newUserIds.filter((userId) => userId !== req.userId);
   if (notifiedUsers.length) {
     emitToUsers(notifiedUsers, 'mention:create', { message, channelId: stored.channel_id });
+  }
+  for (const userId of notifiedUsers) {
+    await createNotification({
+      userId,
+      type: 'mention',
+      messageId: stored.id,
+      channelId: stored.channel_id,
+      actorId: req.userId
+    });
   }
   return res.json({ message });
 }

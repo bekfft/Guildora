@@ -76,6 +76,8 @@ export default function ChannelView({
   currentUserId,
   canManageMessages,
   members = [],
+  focusMessageId,
+  onRead,
   onToast
 }) {
   const [messages, setMessages] = useState([]);
@@ -110,21 +112,33 @@ export default function ChannelView({
       setLoading(false);
       return () => { active = false; };
     }
-    api.messages(channel.id)
+    api.messages(channel.id, focusMessageId ? { around: focusMessageId } : {})
       .then((result) => {
         if (!active) return;
         setMessages(result.messages);
         setHasMore(result.has_more);
+        const readTarget = focusMessageId || result.messages.at(-1)?.id;
+        if (readTarget) {
+          api.markChannelRead(channel.id, readTarget)
+            .then((readResult) => active && onRead?.(channel.id, readResult.unread_count))
+            .catch(() => {});
+        }
       })
       .catch((error) => active && onToast(error.message, 'error'))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
-  }, [channel?.id, draftKey, onToast, canReadHistory]);
+  }, [channel?.id, draftKey, focusMessageId, onToast, canReadHistory]);
 
   useEffect(() => {
     if (!channel) return undefined;
     const onCreate = ({ message }) => {
-      if (message.channel_id === channel.id) setMessages((current) => mergeMessage(current, message));
+      if (message.channel_id !== channel.id) return;
+      setMessages((current) => mergeMessage(current, message));
+      if (message.author.id !== currentUserId && document.visibilityState === 'visible') {
+        api.markChannelRead(channel.id, message.id)
+          .then((readResult) => onRead?.(channel.id, readResult.unread_count))
+          .catch(() => {});
+      }
     };
     const onUpdate = ({ message }) => {
       if (message.channel_id === channel.id) setMessages((current) => mergeMessage(current, message));
@@ -141,11 +155,6 @@ export default function ChannelView({
         setMessages((current) => mergeReaction(current, messageId, reaction));
       }
     };
-    const onMention = ({ message, channelId }) => {
-      if (channelId === channel.id && message.author.id !== currentUserId) {
-        onToast(`${authorName(message.author)} hat dich in #${channel.name} erwähnt.`, 'info');
-      }
-    };
     const onConnectError = async (error) => {
       if (error.message !== 'UNAUTHORIZED') return;
       try {
@@ -159,7 +168,6 @@ export default function ChannelView({
     socket.on('message:update', onUpdate);
     socket.on('message:delete', onDelete);
     socket.on('message:reaction', onReaction);
-    socket.on('mention:create', onMention);
     socket.on('connect_error', onConnectError);
     if (!socket.connected) socket.connect();
     socket.emit('channel:join', { channelId: channel.id });
@@ -170,18 +178,18 @@ export default function ChannelView({
       socket.off('message:update', onUpdate);
       socket.off('message:delete', onDelete);
       socket.off('message:reaction', onReaction);
-      socket.off('mention:create', onMention);
       socket.off('connect_error', onConnectError);
       socket.off('connect', rejoin);
     };
-  }, [channel?.id, channel?.name, currentUserId, onToast]);
+  }, [channel?.id, currentUserId, onRead, onToast]);
 
   useEffect(() => {
     if (!loading && !initialScrollDone.current && scrollerRef.current) {
-      scrollerRef.current.scrollTop = scrollerRef.current.scrollHeight;
+      if (focusMessageId) scrollToMessage(focusMessageId);
+      else scrollerRef.current.scrollTop = scrollerRef.current.scrollHeight;
       initialScrollDone.current = true;
     }
-  }, [loading, messages.length]);
+  }, [loading, messages.length, focusMessageId]);
 
   useEffect(() => {
     if (!draftKey) return;

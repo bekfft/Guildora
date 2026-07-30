@@ -193,7 +193,7 @@ export default function ChannelSidebar({
                   <div>
                     {guildData.channels.filter((channel) => !channel.category_id).map((channel) => (
                       <div
-                        className={`channel-row ${channelId === channel.id ? 'is-active' : ''} ${draggingChannelId === channel.id ? 'is-dragging' : ''}`}
+                        className={`channel-row ${channelId === channel.id ? 'is-active' : ''} ${channel.unread_count > 0 ? 'is-unread' : ''} ${draggingChannelId === channel.id ? 'is-dragging' : ''}`}
                         draggable={canManageChannels}
                         onDragStart={(event) => startChannelDrag(event, channel)}
                         onDragEnd={finishChannelDrag}
@@ -210,6 +210,7 @@ export default function ChannelSidebar({
                             onClick={onNavigate}
                           >
                             <Hash size={20} /><span>{channel.name}</span>
+                            {channel.unread_count > 0 && <strong className="channel-unread-count">{channel.unread_count > 99 ? '99+' : channel.unread_count}</strong>}
                           </NavLink>
                         ) : (
                           <button className="channel-link" type="button" data-channel-link draggable={canManageChannels} onClick={() => onToast('Voice kommt in einer späteren Version.')}>
@@ -259,7 +260,7 @@ export default function ChannelSidebar({
                     <div>
                       {channels.map((channel) => (
                         <div
-                          className={`channel-row ${channelId === channel.id ? 'is-active' : ''} ${draggingChannelId === channel.id ? 'is-dragging' : ''}`}
+                          className={`channel-row ${channelId === channel.id ? 'is-active' : ''} ${channel.unread_count > 0 ? 'is-unread' : ''} ${draggingChannelId === channel.id ? 'is-dragging' : ''}`}
                           draggable={canManageChannels}
                           onDragStart={(event) => startChannelDrag(event, channel)}
                           onDragEnd={finishChannelDrag}
@@ -277,6 +278,7 @@ export default function ChannelSidebar({
                               onClick={onNavigate}
                             >
                               <Hash size={20} /><span>{channel.name}</span>
+                              {channel.unread_count > 0 && <strong className="channel-unread-count">{channel.unread_count > 99 ? '99+' : channel.unread_count}</strong>}
                             </NavLink>
                           ) : (
                             <button className="channel-link" type="button" data-channel-link draggable={canManageChannels} tabIndex={collapsed[category.id] ? -1 : 0} onClick={() => onToast('Voice kommt in einer späteren Version.')}>

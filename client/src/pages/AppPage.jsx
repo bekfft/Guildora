@@ -9,7 +9,9 @@ import DiscoveryPage from '../app/DiscoveryPage.jsx';
 import FriendsView from '../app/FriendsView.jsx';
 import GuildModal from '../app/GuildModal.jsx';
 import MainHeader from '../app/MainHeader.jsx';
+import MessageSearch from '../app/MessageSearch.jsx';
 import MemberList from '../app/MemberList.jsx';
+import NotificationCenter from '../app/NotificationCenter.jsx';
 import ServerRail from '../app/ServerRail.jsx';
 import ServerSettingsModal from '../app/ServerSettingsModal.jsx';
 import SettingsModal from '../app/SettingsModal.jsx';
@@ -22,7 +24,7 @@ import '../styles/app.css';
 
 export default function AppPage() {
   const { user } = useAuth();
-  const { guilds, loading: guildsLoading, leaveGuild } = useGuilds();
+  const { guilds, loading: guildsLoading, leaveGuild, refreshGuilds } = useGuilds();
   const { guildId, channelId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -36,10 +38,15 @@ export default function AppPage() {
   const [serverSettingsTab, setServerSettingsTab] = useState(null);
   const [channelSettings, setChannelSettings] = useState(null);
   const [categorySettings, setCategorySettings] = useState(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
   const [toast, setToast] = useState(null);
   const toastTimers = useRef([]);
+  const engagementRefreshTimer = useRef(null);
   const isDiscovery = location.pathname === '/app/discovery';
   const isHome = location.pathname === '/app/channels/@me';
+  const focusMessageId = new URLSearchParams(location.search).get('message');
 
   const showToast = useCallback((message, type = 'info') => {
     toastTimers.current.forEach((timer) => window.clearTimeout(timer));
@@ -53,6 +60,13 @@ export default function AppPage() {
 
   useEffect(() => () => {
     toastTimers.current.forEach((timer) => window.clearTimeout(timer));
+    if (engagementRefreshTimer.current) window.clearTimeout(engagementRefreshTimer.current);
+  }, []);
+
+  useEffect(() => {
+    api.notifications({ limit: 1 })
+      .then((result) => setNotificationCount(result.unread_count))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -89,6 +103,44 @@ export default function AppPage() {
       .finally(() => active && setLoadingDetails(false));
     return () => { active = false; };
   }, [guildId]);
+
+  useEffect(() => {
+    const onNotification = ({ notification }) => {
+      setNotificationCount((current) => current + 1);
+      const actor = notification.actor.display_name || notification.actor.username;
+      showToast(
+        notification.type === 'mention'
+          ? `${actor} hat dich in #${notification.channel_name} erwähnt.`
+          : `${actor} hat dir in #${notification.channel_name} geantwortet.`,
+        'info'
+      );
+      if (
+        localStorage.getItem('guildora:desktop-notifications') === 'enabled'
+        && 'Notification' in window
+        && Notification.permission === 'granted'
+      ) {
+        new Notification(notification.type === 'mention' ? 'Neue Erwähnung' : 'Neue Antwort', {
+          body: `${actor} in #${notification.channel_name}: ${notification.content.slice(0, 120)}`
+        });
+      }
+    };
+    const onUnreadRefresh = ({ guildId: changedGuildId }) => {
+      if (engagementRefreshTimer.current) window.clearTimeout(engagementRefreshTimer.current);
+      engagementRefreshTimer.current = window.setTimeout(async () => {
+        refreshGuilds(false).catch(() => {});
+        if (changedGuildId === guildId) {
+          api.guild(guildId).then(setGuildData).catch(() => {});
+        }
+      }, 180);
+    };
+    socket.on('notification:create', onNotification);
+    socket.on('unread:refresh', onUnreadRefresh);
+    if (!socket.connected) socket.connect();
+    return () => {
+      socket.off('notification:create', onNotification);
+      socket.off('unread:refresh', onUnreadRefresh);
+    };
+  }, [guildId, refreshGuilds, showToast]);
 
   useEffect(() => {
     if (guildId && channelId) localStorage.setItem(`guildora:last-channel:${guildId}`, channelId);
@@ -129,6 +181,22 @@ export default function AppPage() {
     const [details, memberResult] = await Promise.all([api.guild(guildId), api.guildMembers(guildId)]);
     setGuildData(details);
     setMembers(memberResult.members);
+  }
+
+  const handleChannelRead = useCallback((readChannelId, unreadCount) => {
+    setGuildData((current) => current ? {
+      ...current,
+      channels: current.channels.map((channel) => (
+        channel.id === readChannelId ? { ...channel, unread_count: unreadCount } : channel
+      ))
+    } : current);
+    refreshGuilds(false).catch(() => {});
+  }, [refreshGuilds]);
+
+  function navigateToMessage(item) {
+    setNotificationsOpen(false);
+    setSearchOpen(false);
+    navigate(`/app/channels/${item.guild_id || guildId}/${item.channel_id || item.channel.id}?message=${item.message_id || item.id}`);
   }
 
   async function handleLeave() {
@@ -239,17 +307,22 @@ export default function AppPage() {
             channel={activeChannel}
             isHome={isHome}
             membersVisible={membersVisible}
+            notificationCount={notificationCount}
             onToggleMembers={() => setMembersVisible((value) => !value)}
             onToast={showToast}
             onOpenDrawer={() => setDrawerOpen(true)}
+            onOpenNotifications={() => setNotificationsOpen(true)}
+            onOpenSearch={() => setSearchOpen(true)}
           />
           {isHome ? <FriendsView /> : (
             <ChannelView
-              key={activeChannel?.id || 'loading'}
+              key={`${activeChannel?.id || 'loading'}:${focusMessageId || ''}`}
               channel={loadingDetails ? null : activeChannel}
               currentUserId={user.id}
               canManageMessages={capabilities.manageMessages}
               members={members}
+              focusMessageId={focusMessageId}
+              onRead={handleChannelRead}
               onToast={showToast}
             />
           )}
@@ -293,6 +366,23 @@ export default function AppPage() {
           category={categorySettings}
           onClose={() => setCategorySettings(null)}
           onRefresh={refreshGuildData}
+          onToast={showToast}
+        />
+      )}
+      {notificationsOpen && (
+        <NotificationCenter
+          onClose={() => setNotificationsOpen(false)}
+          onNavigate={navigateToMessage}
+          onCountChange={setNotificationCount}
+          onToast={showToast}
+        />
+      )}
+      {searchOpen && guildData && (
+        <MessageSearch
+          guildData={guildData}
+          members={members}
+          onClose={() => setSearchOpen(false)}
+          onNavigate={navigateToMessage}
           onToast={showToast}
         />
       )}

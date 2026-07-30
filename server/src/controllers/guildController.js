@@ -4,6 +4,11 @@ import { ApiError } from '../middleware/errorHandler.js';
 import { createGuildSchema, discoveryQuerySchema } from '../validation/guildSchemas.js';
 import { getChannelPermissions, requireChannelPermission } from '../utils/channelPermissions.js';
 import { isUserOnline } from '../realtime.js';
+import {
+  initializeGuildReadStates,
+  unreadCountForGuild,
+  unreadCountsForChannels
+} from '../utils/unread.js';
 
 function bool(value) {
   return Boolean(value);
@@ -25,6 +30,7 @@ function guildResponse(guild) {
     created_at: guild.created_at,
     member_count: Number(guild.member_count || 0),
     online_count: Number(guild.online_count || 0),
+    unread_count: Number(guild.unread_count || 0),
     is_member: bool(guild.is_member)
   };
 }
@@ -83,7 +89,11 @@ export async function getMyGuilds(req, res) {
      ORDER BY g.is_official DESC, gm.joined_at ASC`,
     [req.userId]
   );
-  return res.json({ guilds: guilds.map(guildResponse) });
+  const hydratedGuilds = await Promise.all(guilds.map(async (guild) => ({
+    ...guild,
+    unread_count: await unreadCountForGuild(guild.id, req.userId)
+  })));
+  return res.json({ guilds: hydratedGuilds.map(guildResponse) });
 }
 
 export async function discoverGuilds(req, res) {
@@ -138,14 +148,22 @@ export async function getGuild(req, res) {
     const permissions = await getChannelPermissions(channel.id, req.userId);
     return permissions.viewChannel ? { ...channel, permissions } : null;
   }))).filter(Boolean);
-  const visibleCategoryIds = new Set(channelsWithPermissions.map((channel) => channel.category_id).filter(Boolean));
+  const readableChannelIds = channelsWithPermissions
+    .filter((channel) => channel.type === 'text' && channel.permissions.readHistory)
+    .map((channel) => channel.id);
+  const unreadCounts = await unreadCountsForChannels(readableChannelIds, req.userId);
+  const channelsWithUnread = channelsWithPermissions.map((channel) => ({
+    ...channel,
+    unread_count: unreadCounts.get(channel.id) || 0
+  }));
+  const visibleCategoryIds = new Set(channelsWithUnread.map((channel) => channel.category_id).filter(Boolean));
   const visibleCategories = channelsWithPermissions.length === channels.length
     ? categories
     : categories.filter((category) => visibleCategoryIds.has(category.id));
   return res.json({
     guild: guildResponse({ ...guild, is_member: true }),
     categories: visibleCategories,
-    channels: channelsWithPermissions,
+    channels: channelsWithUnread,
     roles: roles.map(roleResponse)
   });
 }
@@ -197,6 +215,7 @@ export async function joinGuild(req, res) {
   }
   const memberId = crypto.randomUUID();
   await db.run('INSERT INTO guild_members (id, guild_id, user_id) VALUES (?, ?, ?)', [memberId, guild.id, req.userId]);
+  await initializeGuildReadStates(guild.id, req.userId);
   return res.status(201).json({ guild: guildResponse({ ...guild, is_member: true }), channel: await firstTextChannel(guild.id) });
 }
 

@@ -140,10 +140,11 @@ test('Migrationen laufen nur einmal und erhalten Server-, Rollen- und Channel-Zu
     attach_files: 1,
     manage_messages: 1
   });
-  assert.equal(migrationCount.count, 9);
+  assert.equal(migrationCount.count, 10);
   const backups = fs.readdirSync(path.join(temporaryDirectory, 'backups'));
-  assert.equal(backups.length, 1);
-  assert.match(backups[0], /^guildora-before-migration-baseline-.+\.sqlite$/);
+  assert.equal(backups.length, 2);
+  assert.ok(backups.some((backup) => /^guildora-before-migration-baseline-.+\.sqlite$/.test(backup)));
+  assert.ok(backups.some((backup) => /^guildora-before-migration-010_read_states_notifications_search-.+\.sqlite$/.test(backup)));
 });
 
 test('Seed verändert einen bereits vorhandenen offiziellen Server nicht', async () => {

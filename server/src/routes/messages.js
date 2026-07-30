@@ -7,6 +7,13 @@ import {
   toggleReaction,
   updateMessage
 } from '../controllers/messageController.js';
+import {
+  listNotifications,
+  markChannelRead,
+  readAllNotifications,
+  readNotification,
+  searchMessages
+} from '../controllers/engagementController.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 
@@ -24,6 +31,11 @@ const sendLimiter = rateLimit({
 });
 
 router.get('/channels/:channelId/messages', asyncHandler(getMessages));
+router.post('/channels/:channelId/read', asyncHandler(markChannelRead));
+router.get('/guilds/:guildId/messages/search', asyncHandler(searchMessages));
+router.get('/notifications', asyncHandler(listNotifications));
+router.patch('/notifications/:id/read', asyncHandler(readNotification));
+router.post('/notifications/read-all', asyncHandler(readAllNotifications));
 router.post('/channels/:channelId/messages', sendLimiter, asyncHandler(createMessage));
 router.patch('/messages/:id', asyncHandler(updateMessage));
 router.delete('/messages/:id', asyncHandler(deleteMessage));

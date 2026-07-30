@@ -7,13 +7,13 @@ export function GuildProvider({ children }) {
   const [guilds, setGuilds] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const refreshGuilds = useCallback(async () => {
-    setLoading(true);
+  const refreshGuilds = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const result = await api.myGuilds();
       setGuilds(result.guilds);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, []);
 

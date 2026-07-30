@@ -368,6 +368,77 @@ test('Nachrichten unterstützen Antworten, Reaktionen, Erwähnungen und Echtzeit
   assert.equal(listedBody.messages[1].reactions[0].count, 1);
   assert.equal(listedBody.has_more, false);
 
+  const secondNotifications = await request('/api/notifications', { cookie: secondCookie });
+  assert.equal(secondNotifications.status, 200);
+  const secondNotificationBody = await secondNotifications.json();
+  assert.equal(secondNotificationBody.unread_count, 1);
+  assert.equal(secondNotificationBody.notifications[0].type, 'mention');
+  assert.equal(secondNotificationBody.notifications[0].message_id, replyBody.message.id);
+
+  const markedRead = await request(`/api/channels/${createdChannelId}/read`, {
+    method: 'POST',
+    cookie: secondCookie,
+    body: { messageId: replyBody.message.id }
+  });
+  assert.equal(markedRead.status, 200);
+  assert.equal((await markedRead.json()).unread_count, 0);
+
+  const unreadEvent = new Promise((resolve) => mentionedClient.once('unread:refresh', resolve));
+  const searchable = await request(`/api/channels/${createdChannelId}/messages`, {
+    cookie: authCookie,
+    body: { content: 'Diese eindeutig suchbare Nachricht bleibt auffindbar.' }
+  });
+  assert.equal(searchable.status, 201);
+  const searchableBody = await searchable.json();
+  assert.equal((await unreadEvent).channelId, createdChannelId);
+
+  const guildWithUnread = await request(`/api/guilds/${createdGuildId}`, { cookie: secondCookie });
+  assert.equal(guildWithUnread.status, 200);
+  const unreadChannel = (await guildWithUnread.json()).channels.find((channel) => channel.id === createdChannelId);
+  assert.equal(unreadChannel.unread_count, 1);
+
+  const search = await request(
+    `/api/guilds/${createdGuildId}/messages/search?q=${encodeURIComponent('eindeutig suchbare')}`,
+    { cookie: secondCookie }
+  );
+  assert.equal(search.status, 200);
+  const searchBody = await search.json();
+  assert.equal(searchBody.results.length, 1);
+  assert.equal(searchBody.results[0].id, searchableBody.message.id);
+  assert.equal(searchBody.results[0].channel.id, createdChannelId);
+
+  const around = await request(
+    `/api/channels/${createdChannelId}/messages?around=${searchableBody.message.id}&limit=25`,
+    { cookie: secondCookie }
+  );
+  assert.equal(around.status, 200);
+  assert.ok((await around.json()).messages.some((message) => message.id === searchableBody.message.id));
+
+  const replyNotificationEvent = new Promise((resolve) => realtimeClient.once('notification:create', resolve));
+  const secondReply = await request(`/api/channels/${createdChannelId}/messages`, {
+    cookie: secondCookie,
+    body: {
+      content: 'Antwort von Alex auf den Suchtreffer.',
+      replyToId: searchableBody.message.id
+    }
+  });
+  assert.equal(secondReply.status, 201);
+  const secondReplyBody = await secondReply.json();
+  const replyNotification = await replyNotificationEvent;
+  assert.equal(replyNotification.notification.type, 'reply');
+  assert.equal(replyNotification.notification.message_id, secondReplyBody.message.id);
+
+  const ownerNotifications = await request('/api/notifications?unreadOnly=true', { cookie: authCookie });
+  assert.equal(ownerNotifications.status, 200);
+  const ownerNotificationBody = await ownerNotifications.json();
+  assert.equal(ownerNotificationBody.unread_count, 1);
+  assert.equal(ownerNotificationBody.notifications[0].type, 'reply');
+  assert.equal((await request(`/api/notifications/${ownerNotificationBody.notifications[0].id}/read`, {
+    method: 'PATCH',
+    cookie: authCookie
+  })).status, 200);
+  assert.equal((await (await request('/api/notifications', { cookie: authCookie })).json()).unread_count, 0);
+
   const updated = await request(`/api/messages/${replyBody.message.id}`, {
     method: 'PATCH',
     cookie: authCookie,
@@ -387,6 +458,15 @@ test('Nachrichten unterstützen Antworten, Reaktionen, Erwähnungen und Echtzeit
   });
   assert.equal(unreacted.status, 200);
   assert.equal((await unreacted.json()).active, false);
+
+  assert.equal((await request(`/api/messages/${secondReplyBody.message.id}`, {
+    method: 'DELETE',
+    cookie: secondCookie
+  })).status, 204);
+  assert.equal((await request(`/api/messages/${searchableBody.message.id}`, {
+    method: 'DELETE',
+    cookie: authCookie
+  })).status, 204);
 
   const removed = await request(`/api/messages/${createdBody.message.id}`, {
     method: 'DELETE',

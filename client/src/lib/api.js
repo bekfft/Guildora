@@ -57,10 +57,34 @@ export const api = {
   leaveGuild: (id) => request(`/api/guilds/${id}/leave`, { method: 'DELETE' }),
   createGuild: (data) => request('/api/guilds', { method: 'POST', body: JSON.stringify(data) }),
   channel: (id) => request(`/api/channels/${id}`),
-  messages: (channelId, { before, limit = 50 } = {}) => {
+  messages: (channelId, { before, around, limit = 50 } = {}) => {
     const query = new URLSearchParams({ limit: String(limit) });
     if (before) query.set('before', before);
+    if (around) query.set('around', around);
     return request(`/api/channels/${channelId}/messages?${query}`);
+  },
+  markChannelRead: (channelId, messageId = null) => request(`/api/channels/${channelId}/read`, {
+    method: 'POST',
+    body: JSON.stringify({ messageId })
+  }),
+  notifications: ({ unreadOnly = false, limit = 50 } = {}) => {
+    const query = new URLSearchParams({
+      unreadOnly: String(unreadOnly),
+      limit: String(limit)
+    });
+    return request(`/api/notifications?${query}`);
+  },
+  readNotification: (notificationId) => request(`/api/notifications/${notificationId}/read`, {
+    method: 'PATCH'
+  }),
+  readAllNotifications: () => request('/api/notifications/read-all', { method: 'POST' }),
+  searchMessages: (guildId, filters) => {
+    const query = new URLSearchParams({ q: filters.q, limit: String(filters.limit || 50) });
+    if (filters.channelId) query.set('channelId', filters.channelId);
+    if (filters.authorId) query.set('authorId', filters.authorId);
+    if (filters.dateFrom) query.set('dateFrom', filters.dateFrom);
+    if (filters.dateTo) query.set('dateTo', filters.dateTo);
+    return request(`/api/guilds/${guildId}/messages/search?${query}`);
   },
   sendMessage: (channelId, content, replyToId = null) => request(`/api/channels/${channelId}/messages`, {
     method: 'POST',

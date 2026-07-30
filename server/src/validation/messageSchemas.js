@@ -23,5 +23,29 @@ export const reactionSchema = z.object({
 
 export const messageQuerySchema = z.object({
   before: z.string().datetime({ offset: true }).optional(),
+  around: z.string().uuid('Die Zielnachricht ist ungültig.').optional(),
   limit: z.coerce.number().int().min(1).max(100).optional().default(50)
+}).refine((value) => !(value.before && value.around), {
+  message: 'before und around können nicht gemeinsam verwendet werden.'
+});
+
+export const markReadSchema = z.object({
+  messageId: z.string().uuid('Die Nachricht ist ungültig.').nullable().optional()
+});
+
+export const notificationQuerySchema = z.object({
+  unreadOnly: z.enum(['true', 'false']).optional().default('false')
+    .transform((value) => value === 'true'),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(50)
+});
+
+export const messageSearchSchema = z.object({
+  q: z.string().trim().min(2, 'Bitte gib mindestens zwei Zeichen ein.').max(100),
+  channelId: z.string().uuid().optional(),
+  authorId: z.string().uuid().optional(),
+  dateFrom: z.string().datetime({ offset: true }).optional(),
+  dateTo: z.string().datetime({ offset: true }).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(50)
+}).refine((value) => !value.dateFrom || !value.dateTo || value.dateFrom <= value.dateTo, {
+  message: 'Der Startzeitpunkt muss vor dem Endzeitpunkt liegen.'
 });

@@ -51,6 +51,9 @@ export default function ServerRail({ guilds, activeGuildId, discoveryActive, onO
             {guild.icon_url
               ? <img src={guild.icon_url} alt="" />
               : <span className="server-button__initials" style={{ background: colorForName(guild.name) }}>{initials(guild.name)}</span>}
+            {guild.unread_count > 0 && (
+              <span className="server-unread-count">{guild.unread_count > 99 ? '99+' : guild.unread_count}</span>
+            )}
           </button>
         ))}
       </div>
