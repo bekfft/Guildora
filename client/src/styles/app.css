@@ -903,6 +903,33 @@
   place-items: center;
 }
 
+.voice-participant__avatar,
+.message-avatar,
+.friend-avatar,
+.settings-user-summary > span:first-child,
+.account-card > div {
+  position: relative;
+}
+
+.voice-participant__avatar > img,
+.mini-avatar > img,
+.member-avatar > img,
+.user-profile-card__avatar > img,
+.message-avatar > img,
+.friend-avatar > img,
+.settings-user-summary > span:first-child > img,
+.account-card > div > img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
 .mini-avatar {
   width: 32px;
   height: 32px;
