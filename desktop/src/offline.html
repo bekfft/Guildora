@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guildora – Offline</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    body { display:grid; min-height:100vh; margin:0; padding:32px; color:#f2f3f5; background:radial-gradient(circle at 50% 20%,#343866,#1e1f22 58%); place-items:center; }
+    main { width:min(480px,100%); text-align:center; }
+    .logo { display:grid; width:72px; height:72px; margin:0 auto 24px; border-radius:22px; background:#5865f2; box-shadow:0 16px 38px #0005; font-size:34px; place-items:center; }
+    h1 { margin:0 0 10px; font-size:30px; }
+    p { margin:0 0 24px; color:#b5bac1; line-height:1.6; }
+    button { padding:12px 22px; border:0; border-radius:6px; color:#fff; background:#5865f2; font:inherit; font-weight:700; cursor:pointer; }
+    small { display:block; margin-top:18px; color:#80848e; overflow-wrap:anywhere; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="logo" aria-hidden="true">G</div>
+    <h1>Keine Verbindung zu Guildora</h1>
+    <p>Prüfe deine Internetverbindung. Guildora versucht im Hintergrund automatisch, die Verbindung wiederherzustellen.</p>
+    <button id="retry" type="button">Erneut versuchen</button>
+    <small id="target"></small>
+  </main>
+  <script src="./offline.js"></script>
+</body>
+</html>

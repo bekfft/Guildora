@@ -1,0 +1,24 @@
+{
+  "name": "guildora",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server",
+    "desktop"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,magenta \"npm run dev --workspace server\" \"npm run dev --workspace client\"",
+    "build": "npm run build --workspace client",
+    "migrate": "npm run migrate --workspace server",
+    "seed": "npm run seed --workspace server",
+    "test": "npm run test --workspace server",
+    "tunnel": "ngrok http 5174 --url https://alvin-thrushlike-florence.ngrok-free.dev",
+    "desktop:dev": "npm run dev --workspace guildora-desktop",
+    "desktop:build": "npm run build --workspace guildora-desktop",
+    "desktop:release": "npm run release --workspace guildora-desktop --"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}

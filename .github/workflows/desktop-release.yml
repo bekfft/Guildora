@@ -1,0 +1,54 @@
+name: Desktop-Release
+
+on:
+  push:
+    tags:
+      - desktop-v*
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Server- und Desktop-Tests
+        run: |
+          npm test
+          npm run test --workspace guildora-desktop
+      - name: Web-Client bauen
+        run: npm run build
+      - name: Desktop-Version aus Tag übernehmen
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".Replace("desktop-v", "")
+          npm version $version --workspace guildora-desktop --no-git-tag-version
+      - run: npm run desktop:build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Veröffentlichtes Release mit Update-Metadaten erstellen
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: false
+          make_latest: true
+          name: Guildora Desktop ${{ github.ref_name }}
+          files: |
+            desktop/dist/Guildora-Setup-*.exe
+            desktop/dist/latest.yml
+      - name: Release-Assets prüfen
+        shell: pwsh
+        run: node desktop/scripts/verify-release.js
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}

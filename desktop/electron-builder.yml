@@ -1,0 +1,33 @@
+appId: com.bekfft.guildora
+productName: Guildora
+electronUpdaterCompatibility: ">= 2.16"
+directories:
+  output: dist
+  buildResources: build
+files:
+  - src/**/*
+  - package.json
+extraResources:
+  - from: build/icon.ico
+    to: icon.ico
+publish:
+  provider: github
+  owner: bekfft
+  repo: Guildora
+  releaseType: release
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+  artifactName: ${productName}-Setup-${version}.${ext}
+  # Später über CSC_LINK und CSC_KEY_PASSWORD aktivieren:
+  # certificateFile: ${env.CSC_LINK}
+  # certificatePassword: ${env.CSC_KEY_PASSWORD}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  deleteAppDataOnUninstall: false
