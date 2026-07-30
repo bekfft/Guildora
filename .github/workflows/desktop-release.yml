@@ -32,7 +32,7 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ github.ref_name }}".Replace("desktop-v", "")
-          npm version $version --workspace guildora-desktop --no-git-tag-version
+          npm version $version --workspace guildora-desktop --no-git-tag-version --allow-same-version
       - run: npm run desktop:build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
