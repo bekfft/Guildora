@@ -13,6 +13,8 @@ test('Desktop-Updater lädt stabile Updates automatisch und installiert sie beim
   const source = read('src/updater.js');
   assert.match(source, /autoUpdater\.autoDownload = true/);
   assert.match(source, /autoUpdater\.autoInstallOnAppQuit = true/);
+  assert.match(source, /autoUpdater\.quitAndInstall\(true, true\)/);
+  assert.doesNotMatch(source, /autoUpdater\.quitAndInstall\(false,/);
   assert.match(source, /autoUpdater\.allowDowngrade = false/);
   assert.match(source, /autoUpdater\.allowPrerelease = false/);
   assert.match(source, /UPDATE_CHECK_INTERVAL_MS = 30 \* 60 \* 1000/);

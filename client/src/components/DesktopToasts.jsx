@@ -15,7 +15,7 @@ export default function DesktopToasts() {
       {desktop.update.type === 'downloaded' && (
         <div className="desktop-toast">
           <strong>Version {desktop.update.version} ist bereit</strong>
-          <span>Jetzt neu starten oder beim nächsten vollständigen Beenden automatisch installieren.</span>
+          <span>Jetzt still aktualisieren oder beim nächsten vollständigen Beenden automatisch installieren.</span>
           <div>
             <button type="button" onClick={desktop.installUpdate}>Jetzt neu starten</button>
             <button type="button" onClick={desktop.dismissUpdate}>Später</button>

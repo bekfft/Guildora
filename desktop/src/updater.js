@@ -67,7 +67,7 @@ function initializeUpdater(window) {
 }
 
 function installUpdate() {
-  if (app.isPackaged) autoUpdater.quitAndInstall(false, true);
+  if (app.isPackaged) autoUpdater.quitAndInstall(true, true);
 }
 
 function stopUpdater() {
