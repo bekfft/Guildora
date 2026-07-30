@@ -1,4 +1,4 @@
-import { ShieldCheck, Users, X } from 'lucide-react';
+import { Check, Plus, Search, ShieldCheck, Users, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api.js';
 
@@ -18,11 +18,17 @@ export default function MemberList({
 }) {
   const [selectedId, setSelectedId] = useState(null);
   const [closing, setClosing] = useState(false);
-  const [roleBusy, setRoleBusy] = useState(false);
+  const [roleBusy, setRoleBusy] = useState(null);
+  const [rolePickerOpen, setRolePickerOpen] = useState(false);
+  const [roleQuery, setRoleQuery] = useState('');
   const selected = members.find((member) => member.id === selectedId) || null;
+  const customRoles = roles.filter((role) => !role.is_default);
+  const filteredRoles = customRoles.filter((role) => role.name.toLowerCase().includes(roleQuery.trim().toLowerCase()));
 
   function closeProfile() {
     if (!selected || closing) return;
+    setRolePickerOpen(false);
+    setRoleQuery('');
     setClosing(true);
     const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 160;
     window.setTimeout(() => {
@@ -33,11 +39,22 @@ export default function MemberList({
 
   useEffect(() => {
     function close(event) {
-      if (event.key === 'Escape') closeProfile();
+      if (event.key !== 'Escape') return;
+      if (rolePickerOpen) {
+        setRolePickerOpen(false);
+        setRoleQuery('');
+      } else {
+        closeProfile();
+      }
     }
     document.addEventListener('keydown', close);
     return () => document.removeEventListener('keydown', close);
-  }, [selected, closing]);
+  }, [selected, closing, rolePickerOpen]);
+
+  useEffect(() => {
+    setRolePickerOpen(false);
+    setRoleQuery('');
+  }, [selectedId]);
 
   const groups = useMemo(() => {
     const grouped = new Map();
@@ -59,7 +76,7 @@ export default function MemberList({
     if (!selected || roleBusy || !canManageRoles) return;
     const current = selected.roles.filter((role) => !role.is_default).map((role) => role.id);
     const next = checked ? [...new Set([...current, roleId])] : current.filter((id) => id !== roleId);
-    setRoleBusy(true);
+    setRoleBusy(roleId);
     try {
       await api.updateMemberRoles(guildId, selected.id, next);
       await onRolesChanged();
@@ -67,7 +84,7 @@ export default function MemberList({
     } catch (error) {
       onToast(error.message, 'error');
     } finally {
-      setRoleBusy(false);
+      setRoleBusy(null);
     }
   }
 
@@ -101,27 +118,71 @@ export default function MemberList({
             <strong>Mitglied seit</strong>
             <span>{new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium' }).format(new Date(selected.joined_at))}</span>
           </div>
-          <div className="role-chips">
-            {selected.roles.filter((role) => !role.is_default).map((role) => <span key={role.id}><i style={{ background: role.color || '#949ba4' }} />{role.name}</span>)}
-            {!selected.roles.some((role) => !role.is_default) && <span><i style={{ background: '#949ba4' }} />@everyone</span>}
+          <div className="role-chips profile-role-chips">
+            {selected.roles.filter((role) => !role.is_default).map((role) => (
+              <span className="profile-role-chip" key={role.id}>
+                <i style={{ background: role.color || '#949ba4' }} />
+                <span>{role.name}</span>
+                {canManageRoles && (
+                  <button
+                    type="button"
+                    disabled={Boolean(roleBusy)}
+                    onClick={() => toggleRole(role.id, false)}
+                    aria-label={`${role.name} entfernen`}
+                    title={`${role.name} entfernen`}
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </span>
+            ))}
+            {!selected.roles.some((role) => !role.is_default) && <span className="profile-role-chip"><i style={{ background: '#949ba4' }} /><span>@everyone</span></span>}
+            {canManageRoles && (
+              <button
+                className="profile-role-add"
+                type="button"
+                aria-expanded={rolePickerOpen}
+                onClick={() => setRolePickerOpen((current) => !current)}
+              >
+                <Plus size={14} /> Rolle
+              </button>
+            )}
           </div>
-          {canManageRoles && (
-            <div className="profile-role-editor">
-              <strong>Rollen verwalten</strong>
-              <span>Änderungen werden sofort gespeichert.</span>
-              <div>
-                {roles.filter((role) => !role.is_default).map((role) => (
-                  <label key={role.id}>
-                    <span><i style={{ background: role.color || '#949ba4' }} />{role.name}</span>
-                    <input
-                      type="checkbox"
-                      checked={selected.roles.some((item) => item.id === role.id)}
-                      disabled={roleBusy}
-                      onChange={(event) => toggleRole(role.id, event.target.checked)}
-                    />
-                  </label>
-                ))}
-                {!roles.some((role) => !role.is_default) && <small>Noch keine benutzerdefinierten Rollen vorhanden.</small>}
+          {canManageRoles && rolePickerOpen && (
+            <div className="profile-role-picker">
+              <header>
+                <strong>Rollen</strong>
+                <button type="button" onClick={() => { setRolePickerOpen(false); setRoleQuery(''); }} aria-label="Rollenauswahl schließen"><X size={16} /></button>
+              </header>
+              <label className="profile-role-search">
+                <Search size={15} />
+                <input
+                  value={roleQuery}
+                  onChange={(event) => setRoleQuery(event.target.value)}
+                  placeholder="Rolle suchen"
+                  aria-label="Rolle suchen"
+                  autoFocus
+                />
+              </label>
+              <div className="profile-role-options">
+                {filteredRoles.map((role) => {
+                  const assigned = selected.roles.some((item) => item.id === role.id);
+                  return (
+                    <button
+                      type="button"
+                      className={assigned ? 'is-assigned' : ''}
+                      disabled={Boolean(roleBusy)}
+                      aria-pressed={assigned}
+                      onClick={() => toggleRole(role.id, !assigned)}
+                      key={role.id}
+                    >
+                      <i style={{ background: role.color || '#949ba4' }} />
+                      <span>{role.name}</span>
+                      {assigned && <Check size={16} />}
+                    </button>
+                  );
+                })}
+                {filteredRoles.length === 0 && <p>{customRoles.length ? 'Keine Rolle gefunden.' : 'Noch keine Rollen vorhanden.'}</p>}
               </div>
             </div>
           )}

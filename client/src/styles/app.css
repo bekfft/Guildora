@@ -5146,88 +5146,201 @@ html.is-desktop .modal-overlay {
   }
 }
 
-.profile-role-editor {
-  margin: 14px 16px 0;
-  padding-top: 12px;
-  border-top: 1px solid var(--divider);
-}
-
-.profile-role-editor > strong,
-.profile-role-editor > span {
-  display: block;
-}
-
-.profile-role-editor > strong {
-  font-size: 12px;
-}
-
-.profile-role-editor > span,
-.profile-role-editor small {
-  color: var(--channel-idle);
-  font-size: 10px;
-}
-
-.profile-role-editor > div {
-  display: flex;
-  gap: 4px;
-  margin-top: 8px;
-  flex-direction: column;
-}
-
-.profile-role-editor label {
-  display: flex;
-  min-height: 38px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 5px 7px;
-  border-radius: 6px;
-  background: #1e1f22;
-  cursor: pointer;
-}
-
-.profile-role-editor label:hover {
-  background: #2b2d31;
-}
-
-.profile-role-editor label > span {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 7px;
-  overflow: hidden;
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.profile-role-editor label i {
-  width: 10px;
-  height: 10px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-}
-
-.profile-role-editor input {
-  width: 17px;
-  height: 17px;
-  flex: 0 0 auto;
-  accent-color: var(--brand);
-}
-
-.profile-popover:has(.profile-role-editor) {
+.profile-popover:has(.profile-role-add) {
   max-height: calc(100dvh - var(--titlebar-height) - 100px);
   overflow-x: hidden;
   overflow-y: auto;
 }
 
-@media (max-width: 520px) {
-  .profile-role-editor label {
-    min-height: 44px;
-  }
+.profile-role-chips {
+  position: relative;
+  align-items: center;
+}
 
-  .profile-popover:has(.profile-role-editor) {
+.profile-role-chip {
+  max-width: 100%;
+}
+
+.profile-role-chip > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-role-chip > button {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  margin: -2px -3px -2px 1px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  color: var(--channel-idle);
+  background: transparent;
+  cursor: pointer;
+  place-items: center;
+}
+
+.profile-role-chip > button:hover:not(:disabled) {
+  color: #fff;
+  background: rgb(255 255 255 / 12%);
+}
+
+.profile-role-chip > button:disabled {
+  opacity: .45;
+}
+
+.profile-role-add {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px dashed #4e5058;
+  border-radius: 5px;
+  color: var(--channel-hover);
+  background: transparent;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.profile-role-add:hover,
+.profile-role-add[aria-expanded="true"] {
+  border-color: var(--brand-light);
+  color: #fff;
+  background: rgb(88 101 242 / 18%);
+}
+
+.profile-role-picker {
+  margin: 9px 16px 0;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 9px;
+  background: #1e1f22;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 36%);
+}
+
+.profile-role-picker header {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 0 11px;
+  font-size: 12px;
+}
+
+.profile-role-picker header button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  color: var(--channel-idle);
+  background: transparent;
+  cursor: pointer;
+  place-items: center;
+}
+
+.profile-role-picker header button:hover {
+  color: #fff;
+  background: var(--bg-hover);
+}
+
+.profile-role-search {
+  display: flex;
+  height: 34px;
+  align-items: center;
+  gap: 7px;
+  margin: 0 8px 7px;
+  padding: 0 9px;
+  border-radius: 5px;
+  color: var(--channel-idle);
+  background: #111214;
+}
+
+.profile-role-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  color: var(--text-normal);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+}
+
+.profile-role-options {
+  max-height: 184px;
+  padding: 2px 5px 6px;
+  overflow-y: auto;
+}
+
+.profile-role-options > button {
+  display: grid;
+  width: 100%;
+  min-height: 36px;
+  grid-template-columns: 12px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--channel-hover);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profile-role-options > button:hover:not(:disabled) {
+  color: #fff;
+  background: var(--bg-hover);
+}
+
+.profile-role-options > button.is-assigned {
+  color: #fff;
+  background: rgb(88 101 242 / 14%);
+}
+
+.profile-role-options > button > i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+
+.profile-role-options > button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-role-options > button > svg {
+  color: var(--brand-light);
+}
+
+.profile-role-options > p {
+  margin: 8px;
+  color: var(--channel-idle);
+  font-size: 11px;
+  text-align: center;
+}
+
+@media (max-width: 520px) {
+  .profile-popover:has(.profile-role-add) {
     bottom: max(12px, env(safe-area-inset-bottom));
     max-height: none;
+  }
+
+  .profile-role-add,
+  .profile-role-options > button {
+    min-height: 42px;
+  }
+
+  .profile-role-search {
+    height: 42px;
+  }
+
+  .profile-role-search input {
+    font-size: 16px;
   }
 }
