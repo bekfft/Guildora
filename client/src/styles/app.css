@@ -714,8 +714,8 @@
 .voice-participant {
   display: grid;
   min-width: 0;
-  min-height: 30px;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
+  min-height: 38px;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
   align-items: center;
   gap: 7px;
   padding: 2px 5px;
@@ -732,8 +732,9 @@
 
 .voice-participant__avatar {
   display: grid;
-  width: 22px;
-  height: 22px;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
   overflow: hidden;
   border: 2px solid transparent;
   border-radius: 50%;

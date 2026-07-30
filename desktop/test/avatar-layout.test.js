@@ -28,6 +28,17 @@ test('Avatarbilder bleiben unabhängig vom Seitenverhältnis in ihrem festen Rah
   assert.match(imageRule[1], /object-fit:\s*cover/);
 });
 
+test('Voice-Avatare bleiben auch bei detailreichen Hochformatbildern erkennbar', () => {
+  assert.match(
+    appCss,
+    /\.voice-participant\s*\{[^}]*min-height:\s*38px;[^}]*grid-template-columns:\s*30px minmax\(0,\s*1fr\) auto;/s
+  );
+  assert.match(
+    appCss,
+    /\.voice-participant__avatar\s*\{[^}]*width:\s*30px;[^}]*height:\s*30px;[^}]*overflow:\s*hidden;/s
+  );
+});
+
 test('Serverprofile zeigen den Servernamen vollständig unterhalb des Banners', () => {
   assert.match(profileModal, /const displayName = profile\.server_profile\?\.nickname \|\| nameOf\(profile\)/);
   assert.match(profileModal, /<h2>\{displayName\}<\/h2>/);
