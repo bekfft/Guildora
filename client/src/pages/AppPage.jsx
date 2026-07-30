@@ -249,6 +249,7 @@ export default function AppPage() {
               channel={loadingDetails ? null : activeChannel}
               currentUserId={user.id}
               canManageMessages={capabilities.manageMessages}
+              members={members}
               onToast={showToast}
             />
           )}

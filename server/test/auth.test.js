@@ -278,15 +278,37 @@ test('Serververwaltung ändert Profil, Kategorien, Channels, Rollen und Mitglied
   assert.equal((await request(`/api/guilds/${createdGuildId}/categories/${categoryBody.category.id}`, { method: 'DELETE', cookie: authCookie })).status, 204);
 });
 
-test('Nachrichten können erstellt, geladen, bearbeitet und gelöscht werden', async () => {
+test('Nachrichten unterstützen Antworten, Reaktionen, Erwähnungen und Echtzeit', async () => {
+  const secondUser = { id: crypto.randomUUID(), username: 'alex.test' };
+  await db.run(
+    `INSERT INTO users
+     (id, email, username, display_name, password_hash, birthdate)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [secondUser.id, 'alex@example.de', secondUser.username, 'Alex Test', 'not-used-in-this-test', '1998-07-12']
+  );
+  const secondCookie = `access_token=${signAccessToken(secondUser.id)}`;
+  await db.run(
+    'INSERT INTO guild_members (id, guild_id, user_id) VALUES (?, ?, ?)',
+    [crypto.randomUUID(), createdGuildId, secondUser.id]
+  );
+
   const realtimeClient = connectSocket(baseUrl, {
     path: '/api/socket.io',
     transports: ['websocket'],
     extraHeaders: { Cookie: authCookie }
   });
+  const mentionedClient = connectSocket(baseUrl, {
+    path: '/api/socket.io',
+    transports: ['websocket'],
+    extraHeaders: { Cookie: secondCookie }
+  });
   await new Promise((resolve, reject) => {
     realtimeClient.once('connect', resolve);
     realtimeClient.once('connect_error', reject);
+  });
+  await new Promise((resolve, reject) => {
+    mentionedClient.once('connect', resolve);
+    mentionedClient.once('connect_error', reject);
   });
   const joined = await new Promise((resolve) => {
     realtimeClient.emit('channel:join', { channelId: createdChannelId }, resolve);
@@ -307,14 +329,46 @@ test('Nachrichten können erstellt, geladen, bearbeitet und gelöscht werden', a
   const realtimeBody = await realtimeMessage;
   assert.equal(realtimeBody.message.id, createdBody.message.id);
 
+  const mentionEvent = new Promise((resolve) => mentionedClient.once('mention:create', resolve));
+  const realtimeReply = new Promise((resolve) => realtimeClient.once('message:create', resolve));
+  const reply = await request(`/api/channels/${createdChannelId}/messages`, {
+    cookie: authCookie,
+    body: {
+      content: 'Hallo @alex.test, das ist meine Antwort.',
+      replyToId: createdBody.message.id
+    }
+  });
+  assert.equal(reply.status, 201);
+  const replyBody = await reply.json();
+  assert.equal(replyBody.message.reply_to.id, createdBody.message.id);
+  assert.equal(replyBody.message.mentions.length, 1);
+  assert.equal(replyBody.message.mentions[0].id, secondUser.id);
+  assert.equal((await realtimeReply).message.id, replyBody.message.id);
+  assert.equal((await mentionEvent).message.id, replyBody.message.id);
+
+  const reactionEvent = new Promise((resolve) => realtimeClient.once('message:reaction', resolve));
+  const reacted = await request(`/api/messages/${replyBody.message.id}/reactions`, {
+    method: 'PUT',
+    cookie: secondCookie,
+    body: { emoji: '❤️' }
+  });
+  assert.equal(reacted.status, 200);
+  const reactedBody = await reacted.json();
+  assert.equal(reactedBody.active, true);
+  assert.equal(reactedBody.reaction.count, 1);
+  assert.deepEqual(reactedBody.reaction.user_ids, [secondUser.id]);
+  assert.equal((await reactionEvent).messageId, replyBody.message.id);
+
   const listed = await request(`/api/channels/${createdChannelId}/messages?limit=25`, { cookie: authCookie });
   assert.equal(listed.status, 200);
   const listedBody = await listed.json();
-  assert.equal(listedBody.messages.length, 1);
+  assert.equal(listedBody.messages.length, 2);
   assert.equal(listedBody.messages[0].id, createdBody.message.id);
+  assert.equal(listedBody.messages[1].reply_to.id, createdBody.message.id);
+  assert.equal(listedBody.messages[1].reactions[0].count, 1);
   assert.equal(listedBody.has_more, false);
 
-  const updated = await request(`/api/messages/${createdBody.message.id}`, {
+  const updated = await request(`/api/messages/${replyBody.message.id}`, {
     method: 'PATCH',
     cookie: authCookie,
     body: { content: 'Bearbeitete Nachricht' }
@@ -323,6 +377,16 @@ test('Nachrichten können erstellt, geladen, bearbeitet und gelöscht werden', a
   const updatedBody = await updated.json();
   assert.equal(updatedBody.message.content, 'Bearbeitete Nachricht');
   assert.equal(updatedBody.message.edited, true);
+  assert.equal(updatedBody.message.mentions.length, 0);
+  assert.equal(updatedBody.message.reply_to.id, createdBody.message.id);
+
+  const unreacted = await request(`/api/messages/${replyBody.message.id}/reactions`, {
+    method: 'PUT',
+    cookie: secondCookie,
+    body: { emoji: '❤️' }
+  });
+  assert.equal(unreacted.status, 200);
+  assert.equal((await unreacted.json()).active, false);
 
   const removed = await request(`/api/messages/${createdBody.message.id}`, {
     method: 'DELETE',
@@ -330,9 +394,18 @@ test('Nachrichten können erstellt, geladen, bearbeitet und gelöscht werden', a
   });
   assert.equal(removed.status, 204);
 
-  const empty = await request(`/api/channels/${createdChannelId}/messages`, { cookie: authCookie });
-  assert.equal((await empty.json()).messages.length, 0);
+  const replySurvives = await request(`/api/channels/${createdChannelId}/messages`, { cookie: authCookie });
+  const survivingMessages = (await replySurvives.json()).messages;
+  assert.equal(survivingMessages.length, 1);
+  assert.equal(survivingMessages[0].id, replyBody.message.id);
+  assert.equal(survivingMessages[0].reply_to, null);
+
+  assert.equal((await request(`/api/messages/${replyBody.message.id}`, {
+    method: 'DELETE',
+    cookie: authCookie
+  })).status, 204);
   realtimeClient.disconnect();
+  mentionedClient.disconnect();
 });
 
 test('Discovery, Join und Leave funktionieren vollständig', async () => {

@@ -62,15 +62,19 @@ export const api = {
     if (before) query.set('before', before);
     return request(`/api/channels/${channelId}/messages?${query}`);
   },
-  sendMessage: (channelId, content) => request(`/api/channels/${channelId}/messages`, {
+  sendMessage: (channelId, content, replyToId = null) => request(`/api/channels/${channelId}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ content })
+    body: JSON.stringify({ content, replyToId })
   }),
   updateMessage: (messageId, content) => request(`/api/messages/${messageId}`, {
     method: 'PATCH',
     body: JSON.stringify({ content })
   }),
   deleteMessage: (messageId) => request(`/api/messages/${messageId}`, { method: 'DELETE' }),
+  toggleReaction: (messageId, emoji) => request(`/api/messages/${messageId}/reactions`, {
+    method: 'PUT',
+    body: JSON.stringify({ emoji })
+  }),
   updateGuild: (guildId, data) => request(`/api/guilds/${guildId}`, {
     method: 'PATCH',
     body: JSON.stringify(data)

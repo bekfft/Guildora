@@ -4,6 +4,7 @@ import {
   createMessage,
   deleteMessage,
   getMessages,
+  toggleReaction,
   updateMessage
 } from '../controllers/messageController.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
@@ -26,5 +27,6 @@ router.get('/channels/:channelId/messages', asyncHandler(getMessages));
 router.post('/channels/:channelId/messages', sendLimiter, asyncHandler(createMessage));
 router.patch('/messages/:id', asyncHandler(updateMessage));
 router.delete('/messages/:id', asyncHandler(deleteMessage));
+router.put('/messages/:id/reactions', sendLimiter, asyncHandler(toggleReaction));
 
 export default router;

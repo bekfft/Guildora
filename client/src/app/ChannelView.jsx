@@ -1,12 +1,23 @@
-import { Check, Hash, LoaderCircle, Pencil, Send, Trash2, X } from 'lucide-react';
+import {
+  Check,
+  CornerUpLeft,
+  Hash,
+  LoaderCircle,
+  Pencil,
+  Send,
+  SmilePlus,
+  Trash2,
+  X
+} from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { socket } from '../lib/socket.js';
 
 const GROUP_WINDOW = 5 * 60 * 1000;
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '👀', '🔥'];
 
 function authorName(author) {
-  return author.display_name || author.username;
+  return author?.display_name || author?.username || 'Unbekannt';
 }
 
 function messageTime(value) {
@@ -33,7 +44,40 @@ function mergeMessage(list, message) {
   return list.map((item) => item.id === message.id ? message : item);
 }
 
-export default function ChannelView({ channel, currentUserId, canManageMessages, onToast }) {
+function mergeReaction(list, messageId, reaction) {
+  return list.map((message) => {
+    if (message.id !== messageId) return message;
+    const remaining = (message.reactions || []).filter((item) => item.emoji !== reaction.emoji);
+    return {
+      ...message,
+      reactions: reaction.count > 0 ? [...remaining, reaction] : remaining
+    };
+  });
+}
+
+function MessageText({ message }) {
+  const mentioned = new Set((message.mentions || []).map((user) => user.username.toLowerCase()));
+  const parts = message.content.split(/(@[a-z0-9._]{2,32})/gi);
+  return (
+    <p>
+      {parts.map((part, index) => {
+        const username = part.startsWith('@') ? part.slice(1).toLowerCase() : '';
+        return mentioned.has(username)
+          ? <span className="message-mention" key={`${part}-${index}`}>{part}</span>
+          : part;
+      })}
+      {message.edited && <small className="edited-mark"> (bearbeitet)</small>}
+    </p>
+  );
+}
+
+export default function ChannelView({
+  channel,
+  currentUserId,
+  canManageMessages,
+  members = [],
+  onToast
+}) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -42,7 +86,10 @@ export default function ChannelView({ channel, currentUserId, canManageMessages,
   const [sending, setSending] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState('');
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [reactionPickerId, setReactionPickerId] = useState(null);
   const scrollerRef = useRef(null);
+  const composerRef = useRef(null);
   const initialScrollDone = useRef(false);
   const draftKey = channel ? `guildora:draft:${channel.id}` : '';
   const canReadHistory = channel?.permissions?.readHistory !== false;
@@ -54,6 +101,8 @@ export default function ChannelView({ channel, currentUserId, canManageMessages,
     initialScrollDone.current = false;
     setLoading(true);
     setMessages([]);
+    setReplyingTo(null);
+    setReactionPickerId(null);
     setDraft(localStorage.getItem(draftKey) || '');
     if (!canReadHistory) {
       setMessages([]);
@@ -81,7 +130,21 @@ export default function ChannelView({ channel, currentUserId, canManageMessages,
       if (message.channel_id === channel.id) setMessages((current) => mergeMessage(current, message));
     };
     const onDelete = ({ messageId, channelId }) => {
-      if (channelId === channel.id) setMessages((current) => current.filter((item) => item.id !== messageId));
+      if (channelId !== channel.id) return;
+      setMessages((current) => current
+        .filter((item) => item.id !== messageId)
+        .map((item) => item.reply_to?.id === messageId ? { ...item, reply_to: null } : item));
+      setReplyingTo((current) => current?.id === messageId ? null : current);
+    };
+    const onReaction = ({ messageId, channelId, reaction }) => {
+      if (channelId === channel.id) {
+        setMessages((current) => mergeReaction(current, messageId, reaction));
+      }
+    };
+    const onMention = ({ message, channelId }) => {
+      if (channelId === channel.id && message.author.id !== currentUserId) {
+        onToast(`${authorName(message.author)} hat dich in #${channel.name} erwähnt.`, 'info');
+      }
     };
     const onConnectError = async (error) => {
       if (error.message !== 'UNAUTHORIZED') return;
@@ -95,6 +158,8 @@ export default function ChannelView({ channel, currentUserId, canManageMessages,
     socket.on('message:create', onCreate);
     socket.on('message:update', onUpdate);
     socket.on('message:delete', onDelete);
+    socket.on('message:reaction', onReaction);
+    socket.on('mention:create', onMention);
     socket.on('connect_error', onConnectError);
     if (!socket.connected) socket.connect();
     socket.emit('channel:join', { channelId: channel.id });
@@ -104,10 +169,12 @@ export default function ChannelView({ channel, currentUserId, canManageMessages,
       socket.off('message:create', onCreate);
       socket.off('message:update', onUpdate);
       socket.off('message:delete', onDelete);
+      socket.off('message:reaction', onReaction);
+      socket.off('mention:create', onMention);
       socket.off('connect_error', onConnectError);
       socket.off('connect', rejoin);
     };
-  }, [channel?.id, onToast]);
+  }, [channel?.id, channel?.name, currentUserId, onToast]);
 
   useEffect(() => {
     if (!loading && !initialScrollDone.current && scrollerRef.current) {
@@ -124,11 +191,41 @@ export default function ChannelView({ channel, currentUserId, canManageMessages,
 
   const renderedMessages = useMemo(() => messages.map((message, index) => {
     const previous = messages[index - 1];
-    const grouped = previous
+    const grouped = !message.reply_to
+      && previous
       && previous.author.id === message.author.id
       && new Date(message.created_at) - new Date(previous.created_at) < GROUP_WINDOW;
     return { message, grouped, showDay: !previous || !sameDay(previous.created_at, message.created_at) };
   }), [messages]);
+
+  const mentionSuggestions = useMemo(() => {
+    const match = draft.match(/(?:^|\s)@([a-z0-9._]*)$/i);
+    if (!match) return [];
+    const term = match[1].toLowerCase();
+    return members
+      .filter((member) => member.username?.toLowerCase().includes(term)
+        || member.display_name?.toLowerCase().includes(term))
+      .slice(0, 5);
+  }, [draft, members]);
+
+  function scrollToMessage(messageId) {
+    const row = scrollerRef.current?.querySelector(`[data-message-id="${messageId}"]`);
+    if (!row) return;
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    row.classList.remove('is-highlighted');
+    requestAnimationFrame(() => row.classList.add('is-highlighted'));
+  }
+
+  function startReply(message) {
+    setReplyingTo(message);
+    setReactionPickerId(null);
+    requestAnimationFrame(() => composerRef.current?.focus());
+  }
+
+  function insertMention(member) {
+    setDraft((current) => current.replace(/(^|\s)@[a-z0-9._]*$/i, `$1@${member.username} `));
+    requestAnimationFrame(() => composerRef.current?.focus());
+  }
 
   async function loadOlder() {
     if (!messages[0] || loadingMore) return;
@@ -153,9 +250,10 @@ export default function ChannelView({ channel, currentUserId, canManageMessages,
     if (!content || sending || !canSendMessages) return;
     setSending(true);
     try {
-      const result = await api.sendMessage(channel.id, content);
+      const result = await api.sendMessage(channel.id, content, replyingTo?.id || null);
       setMessages((current) => mergeMessage(current, result.message));
       setDraft('');
+      setReplyingTo(null);
       requestAnimationFrame(() => {
         if (scrollerRef.current) scrollerRef.current.scrollTop = scrollerRef.current.scrollHeight;
       });
@@ -173,6 +271,16 @@ export default function ChannelView({ channel, currentUserId, canManageMessages,
       const result = await api.updateMessage(messageId, content);
       setMessages((current) => mergeMessage(current, result.message));
       setEditingId(null);
+    } catch (error) {
+      onToast(error.message, 'error');
+    }
+  }
+
+  async function toggleReaction(messageId, emoji) {
+    try {
+      const result = await api.toggleReaction(messageId, emoji);
+      setMessages((current) => mergeReaction(current, messageId, result.reaction));
+      setReactionPickerId(null);
     } catch (error) {
       onToast(error.message, 'error');
     }
@@ -213,7 +321,10 @@ export default function ChannelView({ channel, currentUserId, canManageMessages,
             {renderedMessages.map(({ message, grouped, showDay }) => (
               <div key={message.id}>
                 {showDay && <div className="message-day"><span>{messageDay(message.created_at)}</span></div>}
-                <article className={`message-row ${grouped ? 'is-grouped' : ''}`}>
+                <article
+                  className={`message-row ${grouped ? 'is-grouped' : ''}`}
+                  data-message-id={message.id}
+                >
                   {!grouped && (
                     <div className="message-avatar" aria-hidden="true">
                       {message.author.avatar_url
@@ -222,6 +333,17 @@ export default function ChannelView({ channel, currentUserId, canManageMessages,
                     </div>
                   )}
                   <div className="message-content">
+                    {message.reply_to && (
+                      <button
+                        className="message-reply-reference"
+                        type="button"
+                        onClick={() => scrollToMessage(message.reply_to.id)}
+                      >
+                        <CornerUpLeft size={13} />
+                        <strong>{authorName(message.reply_to.author)}</strong>
+                        <span>{message.reply_to.content}</span>
+                      </button>
+                    )}
                     {!grouped && (
                       <div className="message-meta">
                         <strong>{authorName(message.author)}</strong>
@@ -247,15 +369,39 @@ export default function ChannelView({ channel, currentUserId, canManageMessages,
                         <button type="button" onClick={() => saveEdit(message.id)} aria-label="Änderung speichern"><Check size={17} /></button>
                         <button type="button" onClick={() => setEditingId(null)} aria-label="Bearbeiten abbrechen"><X size={17} /></button>
                       </div>
-                    ) : (
-                      <p>
-                        {message.content}
-                        {message.edited && <small className="edited-mark"> (bearbeitet)</small>}
-                      </p>
+                    ) : <MessageText message={message} />}
+                    {(message.reactions || []).length > 0 && (
+                      <div className="message-reactions" aria-label="Reaktionen">
+                        {message.reactions.map((reaction) => (
+                          <button
+                            className={reaction.user_ids.includes(currentUserId) ? 'is-active' : ''}
+                            type="button"
+                            key={reaction.emoji}
+                            onClick={() => toggleReaction(message.id, reaction.emoji)}
+                            aria-label={`${reaction.emoji} ${reaction.count}`}
+                          >
+                            <span>{reaction.emoji}</span><strong>{reaction.count}</strong>
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  {(message.author.id === currentUserId || canManageMessages) && editingId !== message.id && (
+                  {editingId !== message.id && (
                     <div className="message-actions">
+                      {canSendMessages && (
+                        <>
+                          <button type="button" aria-label="Antworten" onClick={() => startReply(message)}>
+                            <CornerUpLeft size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Reaktion hinzufügen"
+                            onClick={() => setReactionPickerId((current) => current === message.id ? null : message.id)}
+                          >
+                            <SmilePlus size={15} />
+                          </button>
+                        </>
+                      )}
                       {message.author.id === currentUserId && (
                         <button
                           type="button"
@@ -263,9 +409,20 @@ export default function ChannelView({ channel, currentUserId, canManageMessages,
                           onClick={() => { setEditingId(message.id); setEditContent(message.content); }}
                         ><Pencil size={15} /></button>
                       )}
-                      <button type="button" className="danger" aria-label="Nachricht löschen" onClick={() => removeMessage(message.id)}>
-                        <Trash2 size={15} />
-                      </button>
+                      {(message.author.id === currentUserId || canManageMessages) && (
+                        <button type="button" className="danger" aria-label="Nachricht löschen" onClick={() => removeMessage(message.id)}>
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {reactionPickerId === message.id && (
+                    <div className="reaction-picker" role="menu" aria-label="Reaktion auswählen">
+                      {QUICK_REACTIONS.map((emoji) => (
+                        <button type="button" role="menuitem" key={emoji} onClick={() => toggleReaction(message.id, emoji)}>
+                          {emoji}
+                        </button>
+                      ))}
                     </div>
                   )}
                 </article>
@@ -274,28 +431,56 @@ export default function ChannelView({ channel, currentUserId, canManageMessages,
           </div>
         )}
       </div>
-      <div className="composer-shell">
-        <textarea
-          value={draft}
-          maxLength={2000}
-          rows={1}
-          placeholder={canSendMessages ? `Nachricht an #${channel.name}` : 'Du darfst in diesem Channel nicht schreiben.'}
-          aria-label={`Nachricht an #${channel.name}`}
-          disabled={!canSendMessages}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault();
-              sendMessage();
-            }
-          }}
-        />
-        <span className={draft.length > 1800 ? 'character-count is-near-limit' : 'character-count'}>
-          {draft.length > 1800 ? 2000 - draft.length : ''}
-        </span>
-        <button type="button" onClick={sendMessage} disabled={!canSendMessages || !draft.trim() || sending} aria-label="Nachricht senden">
-          {sending ? <LoaderCircle className="spin" size={19} /> : <Send size={19} />}
-        </button>
+      <div className="composer-area">
+        {mentionSuggestions.length > 0 && (
+          <div className="mention-suggestions">
+            <small>Mitglied erwähnen</small>
+            {mentionSuggestions.map((member) => (
+              <button type="button" key={member.user_id} onClick={() => insertMention(member)}>
+                <span className="mini-avatar">
+                  {member.avatar_url ? <img src={member.avatar_url} alt="" /> : authorName(member)[0].toUpperCase()}
+                </span>
+                <strong>{authorName(member)}</strong>
+                <span>@{member.username}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {replyingTo && (
+          <div className="composer-reply">
+            <CornerUpLeft size={15} />
+            <span>Antwort an <strong>{authorName(replyingTo.author)}</strong></span>
+            <button type="button" aria-label="Antwort abbrechen" onClick={() => setReplyingTo(null)}><X size={16} /></button>
+          </div>
+        )}
+        <div className="composer-shell">
+          <textarea
+            ref={composerRef}
+            value={draft}
+            maxLength={2000}
+            rows={1}
+            placeholder={canSendMessages ? `Nachricht an #${channel.name}` : 'Du darfst in diesem Channel nicht schreiben.'}
+            aria-label={`Nachricht an #${channel.name}`}
+            disabled={!canSendMessages}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && replyingTo) {
+                setReplyingTo(null);
+                return;
+              }
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+              }
+            }}
+          />
+          <span className={draft.length > 1800 ? 'character-count is-near-limit' : 'character-count'}>
+            {draft.length > 1800 ? 2000 - draft.length : ''}
+          </span>
+          <button type="button" onClick={sendMessage} disabled={!canSendMessages || !draft.trim() || sending} aria-label="Nachricht senden">
+            {sending ? <LoaderCircle className="spin" size={19} /> : <Send size={19} />}
+          </button>
+        </div>
       </div>
     </section>
   );

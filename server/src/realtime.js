@@ -54,6 +54,7 @@ export function configureRealtime(httpServer) {
 
   io.on('connection', (socket) => {
     addOnlineUser(socket.data.userId);
+    socket.join(`user:${socket.data.userId}`);
 
     socket.on('guild:join', async ({ guildId } = {}, acknowledge = () => {}) => {
       try {
@@ -113,4 +114,10 @@ export function configureRealtime(httpServer) {
 
 export function emitToChannel(channelId, event, payload) {
   io?.to(`channel:${channelId}`).emit(event, payload);
+}
+
+export function emitToUsers(userIds, event, payload) {
+  for (const userId of new Set(userIds)) {
+    io?.to(`user:${userId}`).emit(event, payload);
+  }
 }
