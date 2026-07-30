@@ -121,3 +121,19 @@ export function emitToUsers(userIds, event, payload) {
     io?.to(`user:${userId}`).emit(event, payload);
   }
 }
+
+export async function emitGuildRefresh(guildId, scopes = ['guild', 'members', 'list'], extraUserIds = []) {
+  if (!io || !guildId) return;
+  const members = await db.all('SELECT user_id FROM guild_members WHERE guild_id = ?', [guildId]);
+  let target = io.to(`guild:${guildId}`);
+  for (const userId of new Set([...members.map((member) => member.user_id), ...extraUserIds])) {
+    target = target.to(`user:${userId}`);
+  }
+  target.emit('guild:refresh', { guildId, scopes });
+}
+
+export function emitGuildRemoved(userId, guildId, reason = 'removed') {
+  if (!io || !userId || !guildId) return;
+  io.to(`user:${userId}`).emit('guild:removed', { guildId, reason });
+  io.in(`user:${userId}`).socketsLeave(`guild:${guildId}`);
+}

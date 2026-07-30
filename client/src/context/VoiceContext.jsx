@@ -71,6 +71,7 @@ function deviceView(device, index, type) {
 
 export function VoiceProvider({ children }) {
   const roomRef = useRef(null);
+  const participantListenerCleanupRef = useRef(() => {});
   const participantSyncTimerRef = useRef(null);
   const authoritativeParticipantIdsRef = useRef(null);
   const deafenedRef = useRef(storedValue('guildora:voice-deafened') === 'true');
@@ -135,7 +136,7 @@ export function VoiceProvider({ children }) {
     void syncParticipantsFromServer(channelId, room);
     participantSyncTimerRef.current = window.setInterval(() => {
       void syncParticipantsFromServer(channelId, room);
-    }, 2500);
+    }, 5000);
   }, [clearParticipantSync, syncParticipantsFromServer]);
 
   const refreshDevices = useCallback(async (requestPermissions = false) => {
@@ -163,6 +164,8 @@ export function VoiceProvider({ children }) {
 
   const leave = useCallback(async () => {
     clearParticipantSync();
+    participantListenerCleanupRef.current();
+    participantListenerCleanupRef.current = () => {};
     const room = roomRef.current;
     roomRef.current = null;
     authoritativeParticipantIdsRef.current = null;
@@ -176,7 +179,7 @@ export function VoiceProvider({ children }) {
       room.removeAllListeners();
       await room.disconnect().catch(() => {});
     }
-  }, [clearParticipantSync, syncParticipantsFromServer]);
+  }, [clearAudioElements, clearParticipantSync]);
 
   const attachAudioTrack = useCallback((track) => {
     if (track.kind !== 'audio') return;
@@ -217,7 +220,7 @@ export function VoiceProvider({ children }) {
       throw error;
     }
 
-    const { Room, RoomEvent } = await liveKit();
+    const { ParticipantEvent, Room, RoomEvent } = await liveKit();
     const room = new Room({
       adaptiveStream: true,
       dynacast: true,
@@ -245,20 +248,44 @@ export function VoiceProvider({ children }) {
     };
     const removeParticipant = (participant) => {
       if (!participant || room !== roomRef.current) return;
+      unbindParticipant(participant);
+      authoritativeParticipantIdsRef.current?.delete(participant.identity);
       setParticipants((current) => current.filter((item) => item.id !== participant.identity));
     };
-    const updateActiveSpeakers = (speakers) => {
-      if (room !== roomRef.current) return;
-      const speaking = new Set(speakers.map((participant) => participant.identity));
-      setParticipants((current) => current.map((participant) => ({
-        ...participant,
-        is_speaking: speaking.has(participant.id)
-      })));
+    const speakingListeners = new Map();
+    const bindParticipant = (participant) => {
+      if (!participant || speakingListeners.has(participant.identity)) return;
+      const onSpeakingChanged = (isSpeaking) => {
+        if (room !== roomRef.current) return;
+        setParticipants((current) => current.map((item) => (
+          item.id === participant.identity
+            ? { ...item, is_speaking: Boolean(isSpeaking) }
+            : item
+        )));
+      };
+      participant.on(ParticipantEvent.IsSpeakingChanged, onSpeakingChanged);
+      speakingListeners.set(participant.identity, { participant, onSpeakingChanged });
     };
+    const unbindParticipant = (participant) => {
+      const listener = participant && speakingListeners.get(participant.identity);
+      if (!listener) return;
+      listener.participant.off(ParticipantEvent.IsSpeakingChanged, listener.onSpeakingChanged);
+      speakingListeners.delete(participant.identity);
+    };
+    const clearParticipantListeners = () => {
+      for (const listener of speakingListeners.values()) {
+        listener.participant.off(ParticipantEvent.IsSpeakingChanged, listener.onSpeakingChanged);
+      }
+      speakingListeners.clear();
+    };
+    participantListenerCleanupRef.current = clearParticipantListeners;
     room
-      .on(RoomEvent.ParticipantConnected, upsertParticipant)
+      .on(RoomEvent.ParticipantConnected, (participant) => {
+        authoritativeParticipantIdsRef.current?.add(participant.identity);
+        bindParticipant(participant);
+        upsertParticipant(participant);
+      })
       .on(RoomEvent.ParticipantDisconnected, removeParticipant)
-      .on(RoomEvent.ActiveSpeakersChanged, updateActiveSpeakers)
       .on(RoomEvent.TrackMuted, (_publication, participant) => upsertParticipant(participant))
       .on(RoomEvent.TrackUnmuted, (_publication, participant) => upsertParticipant(participant))
       .on(RoomEvent.ConnectionQualityChanged, (_quality, participant) => upsertParticipant(participant))
@@ -282,6 +309,8 @@ export function VoiceProvider({ children }) {
       .on(RoomEvent.Disconnected, () => {
         if (room !== roomRef.current) return;
         clearParticipantSync();
+        clearParticipantListeners();
+        participantListenerCleanupRef.current = () => {};
         roomRef.current = null;
         authoritativeParticipantIdsRef.current = null;
         setConnectionState('error');
@@ -292,6 +321,8 @@ export function VoiceProvider({ children }) {
 
     try {
       await room.connect(credentials.url, credentials.token, { autoSubscribe: true });
+      bindParticipant(room.localParticipant);
+      for (const participant of room.remoteParticipants.values()) bindParticipant(participant);
       if (inputDeviceId) {
         try {
           await room.switchActiveDevice('audioinput', inputDeviceId);
@@ -330,6 +361,8 @@ export function VoiceProvider({ children }) {
         setLastError(error?.message || 'Die Voice-Verbindung konnte nicht aufgebaut werden.');
       }
       room.removeAllListeners();
+      clearParticipantListeners();
+      participantListenerCleanupRef.current = () => {};
       await room.disconnect().catch(() => {});
       clearParticipantSync();
       clearAudioElements();
@@ -427,6 +460,8 @@ export function VoiceProvider({ children }) {
 
   useEffect(() => () => {
     clearParticipantSync();
+    participantListenerCleanupRef.current();
+    participantListenerCleanupRef.current = () => {};
     const room = roomRef.current;
     roomRef.current = null;
     authoritativeParticipantIdsRef.current = null;

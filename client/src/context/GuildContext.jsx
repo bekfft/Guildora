@@ -1,11 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
+import { socket } from '../lib/socket.js';
 
 const GuildContext = createContext(null);
 
 export function GuildProvider({ children }) {
   const [guilds, setGuilds] = useState([]);
   const [loading, setLoading] = useState(true);
+  const realtimeRefreshTimer = useRef(null);
 
   const refreshGuilds = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -19,6 +21,27 @@ export function GuildProvider({ children }) {
 
   useEffect(() => {
     refreshGuilds().catch(() => setLoading(false));
+  }, [refreshGuilds]);
+
+  useEffect(() => {
+    const scheduleRefresh = () => {
+      if (realtimeRefreshTimer.current) window.clearTimeout(realtimeRefreshTimer.current);
+      realtimeRefreshTimer.current = window.setTimeout(() => {
+        refreshGuilds(false).catch(() => {});
+      }, 80);
+    };
+    const removeGuild = ({ guildId }) => {
+      setGuilds((current) => current.filter((guild) => guild.id !== guildId));
+      scheduleRefresh();
+    };
+    socket.on('guild:refresh', scheduleRefresh);
+    socket.on('guild:removed', removeGuild);
+    if (!socket.connected) socket.connect();
+    return () => {
+      socket.off('guild:refresh', scheduleRefresh);
+      socket.off('guild:removed', removeGuild);
+      if (realtimeRefreshTimer.current) window.clearTimeout(realtimeRefreshTimer.current);
+    };
   }, [refreshGuilds]);
 
   const joinGuild = useCallback(async (guild) => {

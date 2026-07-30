@@ -3,6 +3,7 @@ import { db } from '../db/index.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { requirePermission } from './guildAdminController.js';
 import { createInviteSchema, inviteCodeSchema } from '../validation/inviteSchemas.js';
+import { emitGuildRefresh } from '../realtime.js';
 
 function timestamp(value) {
   return value instanceof Date ? value.toISOString() : value;
@@ -180,6 +181,7 @@ export async function joinWithInvite(req, res) {
     throw error;
   }
 
+  await emitGuildRefresh(invite.guild_id, ['members', 'list'], [req.userId]);
   return res.status(201).json({
     guild: { id: invite.guild_id, name: invite.guild_name },
     channel: await firstTextChannel(invite.guild_id),

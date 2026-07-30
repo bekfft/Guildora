@@ -10,6 +10,7 @@ import {
   roleSchema
 } from '../validation/guildAdminSchemas.js';
 import { channelRolePermissionSchema } from '../validation/channelPermissionSchemas.js';
+import { emitGuildRefresh, emitGuildRemoved } from '../realtime.js';
 
 async function guildOrThrow(guildId) {
   const guild = await db.get('SELECT * FROM guilds WHERE id = ?', [guildId]);
@@ -101,6 +102,10 @@ async function saveRolePermissions(roleId, permissions) {
   );
 }
 
+async function refreshGuild(guildId, scopes = ['guild', 'members', 'list']) {
+  await emitGuildRefresh(guildId, scopes);
+}
+
 export async function updateGuildProfile(req, res) {
   await requirePermission(req.params.id, req.userId, 'manageServer');
   const data = guildProfileSchema.parse(req.body);
@@ -108,6 +113,7 @@ export async function updateGuildProfile(req, res) {
     'UPDATE guilds SET name = ?, description = ?, category = ? WHERE id = ?',
     [data.name, data.description, data.category, req.params.id]
   );
+  await refreshGuild(req.params.id, ['guild', 'list']);
   return res.json({ guild: await db.get('SELECT * FROM guilds WHERE id = ?', [req.params.id]) });
 }
 
@@ -121,6 +127,7 @@ export async function createCategory(req, res) {
     'INSERT INTO channel_categories (id, guild_id, name, position) VALUES (?, ?, ?, ?)',
     [id, req.params.id, data.name.toUpperCase(), position]
   );
+  await refreshGuild(req.params.id, ['guild']);
   return res.status(201).json({ category: await db.get('SELECT * FROM channel_categories WHERE id = ?', [id]) });
 }
 
@@ -132,6 +139,7 @@ export async function updateCategory(req, res) {
     'UPDATE channel_categories SET name = ?, position = ? WHERE id = ?',
     [data.name.toUpperCase(), data.position ?? stored.position, stored.id]
   );
+  await refreshGuild(req.params.id, ['guild']);
   return res.json({ category: await db.get('SELECT * FROM channel_categories WHERE id = ?', [stored.id]) });
 }
 
@@ -139,6 +147,7 @@ export async function deleteCategory(req, res) {
   await requirePermission(req.params.id, req.userId, 'manageChannels');
   const stored = await categoryInGuild(req.params.categoryId, req.params.id);
   await db.run('DELETE FROM channel_categories WHERE id = ?', [stored.id]);
+  await refreshGuild(req.params.id, ['guild']);
   return res.status(204).end();
 }
 
@@ -156,6 +165,7 @@ export async function createChannel(req, res) {
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [id, req.params.id, data.categoryId, normalizedName, data.type, data.topic || null, position]
   );
+  await refreshGuild(req.params.id, ['guild']);
   return res.status(201).json({ channel: await db.get('SELECT * FROM channels WHERE id = ?', [id]) });
 }
 
@@ -172,6 +182,7 @@ export async function updateChannel(req, res) {
      WHERE id = ?`,
     [normalizedName, data.type, data.categoryId, data.topic || null, data.position ?? stored.position, stored.id]
   );
+  await refreshGuild(req.params.id, ['guild']);
   return res.json({ channel: await db.get('SELECT * FROM channels WHERE id = ?', [stored.id]) });
 }
 
@@ -185,6 +196,7 @@ export async function deleteChannel(req, res) {
     }
   }
   await db.run('DELETE FROM channels WHERE id = ?', [stored.id]);
+  await refreshGuild(req.params.id, ['guild']);
   return res.status(204).end();
 }
 
@@ -235,6 +247,7 @@ export async function updateChannelRolePermissions(req, res) {
       data.manageMessages
     ]
   );
+  await refreshGuild(req.params.id, ['guild']);
   return res.json({ permission: { roleId: req.params.roleId, ...data } });
 }
 
@@ -246,6 +259,7 @@ export async function deleteChannelRolePermissions(req, res) {
     'DELETE FROM channel_role_permissions WHERE channel_id = ? AND role_id = ?',
     [req.params.channelId, req.params.roleId]
   );
+  await refreshGuild(req.params.id, ['guild']);
   return res.status(204).end();
 }
 
@@ -261,6 +275,7 @@ export async function createRole(req, res) {
     [id, req.params.id, data.name, data.color, position, false]
   );
   await saveRolePermissions(id, data.permissions);
+  await refreshGuild(req.params.id, ['guild', 'members']);
   return res.status(201).json({ role: roleResponse(await db.get('SELECT * FROM roles WHERE id = ?', [id]), data.permissions) });
 }
 
@@ -278,6 +293,7 @@ export async function updateRole(req, res) {
     ]
   );
   await saveRolePermissions(stored.id, data.permissions);
+  await refreshGuild(req.params.id, ['guild', 'members']);
   return res.json({ role: roleResponse(await db.get('SELECT * FROM roles WHERE id = ?', [stored.id]), data.permissions) });
 }
 
@@ -288,6 +304,7 @@ export async function deleteRole(req, res) {
     throw new ApiError(409, 'DEFAULT_ROLE', 'Die Standardrolle kann nicht gelöscht werden.');
   }
   await db.run('DELETE FROM roles WHERE id = ?', [stored.id]);
+  await refreshGuild(req.params.id, ['guild', 'members']);
   return res.status(204).end();
 }
 
@@ -313,6 +330,7 @@ export async function updateMemberRoles(req, res) {
   for (const roleId of roleIds) {
     await db.run('INSERT INTO member_roles (member_id, role_id) VALUES (?, ?)', [member.id, roleId]);
   }
+  await refreshGuild(req.params.id, ['guild', 'members']);
   return res.json({ role_ids: roleIds });
 }
 
@@ -321,6 +339,7 @@ export async function updateMemberNickname(req, res) {
   const member = await memberInGuild(req.params.memberId, req.params.id);
   const data = memberNicknameSchema.parse(req.body);
   await db.run('UPDATE guild_members SET nickname = ? WHERE id = ?', [data.nickname || null, member.id]);
+  await refreshGuild(req.params.id, ['members']);
   return res.json({ member: { ...member, nickname: data.nickname || null } });
 }
 
@@ -331,5 +350,7 @@ export async function kickMember(req, res) {
     throw new ApiError(409, 'OWNER_CANNOT_BE_KICKED', 'Der Serverbesitzer kann nicht entfernt werden.');
   }
   await db.run('DELETE FROM guild_members WHERE id = ?', [member.id]);
+  emitGuildRemoved(member.user_id, req.params.id, 'kicked');
+  await refreshGuild(req.params.id, ['members', 'list']);
   return res.status(204).end();
 }

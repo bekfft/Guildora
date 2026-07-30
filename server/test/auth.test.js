@@ -253,6 +253,18 @@ test('Voice-Tokens sind kurzlebig, rechtegeprüft und nur für Sprachkanäle gü
 });
 
 test('Serververwaltung ändert Profil, Kategorien, Channels, Rollen und Mitglieder', async () => {
+  const guildRealtimeClient = connectSocket(baseUrl, {
+    path: '/api/socket.io',
+    transports: ['websocket'],
+    extraHeaders: { Cookie: authCookie }
+  });
+  await new Promise((resolve, reject) => {
+    guildRealtimeClient.once('connect', resolve);
+    guildRealtimeClient.once('connect_error', reject);
+  });
+  const guildRefreshEvent = new Promise((resolve) => {
+    guildRealtimeClient.once('guild:refresh', resolve);
+  });
   const profile = await request(`/api/guilds/${createdGuildId}`, {
     method: 'PATCH',
     cookie: authCookie,
@@ -264,6 +276,10 @@ test('Serververwaltung ändert Profil, Kategorien, Channels, Rollen und Mitglied
   });
   assert.equal(profile.status, 200);
   assert.equal((await profile.json()).guild.name, 'Test Community Plus');
+  assert.deepEqual(await guildRefreshEvent, {
+    guildId: createdGuildId,
+    scopes: ['guild', 'list']
+  });
 
   const ownerCannotPublish = await request(`/api/guilds/${createdGuildId}`, {
     method: 'PATCH',
@@ -355,6 +371,7 @@ test('Serververwaltung ändert Profil, Kategorien, Channels, Rollen und Mitglied
   assert.equal((await request(`/api/guilds/${createdGuildId}/roles/${roleBody.role.id}`, { method: 'DELETE', cookie: authCookie })).status, 204);
   assert.equal((await request(`/api/guilds/${createdGuildId}/channels/${channelBody.channel.id}`, { method: 'DELETE', cookie: authCookie })).status, 204);
   assert.equal((await request(`/api/guilds/${createdGuildId}/categories/${categoryBody.category.id}`, { method: 'DELETE', cookie: authCookie })).status, 204);
+  guildRealtimeClient.disconnect();
 });
 
 test('Nachrichten unterstützen Antworten, Reaktionen, Erwähnungen und Echtzeit', async () => {

@@ -3,7 +3,7 @@ import { db } from '../db/index.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { createGuildSchema, discoveryQuerySchema } from '../validation/guildSchemas.js';
 import { getChannelPermissions, requireChannelPermission } from '../utils/channelPermissions.js';
-import { isUserOnline } from '../realtime.js';
+import { emitGuildRefresh, emitGuildRemoved, isUserOnline } from '../realtime.js';
 import {
   initializeGuildReadStates,
   unreadCountForGuild,
@@ -216,6 +216,7 @@ export async function joinGuild(req, res) {
   const memberId = crypto.randomUUID();
   await db.run('INSERT INTO guild_members (id, guild_id, user_id) VALUES (?, ?, ?)', [memberId, guild.id, req.userId]);
   await initializeGuildReadStates(guild.id, req.userId);
+  await emitGuildRefresh(guild.id, ['members', 'list'], [req.userId]);
   return res.status(201).json({ guild: guildResponse({ ...guild, is_member: true }), channel: await firstTextChannel(guild.id) });
 }
 
@@ -226,6 +227,8 @@ export async function leaveGuild(req, res) {
   }
   const member = await requireMembership(guild.id, req.userId);
   await db.run('DELETE FROM guild_members WHERE id = ?', [member.id]);
+  emitGuildRemoved(req.userId, guild.id, 'left');
+  await emitGuildRefresh(guild.id, ['members', 'list']);
   return res.status(204).end();
 }
 
@@ -271,6 +274,7 @@ export async function createGuild(req, res) {
     [crypto.randomUUID(), guildId, voiceCategory, 'Allgemein', 'voice', null, 0]
   );
   const guild = await db.get('SELECT * FROM guilds WHERE id = ?', [guildId]);
+  await emitGuildRefresh(guildId, ['guild', 'members', 'list'], [req.userId]);
   return res.status(201).json({ guild: guildResponse({ ...guild, is_member: true }), channel: { id: textChannel, name: 'allgemein' } });
 }
 

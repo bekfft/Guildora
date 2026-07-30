@@ -46,6 +46,7 @@ export default function AppPage() {
   const [toast, setToast] = useState(null);
   const toastTimers = useRef([]);
   const engagementRefreshTimer = useRef(null);
+  const guildRealtimeRefreshTimer = useRef(null);
   const isDiscovery = location.pathname === '/app/discovery';
   const isHome = location.pathname === '/app/channels/@me';
   const focusMessageId = new URLSearchParams(location.search).get('message');
@@ -60,9 +61,23 @@ export default function AppPage() {
     toastTimers.current = [exitTimer, removeTimer];
   }, []);
 
+  const refreshGuildData = useCallback(async () => {
+    if (!guildId) return;
+    const [details, memberResult] = await Promise.all([api.guild(guildId), api.guildMembers(guildId)]);
+    setGuildData(details);
+    setMembers(memberResult.members);
+    if (channelId && !details.channels.some((item) => item.id === channelId)) {
+      const remembered = localStorage.getItem(`guildora:last-channel:${guildId}`);
+      const target = details.channels.find((item) => item.id === remembered && item.type === 'text')
+        || details.channels.find((item) => item.type === 'text');
+      navigate(target ? `/app/channels/${guildId}/${target.id}` : '/app/channels/@me', { replace: true });
+    }
+  }, [channelId, guildId, navigate]);
+
   useEffect(() => () => {
     toastTimers.current.forEach((timer) => window.clearTimeout(timer));
     if (engagementRefreshTimer.current) window.clearTimeout(engagementRefreshTimer.current);
+    if (guildRealtimeRefreshTimer.current) window.clearTimeout(guildRealtimeRefreshTimer.current);
   }, []);
 
   useEffect(() => {
@@ -145,6 +160,31 @@ export default function AppPage() {
   }, [guildId, refreshGuilds, showToast]);
 
   useEffect(() => {
+    const onGuildRefresh = ({ guildId: changedGuildId }) => {
+      if (!guildId || changedGuildId !== guildId) return;
+      if (guildRealtimeRefreshTimer.current) window.clearTimeout(guildRealtimeRefreshTimer.current);
+      guildRealtimeRefreshTimer.current = window.setTimeout(() => {
+        refreshGuildData().catch(() => {});
+      }, 80);
+    };
+    const onGuildRemoved = ({ guildId: removedGuildId, reason }) => {
+      if (removedGuildId !== guildId) return;
+      if (voice.channel?.guild_id === removedGuildId) voice.leave().catch(() => {});
+      setGuildData(null);
+      setMembers([]);
+      navigate('/app/channels/@me', { replace: true });
+      if (reason === 'kicked') showToast('Du wurdest von diesem Server entfernt.', 'error');
+    };
+    socket.on('guild:refresh', onGuildRefresh);
+    socket.on('guild:removed', onGuildRemoved);
+    return () => {
+      socket.off('guild:refresh', onGuildRefresh);
+      socket.off('guild:removed', onGuildRemoved);
+      if (guildRealtimeRefreshTimer.current) window.clearTimeout(guildRealtimeRefreshTimer.current);
+    };
+  }, [guildId, navigate, refreshGuildData, showToast, voice.channel?.guild_id, voice.leave]);
+
+  useEffect(() => {
     if (guildId && channelId) localStorage.setItem(`guildora:last-channel:${guildId}`, channelId);
   }, [guildId, channelId]);
 
@@ -177,13 +217,6 @@ export default function AppPage() {
     manageMessages: Boolean(isGuildOwner || currentMember?.roles.some((role) => role.permissions?.manageMessages))
   };
   const canManageServer = Object.values(capabilities).some(Boolean);
-
-  async function refreshGuildData() {
-    if (!guildId) return;
-    const [details, memberResult] = await Promise.all([api.guild(guildId), api.guildMembers(guildId)]);
-    setGuildData(details);
-    setMembers(memberResult.members);
-  }
 
   const handleChannelRead = useCallback((readChannelId, unreadCount) => {
     setGuildData((current) => current ? {
