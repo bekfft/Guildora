@@ -80,6 +80,7 @@ export default function ChannelView({
   currentUserId,
   canManageMessages,
   members = [],
+  mentionRequest,
   focusMessageId,
   onOpenProfile,
   onRead,
@@ -107,6 +108,12 @@ export default function ChannelView({
   const canReadHistory = channel?.permissions?.readHistory !== false;
   const canSendMessages = channel?.permissions?.sendMessages !== false;
   const canAttachFiles = channel?.permissions?.attachFiles !== false;
+
+  useEffect(() => {
+    if (!mentionRequest || mentionRequest.channelId !== channel?.id || !canSendMessages) return;
+    setDraft((current) => `${current}${current && !/\s$/.test(current) ? ' ' : ''}@${mentionRequest.username} `);
+    requestAnimationFrame(() => composerRef.current?.focus());
+  }, [canSendMessages, channel?.id, mentionRequest]);
 
   useEffect(() => {
     if (!channel) return undefined;

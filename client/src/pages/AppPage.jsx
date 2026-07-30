@@ -57,6 +57,7 @@ export default function AppPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState('Mein Konto');
   const [profileUserId, setProfileUserId] = useState(null);
+  const [mentionRequest, setMentionRequest] = useState(null);
   const [serverSettingsTab, setServerSettingsTab] = useState(null);
   const [channelSettings, setChannelSettings] = useState(null);
   const [categorySettings, setCategorySettings] = useState(null);
@@ -479,6 +480,7 @@ export default function AppPage() {
               currentUserId={user.id}
               canManageMessages={capabilities.manageMessages}
               members={members}
+              mentionRequest={mentionRequest}
               focusMessageId={focusMessageId}
               onOpenProfile={openProfile}
               onRead={handleChannelRead}
@@ -499,8 +501,24 @@ export default function AppPage() {
           <MemberList
             members={members}
             loading={loadingDetails}
+            currentUserId={user.id}
+            guildId={guildData?.guild.id}
+            guildOwnerId={guildData?.guild.owner_id}
+            roles={guildData?.roles || []}
+            capabilities={capabilities}
+            canMention={activeChannel?.permissions?.sendMessages !== false}
             onClose={() => setMembersVisible(false)}
             onOpenProfile={openProfile}
+            onOpenDm={(id) => navigate(`/app/channels/@me/${id}`)}
+            onMention={(member) => setMentionRequest({
+              channelId: activeChannel?.id,
+              username: member.username,
+              requestId: Date.now()
+            })}
+            onOpenModeration={() => setServerSettingsTab('moderation')}
+            onRefresh={refreshGuildData}
+            onSocialChanged={() => refreshConversations().catch(() => {})}
+            onToast={showToast}
           />
         </>
       )}

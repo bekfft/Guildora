@@ -349,6 +349,108 @@
   background: var(--danger);
 }
 
+.member-context-menu {
+  position: fixed;
+  z-index: 1300;
+  width: min(270px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  padding: 6px;
+  overflow-y: auto;
+  border: 1px solid rgb(255 255 255 / 7%);
+  border-radius: 8px;
+  color: var(--text-normal);
+  background: #111214;
+  box-shadow: 0 14px 38px rgb(0 0 0 / 52%);
+  animation: context-menu-in 120ms cubic-bezier(.2, .8, .2, 1);
+  transform-origin: top left;
+}
+
+.member-context-menu > button,
+.member-context-menu__roles > button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 34px;
+  gap: 10px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 4px;
+  outline: 0;
+  color: #dbdee1;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.member-context-menu__chevron {
+  margin-left: auto;
+  transition: transform 120ms ease;
+}
+
+.member-context-menu__chevron.is-open {
+  transform: rotate(90deg);
+}
+
+.member-context-menu > button:hover,
+.member-context-menu > button:focus-visible,
+.member-context-menu__roles > button:hover,
+.member-context-menu__roles > button:focus-visible {
+  color: #fff;
+  background: var(--brand);
+}
+
+.member-context-menu button:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+
+.member-context-menu > button.is-danger {
+  color: #f77478;
+}
+
+.member-context-menu > button.is-danger:hover,
+.member-context-menu > button.is-danger:focus-visible {
+  color: #fff;
+  background: var(--danger);
+}
+
+.member-context-menu__separator {
+  display: block;
+  height: 1px;
+  margin: 5px 4px;
+  background: var(--divider);
+}
+
+.member-context-menu__roles {
+  display: grid;
+  gap: 2px;
+  margin: 2px 4px 5px 14px;
+  padding-left: 6px;
+  border-left: 1px solid var(--divider);
+}
+
+.member-context-menu__roles > button {
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  min-height: 32px;
+  padding: 5px 7px;
+  font-size: 12px;
+}
+
+.member-context-menu__roles i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.member-context-menu__roles span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @keyframes context-menu-in {
   from {
     opacity: 0;
