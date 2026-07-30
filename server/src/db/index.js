@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { backup as backupDatabase, DatabaseSync } from 'node:sqlite';
 import pg from 'pg';
+import { resolveServerDataPath } from '../config/dataPaths.js';
 
 const { Pool } = pg;
 const isPostgres = Boolean(process.env.DATABASE_URL);
@@ -27,7 +28,7 @@ function toPostgresSql(sql) {
 }
 
 function sqliteDatabasePath() {
-  return path.resolve(process.cwd(), process.env.SQLITE_PATH || './data/guildora.sqlite');
+  return resolveServerDataPath(process.env.SQLITE_PATH, 'guildora.sqlite');
 }
 
 function sqliteDatabase() {

@@ -2,11 +2,12 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import multer from 'multer';
+import { resolveServerDataPath } from '../config/dataPaths.js';
 import { db } from '../db/index.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { requireChannelPermission } from '../utils/channelPermissions.js';
 
-const uploadRoot = path.resolve(process.env.UPLOAD_DIR || './data/uploads');
+const uploadRoot = resolveServerDataPath(process.env.UPLOAD_DIR, 'uploads');
 fs.mkdirSync(uploadRoot, { recursive: true });
 
 const allowedTypes = new Set([
