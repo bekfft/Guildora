@@ -91,6 +91,21 @@ export const api = {
     return request(`/api/guilds/${guildId}/messages/search?${query}`);
   },
   searchUsers: (q) => request(`/api/social/users/search?q=${encodeURIComponent(q)}`),
+  profile: (userId, guildId = null) => request(
+    `/api/social/users/${userId}/profile${guildId ? `?guildId=${encodeURIComponent(guildId)}` : ''}`
+  ),
+  updateProfile: (data) => request('/api/social/profile', {
+    method: 'PATCH',
+    body: JSON.stringify(data)
+  }),
+  updateBadgePreferences: (badges) => request('/api/social/profile/badges', {
+    method: 'PUT',
+    body: JSON.stringify({ badges })
+  }),
+  reportProfile: (userId, reason) => request(`/api/social/users/${userId}/report`, {
+    method: 'POST',
+    body: JSON.stringify({ reason })
+  }),
   friends: () => request('/api/social/friends'),
   addFriend: (username) => request('/api/social/friends', { method: 'POST', body: JSON.stringify({ username }) }),
   respondFriend: (id, action) => request(`/api/social/friends/${id}`, { method: 'PATCH', body: JSON.stringify({ action }) }),

@@ -78,7 +78,17 @@ test('Registrierung speichert nur den Hash und setzt sichere Cookies', async () 
   });
   assert.equal(response.status, 201);
   const body = await response.json();
-  assert.deepEqual(Object.keys(body.user).sort(), ['avatar_url', 'created_at', 'display_name', 'email', 'id', 'username']);
+  assert.deepEqual(Object.keys(body.user).sort(), [
+    'avatar_url',
+    'banner_url',
+    'bio',
+    'created_at',
+    'custom_status',
+    'display_name',
+    'email',
+    'id',
+    'username'
+  ]);
   assert.equal(body.user.email, 'mira@example.de');
   assert.equal(body.user.display_name, 'mira.test');
   registeredUserId = body.user.id;
@@ -950,6 +960,70 @@ test('Freunde, Direktnachrichten, Anhänge und Moderation funktionieren vollstä
     body: { action: 'accept' }
   })).status, 200);
 
+  await db.run(
+    'INSERT INTO guild_members (id, guild_id, user_id) VALUES (?, ?, ?)',
+    [crypto.randomUUID(), createdGuildId, friendId]
+  );
+  const availableBadges = await db.all('SELECT id FROM profile_badges ORDER BY sort_order LIMIT 2');
+  for (const [index, badge] of availableBadges.entries()) {
+    await db.run(
+      'INSERT INTO user_badges (user_id, badge_id, display_order) VALUES (?, ?, ?)',
+      [registeredUserId, badge.id, (index + 1) * 10]
+    );
+  }
+  const profileImageForm = new FormData();
+  profileImageForm.append('files', new Blob(['profile-image'], { type: 'image/png' }), 'profil.png');
+  const profileImageUpload = await fetch(`${baseUrl}/api/uploads`, {
+    method: 'POST',
+    headers: { Cookie: authCookie },
+    body: profileImageForm
+  });
+  assert.equal(profileImageUpload.status, 201);
+  const profileAttachmentId = (await profileImageUpload.json()).attachments[0].id;
+  const updatedProfile = await request('/api/social/profile', {
+    method: 'PATCH',
+    cookie: authCookie,
+    body: {
+      displayName: 'Mira Profil',
+      bio: 'Globale Guildora-Biografie',
+      customStatus: 'Testet Profile 2.0',
+      avatarAttachmentId: profileAttachmentId,
+      bannerAttachmentId: profileAttachmentId
+    }
+  });
+  assert.equal(updatedProfile.status, 200);
+  assert.equal((await updatedProfile.json()).profile.bio, 'Globale Guildora-Biografie');
+  const badgePreferences = await request('/api/social/profile/badges', {
+    method: 'PUT',
+    cookie: authCookie,
+    body: {
+      badges: [
+        { id: availableBadges[1].id, visible: true },
+        { id: availableBadges[0].id, visible: false }
+      ]
+    }
+  });
+  assert.equal(badgePreferences.status, 200);
+  const publicProfile = await request(
+    `/api/social/users/${registeredUserId}/profile?guildId=${createdGuildId}`,
+    { cookie: friendCookie }
+  );
+  assert.equal(publicProfile.status, 200);
+  const publicProfileBody = (await publicProfile.json()).profile;
+  assert.equal(publicProfileBody.relationship.state, 'accepted');
+  assert.equal(publicProfileBody.badges.length, 1);
+  assert.equal(publicProfileBody.mutual_guilds.length, 1);
+  assert.ok(publicProfileBody.server_profile);
+  const ownProfile = await request(`/api/social/users/${registeredUserId}/profile`, { cookie: authCookie });
+  assert.deepEqual((await ownProfile.json()).profile.badges.map((badge) => badge.is_visible), [true, false]);
+  assert.equal((await request(`/api/uploads/${profileAttachmentId}`, { cookie: friendCookie })).status, 200);
+  const profileReport = await request(`/api/social/users/${registeredUserId}/report`, {
+    method: 'POST',
+    cookie: friendCookie,
+    body: { reason: 'Profil-Meldetest' }
+  });
+  assert.equal(profileReport.status, 201);
+
   const conversationResponse = await request(`/api/social/dm/users/${friendId}`, {
     method: 'POST',
     cookie: authCookie
@@ -1009,10 +1083,6 @@ test('Freunde, Direktnachrichten, Anhänge und Moderation funktionieren vollstä
   assert.equal(download.status, 200);
   assert.equal(await download.text(), 'Guildora Upload');
 
-  await db.run(
-    'INSERT INTO guild_members (id, guild_id, user_id) VALUES (?, ?, ?)',
-    [crypto.randomUUID(), createdGuildId, friendId]
-  );
   const ban = await request(`/api/guilds/${createdGuildId}/moderation/bans`, {
     cookie: authCookie,
     body: { userId: friendId, reason: 'Integrationstest' }

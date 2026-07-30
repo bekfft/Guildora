@@ -19,7 +19,7 @@ function Attachment({ attachment }) {
   );
 }
 
-export default function DirectMessageView({ conversation, currentUserId, onToast, onRefresh }) {
+export default function DirectMessageView({ conversation, currentUserId, onOpenProfile, onToast, onRefresh }) {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [pendingFiles, setPendingFiles] = useState([]);
@@ -112,16 +112,20 @@ export default function DirectMessageView({ conversation, currentUserId, onToast
     <section className="channel-view dm-view">
       <div className="messages-scroller" ref={scroller}>
         <div className="dm-welcome">
-          <span className="friend-avatar">{nameOf(conversation.user)[0].toUpperCase()}</span>
-          <h1>{nameOf(conversation.user)}</h1>
+          <button className="friend-avatar" type="button" onClick={() => onOpenProfile(conversation.user.id)}>
+            {conversation.user.avatar_url ? <img src={conversation.user.avatar_url} alt="" /> : nameOf(conversation.user)[0].toUpperCase()}
+          </button>
+          <button className="dm-profile-name" type="button" onClick={() => onOpenProfile(conversation.user.id)}>{nameOf(conversation.user)}</button>
           <p>Das ist der Beginn eurer Direktnachrichten.</p>
         </div>
         <div className="messages-list">
           {messages.map((message) => (
             <article className="message-row" key={message.id}>
-              <div className="message-avatar">{nameOf(message.author)[0].toUpperCase()}</div>
+              <button className="message-avatar" type="button" onClick={() => onOpenProfile(message.author.id)} aria-label={`Profil von ${nameOf(message.author)} öffnen`}>
+                {message.author.avatar_url ? <img src={message.author.avatar_url} alt="" /> : nameOf(message.author)[0].toUpperCase()}
+              </button>
               <div className="message-content">
-                <div className="message-meta"><strong>{nameOf(message.author)}</strong><time>{new Date(message.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</time></div>
+                <div className="message-meta"><button className="message-author-button" type="button" onClick={() => onOpenProfile(message.author.id)}>{nameOf(message.author)}</button><time>{new Date(message.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</time></div>
                 {message.content && <p>{message.content}</p>}
                 {message.attachments?.length > 0 && <div className="message-attachments">{message.attachments.map((item) => <Attachment attachment={item} key={item.id} />)}</div>}
               </div>

@@ -10,7 +10,17 @@ import {
   setAuthCookies
 } from '../utils/tokens.js';
 
-const PUBLIC_USER_FIELDS = 'id, email, username, display_name, avatar_url, created_at';
+const PUBLIC_USER_FIELDS = `u.id, u.email, u.username, u.display_name, u.avatar_url, u.created_at,
+  p.banner_url, COALESCE(p.bio, '') AS bio, COALESCE(p.custom_status, '') AS custom_status`;
+
+function findPublicUserById(userId) {
+  return db.get(
+    `SELECT ${PUBLIC_USER_FIELDS}
+     FROM users u LEFT JOIN user_profiles p ON p.user_id = u.id
+     WHERE u.id = ?`,
+    [userId]
+  );
+}
 
 function publicUser(user) {
   return {
@@ -19,6 +29,9 @@ function publicUser(user) {
     username: user.username,
     display_name: user.display_name,
     avatar_url: user.avatar_url,
+    banner_url: user.banner_url,
+    bio: user.bio,
+    custom_status: user.custom_status,
     created_at: user.created_at
   };
 }
@@ -75,7 +88,7 @@ export async function register(req, res) {
   }
 
   console.info(`[E-Mail-Stub] Verifizierungslink für Nutzer ${id} würde jetzt versendet.`);
-  const user = await db.get(`SELECT ${PUBLIC_USER_FIELDS} FROM users WHERE id = ?`, [id]);
+  const user = await findPublicUserById(id);
   await setAuthCookies(res, id);
   return res.status(201).json({ user: publicUser(user) });
 }
@@ -90,7 +103,7 @@ export async function login(req, res) {
   }
 
   await setAuthCookies(res, user.id);
-  return res.json({ user: publicUser(user) });
+  return res.json({ user: publicUser(await findPublicUserById(user.id)) });
 }
 
 export async function logout(req, res) {
@@ -106,7 +119,7 @@ export async function refresh(req, res) {
     throw new ApiError(401, 'UNAUTHORIZED', 'Deine Sitzung ist abgelaufen.');
   }
 
-  const user = await db.get(`SELECT ${PUBLIC_USER_FIELDS} FROM users WHERE id = ?`, [userId]);
+  const user = await findPublicUserById(userId);
   if (!user) {
     clearAuthCookies(res);
     throw new ApiError(401, 'UNAUTHORIZED', 'Deine Sitzung ist ungültig.');
@@ -117,7 +130,7 @@ export async function refresh(req, res) {
 }
 
 export async function me(req, res) {
-  const user = await db.get(`SELECT ${PUBLIC_USER_FIELDS} FROM users WHERE id = ?`, [req.userId]);
+  const user = await findPublicUserById(req.userId);
   if (!user) throw new ApiError(401, 'UNAUTHORIZED', 'Dein Account wurde nicht gefunden.');
   return res.json({ user: publicUser(user) });
 }

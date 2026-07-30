@@ -13,6 +13,7 @@ import MainHeader from '../app/MainHeader.jsx';
 import MessageSearch from '../app/MessageSearch.jsx';
 import MemberList from '../app/MemberList.jsx';
 import NotificationCenter from '../app/NotificationCenter.jsx';
+import ProfileModal from '../app/ProfileModal.jsx';
 import ServerRail from '../app/ServerRail.jsx';
 import ServerSettingsModal from '../app/ServerSettingsModal.jsx';
 import SettingsModal from '../app/SettingsModal.jsx';
@@ -41,6 +42,8 @@ export default function AppPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [guildModalOpen, setGuildModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState('Mein Konto');
+  const [profileUserId, setProfileUserId] = useState(null);
   const [serverSettingsTab, setServerSettingsTab] = useState(null);
   const [channelSettings, setChannelSettings] = useState(null);
   const [categorySettings, setCategorySettings] = useState(null);
@@ -275,6 +278,22 @@ export default function AppPage() {
     manageMessages: Boolean(isGuildOwner || currentMember?.roles.some((role) => role.permissions?.manageMessages))
   };
   const canManageServer = Object.values(capabilities).some(Boolean);
+  const profileMember = members.find((member) => member.user_id === profileUserId) || null;
+
+  const openProfile = useCallback((userId) => {
+    setProfileUserId(userId);
+    setDrawerOpen(false);
+    if (window.matchMedia('(max-width: 1024px)').matches) setMembersVisible(false);
+  }, []);
+
+  const closeProfile = useCallback(() => {
+    setProfileUserId(null);
+  }, []);
+
+  const openProfileSettings = useCallback(() => {
+    setSettingsInitialTab('Profil');
+    setSettingsOpen(true);
+  }, []);
 
   const handleChannelRead = useCallback((readChannelId, unreadCount) => {
     setGuildData((current) => current ? {
@@ -374,7 +393,7 @@ export default function AppPage() {
             canManageInvites={capabilities.manageServer}
             onToast={showToast}
             onLeave={handleLeave}
-            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenSettings={() => { setSettingsInitialTab('Mein Konto'); setSettingsOpen(true); }}
             onOpenServerSettings={(tab = 'overview') => setServerSettingsTab(tab)}
             onOpenChannelSettings={(channel) => {
               setDrawerOpen(false);
@@ -418,6 +437,7 @@ export default function AppPage() {
           {isHome ? (
             <FriendsView
               onOpenDm={(id) => navigate(`/app/channels/@me/${id}`)}
+              onOpenProfile={openProfile}
               onToast={showToast}
               onConversationsChanged={() => refreshConversations().catch(() => {})}
             />
@@ -425,6 +445,7 @@ export default function AppPage() {
             <DirectMessageView
               conversation={activeConversation}
               currentUserId={user.id}
+              onOpenProfile={openProfile}
               onToast={showToast}
               onRefresh={() => refreshConversations().catch(() => {})}
             />
@@ -436,6 +457,7 @@ export default function AppPage() {
               canManageMessages={capabilities.manageMessages}
               members={members}
               focusMessageId={focusMessageId}
+              onOpenProfile={openProfile}
               onRead={handleChannelRead}
               onToast={showToast}
             />
@@ -452,21 +474,32 @@ export default function AppPage() {
             onClick={() => setMembersVisible(false)}
           />
           <MemberList
-            guildId={guildData?.guild.id}
             members={members}
-            roles={guildData?.roles || []}
-            canManageRoles={capabilities.manageRoles}
             loading={loadingDetails}
             onClose={() => setMembersVisible(false)}
-            onRolesChanged={refreshGuildData}
-            onToast={showToast}
+            onOpenProfile={openProfile}
           />
         </>
       )}
 
       {(guildsLoading || (loadingDetails && !guildData && !isDirect)) && !isDiscovery && <div className="sidebar-loading" aria-hidden="true"><span /><span /><span /></div>}
       {guildModalOpen && <GuildModal onClose={() => setGuildModalOpen(false)} onToast={showToast} />}
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsModal initialTab={settingsInitialTab} onClose={() => setSettingsOpen(false)} onToast={showToast} />}
+      {profileUserId && (
+        <ProfileModal
+          userId={profileUserId}
+          guildId={!isHome && !isDirect && !isDiscovery ? guildData?.guild.id : null}
+          member={profileMember}
+          roles={guildData?.roles || []}
+          canManageRoles={capabilities.manageRoles}
+          onClose={closeProfile}
+          onEditProfile={openProfileSettings}
+          onOpenDm={(id) => navigate(`/app/channels/@me/${id}`)}
+          onRolesChanged={refreshGuildData}
+          onSocialChanged={() => refreshConversations().catch(() => {})}
+          onToast={showToast}
+        />
+      )}
       {serverSettingsTab && guildData && (
         <ServerSettingsModal
           guildData={guildData}

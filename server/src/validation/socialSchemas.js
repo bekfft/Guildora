@@ -12,6 +12,25 @@ export const friendActionSchema = z.object({
   action: z.enum(['accept', 'decline'])
 });
 
+export const profileUpdateSchema = z.object({
+  displayName: z.string().trim().min(2).max(32).optional(),
+  bio: z.string().trim().max(190).optional(),
+  customStatus: z.string().trim().max(80).optional(),
+  avatarAttachmentId: z.string().uuid().nullable().optional(),
+  bannerAttachmentId: z.string().uuid().nullable().optional()
+});
+
+export const badgePreferencesSchema = z.object({
+  badges: z.array(z.object({
+    id: z.string().uuid(),
+    visible: z.boolean()
+  })).max(20)
+});
+
+export const profileReportSchema = z.object({
+  reason: z.string().trim().min(3).max(1000)
+});
+
 export const dmMessageSchema = z.object({
   content: z.string().max(2000).optional().default(''),
   attachmentIds: z.array(z.string().uuid()).max(5).optional().default([])

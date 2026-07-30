@@ -80,6 +80,7 @@ export default function ChannelView({
   canManageMessages,
   members = [],
   focusMessageId,
+  onOpenProfile,
   onRead,
   onToast
 }) {
@@ -377,11 +378,16 @@ export default function ChannelView({
                   data-message-id={message.id}
                 >
                   {!grouped && (
-                    <div className="message-avatar" aria-hidden="true">
+                    <button
+                      className="message-avatar"
+                      type="button"
+                      aria-label={`Profil von ${authorName(message.author)} öffnen`}
+                      onClick={() => onOpenProfile(message.author.id)}
+                    >
                       {message.author.avatar_url
                         ? <img src={message.author.avatar_url} alt="" />
                         : authorName(message.author)[0].toUpperCase()}
-                    </div>
+                    </button>
                   )}
                   <div className="message-content">
                     {message.reply_to && (
@@ -397,7 +403,7 @@ export default function ChannelView({
                     )}
                     {!grouped && (
                       <div className="message-meta">
-                        <strong>{authorName(message.author)}</strong>
+                        <button className="message-author-button" type="button" onClick={() => onOpenProfile(message.author.id)}>{authorName(message.author)}</button>
                         <time dateTime={message.created_at}>{messageTime(message.created_at)}</time>
                       </div>
                     )}

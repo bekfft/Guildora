@@ -16,11 +16,21 @@ import {
   searchUsers,
   unblockUser
 } from '../controllers/socialController.js';
+import {
+  getUserProfile,
+  reportUserProfile,
+  updateMyBadgePreferences,
+  updateMyProfile
+} from '../controllers/profileController.js';
 
 const router = Router();
 router.use(requireAuth);
 const writeLimiter = rateLimit({ windowMs: 10_000, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false });
 router.get('/users/search', asyncHandler(searchUsers));
+router.get('/users/:userId/profile', asyncHandler(getUserProfile));
+router.patch('/profile', writeLimiter, asyncHandler(updateMyProfile));
+router.put('/profile/badges', writeLimiter, asyncHandler(updateMyBadgePreferences));
+router.post('/users/:userId/report', writeLimiter, asyncHandler(reportUserProfile));
 router.get('/friends', asyncHandler(listFriends));
 router.post('/friends', writeLimiter, asyncHandler(createFriendRequest));
 router.patch('/friends/:id', asyncHandler(respondFriendRequest));

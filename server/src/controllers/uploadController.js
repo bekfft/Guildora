@@ -64,7 +64,17 @@ export async function getUpload(req, res) {
     );
     if (!allowed) throw new ApiError(403, 'ATTACHMENT_FORBIDDEN', 'Du darfst diesen Anhang nicht öffnen.');
   } else if (attachment.owner_id !== req.userId) {
-    throw new ApiError(403, 'ATTACHMENT_FORBIDDEN', 'Du darfst diesen Anhang nicht öffnen.');
+    const profileAsset = await db.get(
+      `SELECT 1 AS allowed
+       FROM users u
+       LEFT JOIN user_profiles p ON p.user_id = u.id
+       WHERE u.avatar_url = ? OR p.banner_url = ?
+       LIMIT 1`,
+      [`/api/uploads/${attachment.id}`, `/api/uploads/${attachment.id}`]
+    );
+    if (!profileAsset) {
+      throw new ApiError(403, 'ATTACHMENT_FORBIDDEN', 'Du darfst diesen Anhang nicht öffnen.');
+    }
   }
   const filePath = path.join(uploadRoot, attachment.stored_name);
   if (!fs.existsSync(filePath)) throw new ApiError(404, 'ATTACHMENT_FILE_MISSING', 'Die Datei ist nicht mehr verfügbar.');
