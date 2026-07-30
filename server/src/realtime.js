@@ -32,6 +32,22 @@ async function canAccessChannel(userId, channelId) {
   }
 }
 
+async function canAccessConversation(userId, conversationId) {
+  return Boolean(conversationId && await db.get(
+    'SELECT 1 AS allowed FROM dm_members WHERE conversation_id = ? AND user_id = ?',
+    [conversationId, userId]
+  ));
+}
+
+async function emitFriendPresence(userId, status) {
+  const rows = await db.all(
+    `SELECT CASE WHEN requester_id = ? THEN addressee_id ELSE requester_id END AS user_id
+     FROM friendships WHERE status = 'accepted' AND (requester_id = ? OR addressee_id = ?)`,
+    [userId, userId, userId]
+  );
+  emitToUsers(rows.map((row) => row.user_id), 'social:presence', { userId, status });
+}
+
 export function configureRealtime(httpServer) {
   io = new Server(httpServer, {
     path: '/api/socket.io',
@@ -55,6 +71,7 @@ export function configureRealtime(httpServer) {
   io.on('connection', (socket) => {
     addOnlineUser(socket.data.userId);
     socket.join(`user:${socket.data.userId}`);
+    void emitFriendPresence(socket.data.userId, 'online');
 
     socket.on('guild:join', async ({ guildId } = {}, acknowledge = () => {}) => {
       try {
@@ -96,10 +113,45 @@ export function configureRealtime(httpServer) {
       }
     });
 
-    socket.on('disconnecting', () => {
+    socket.on('channel:typing', async ({ channelId, typing } = {}) => {
+      if (!channelId || !(await canAccessChannel(socket.data.userId, channelId))) return;
+      socket.to(`channel:${channelId}`).emit('channel:typing', {
+        channelId,
+        userId: socket.data.userId,
+        typing: Boolean(typing)
+      });
+    });
+
+    socket.on('dm:join', async ({ conversationId } = {}, acknowledge = () => {}) => {
+      try {
+        if (!(await canAccessConversation(socket.data.userId, conversationId))) {
+          acknowledge({ ok: false, error: 'NOT_MEMBER' });
+          return;
+        }
+        for (const room of socket.rooms) {
+          if (room.startsWith('dm:')) socket.leave(room);
+        }
+        socket.join(`dm:${conversationId}`);
+        acknowledge({ ok: true });
+      } catch {
+        acknowledge({ ok: false, error: 'INTERNAL_ERROR' });
+      }
+    });
+
+    socket.on('dm:typing', async ({ conversationId, typing } = {}) => {
+      if (!(await canAccessConversation(socket.data.userId, conversationId))) return;
+      socket.to(`dm:${conversationId}`).emit('dm:typing', {
+        conversationId,
+        userId: socket.data.userId,
+        typing: Boolean(typing)
+      });
+    });
+
+    socket.on('disconnecting', async () => {
       const guildRooms = [...socket.rooms].filter((room) => room.startsWith('guild:'));
       const staysOnline = removeOnlineUser(socket.data.userId);
       if (staysOnline) return;
+      await emitFriendPresence(socket.data.userId, 'offline');
       for (const room of guildRooms) {
         io.to(room).emit('presence:update', {
           userId: socket.data.userId,
@@ -120,6 +172,10 @@ export function emitToUsers(userIds, event, payload) {
   for (const userId of new Set(userIds)) {
     io?.to(`user:${userId}`).emit(event, payload);
   }
+}
+
+export function emitToConversation(conversationId, event, payload) {
+  io?.to(`dm:${conversationId}`).emit(event, payload);
 }
 
 export async function emitGuildRefresh(guildId, scopes = ['guild', 'members', 'list'], extraUserIds = []) {

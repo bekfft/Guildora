@@ -1,5 +1,7 @@
 import {
   AlertTriangle,
+  Camera,
+  MonitorUp,
   Headphones,
   PhoneOff,
   Settings2,
@@ -50,6 +52,24 @@ export default function VoicePanel({ voice, onToast }) {
           <strong>{STATUS_LABELS[voice.connectionState] || 'Voice'}</strong>
           <span>{voice.channel?.name}{voice.channel?.guild_name ? ` · ${voice.channel.guild_name}` : ''}</span>
         </div>
+        <button
+          className={voice.cameraEnabled ? 'is-active' : ''}
+          type="button"
+          aria-label={voice.cameraEnabled ? 'Kamera ausschalten' : 'Kamera einschalten'}
+          title="Kamera"
+          onClick={() => voice.toggleCamera().catch((error) => onToast(error.message, 'error'))}
+        >
+          <Camera size={17} />
+        </button>
+        <button
+          className={voice.screenShareEnabled ? 'is-active' : ''}
+          type="button"
+          aria-label={voice.screenShareEnabled ? 'Bildschirmfreigabe beenden' : 'Bildschirm teilen'}
+          title="Bildschirm teilen"
+          onClick={() => voice.toggleScreenShare().catch((error) => onToast(error.message, 'error'))}
+        >
+          <MonitorUp size={17} />
+        </button>
         <button
           type="button"
           aria-label="Audiogeräte einstellen"

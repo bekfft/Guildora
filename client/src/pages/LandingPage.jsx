@@ -15,12 +15,12 @@ const FEATURES = [
   {
     type: 'voice',
     title: 'Gespräche, die sich leicht anfühlen',
-    text: 'Wechsle später nahtlos zwischen Text, Sprache und Video. Die Oberfläche ist schon heute darauf vorbereitet, dass spontane Abende ganz ohne Umwege beginnen.'
+    text: 'Wechsle nahtlos zwischen Text, Direktnachrichten, Sprache und Video. Teile bei Bedarf deine Kamera oder deinen Bildschirm und starte spontane Abende ohne Umwege.'
   },
   {
     type: 'community',
     title: 'Deine Community, deine Regeln',
-    text: 'Baue einen Ort mit einer eigenen Identität und klaren Bereichen. Guildora wächst in den nächsten Phasen mit deinen Ideen, ohne den persönlichen Charakter zu verlieren.'
+    text: 'Baue einen Ort mit eigener Identität, Rollen und klaren Bereichen. Moderation, Meldungen und ein nachvollziehbares Audit-Log helfen dir, deine Community sicher zu verwalten.'
   }
 ];
 

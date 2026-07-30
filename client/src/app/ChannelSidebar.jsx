@@ -24,6 +24,18 @@ function VoiceParticipants({ voice, channelId }) {
           </span>
           <span>{voiceParticipantName(participant)}</span>
           {participant.is_muted && <MicOff size={14} aria-label="Stummgeschaltet" />}
+          {!participant.is_local && (
+            <input
+              className="voice-participant-volume"
+              type="range"
+              min="0"
+              max="200"
+              value={voice.participantVolumes[participant.id] ?? 100}
+              title={`Lautstärke ${voice.participantVolumes[participant.id] ?? 100}%`}
+              aria-label={`Lautstärke für ${participant.name}`}
+              onChange={(event) => voice.setParticipantVolume(participant.id, event.target.value)}
+            />
+          )}
         </div>
       ))}
     </div>
@@ -33,7 +45,7 @@ function VoiceParticipants({ voice, channelId }) {
 export default function ChannelSidebar({
   guildData, channelId, user, voice, canManageServer, canManageChannels, canManageInvites, onToast, onLeave,
   onOpenSettings, onOpenServerSettings, onOpenChannelSettings, onOpenCategorySettings,
-  onDeleteChannel, onDeleteCategory, onMoveChannel, onNavigate
+  onDeleteChannel, onDeleteCategory, onMoveChannel, onNavigate, conversations = []
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState({});
@@ -191,11 +203,25 @@ export default function ChannelSidebar({
         <>
           <div className="dm-search"><Search size={15} /><span>Unterhaltung finden</span></div>
           <nav className="home-navigation">
-            <NavLink to="/app/channels/@me" className="home-navigation__item is-active" onClick={onNavigate}>
+            <NavLink to="/app/channels/@me" end className={({ isActive }) => `home-navigation__item ${isActive ? 'is-active' : ''}`} onClick={onNavigate}>
               <UserRound size={22} /> Freunde
             </NavLink>
-            <div className="dm-heading"><span>Direktnachrichten</span><span>+</span></div>
-            <p className="dm-empty">Noch keine Unterhaltungen</p>
+            <div className="dm-heading"><span>Direktnachrichten</span><span>{conversations.length}</span></div>
+            {conversations.length === 0 && <p className="dm-empty">Noch keine Unterhaltungen</p>}
+            {conversations.map((conversation) => (
+              <NavLink
+                to={`/app/channels/@me/${conversation.id}`}
+                className={`dm-navigation-item ${channelId === conversation.id ? 'is-active' : ''}`}
+                onClick={onNavigate}
+                key={conversation.id}
+              >
+                <span className={`mini-avatar is-${conversation.user.status}`}>
+                  {conversation.user.avatar_url ? <img src={conversation.user.avatar_url} alt="" /> : (conversation.user.display_name || conversation.user.username)[0].toUpperCase()}
+                </span>
+                <span>{conversation.user.display_name || conversation.user.username}</span>
+                {conversation.unread_count > 0 && <strong>{conversation.unread_count > 99 ? '99+' : conversation.unread_count}</strong>}
+              </NavLink>
+            ))}
           </nav>
         </>
       ) : (
@@ -212,7 +238,7 @@ export default function ChannelSidebar({
                 {canManageServer && (
                   <button type="button" onClick={() => { setMenuOpen(false); onOpenServerSettings('overview'); }}>Server-Einstellungen</button>
                 )}
-                <button type="button" onClick={() => onToast('Benachrichtigungen folgen später.')}>Benachrichtigungen</button>
+                <button type="button" onClick={() => onToast('Benachrichtigungen findest du oben über das Glocken-Symbol.')}>Benachrichtigungen</button>
                 <span />
                 <button className="danger-action" type="button" onClick={() => { setMenuOpen(false); onLeave(); }}><LogOut size={16} /> Server verlassen</button>
               </div>

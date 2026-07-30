@@ -10,10 +10,11 @@ export class ApiError extends Error {
 }
 
 async function request(path, options = {}, allowRefresh = true) {
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const response = await fetch(`${API_BASE}${path}`, {
     credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...options.headers
     },
     ...options
@@ -89,9 +90,42 @@ export const api = {
     if (filters.dateTo) query.set('dateTo', filters.dateTo);
     return request(`/api/guilds/${guildId}/messages/search?${query}`);
   },
-  sendMessage: (channelId, content, replyToId = null) => request(`/api/channels/${channelId}/messages`, {
+  searchUsers: (q) => request(`/api/social/users/search?q=${encodeURIComponent(q)}`),
+  friends: () => request('/api/social/friends'),
+  addFriend: (username) => request('/api/social/friends', { method: 'POST', body: JSON.stringify({ username }) }),
+  respondFriend: (id, action) => request(`/api/social/friends/${id}`, { method: 'PATCH', body: JSON.stringify({ action }) }),
+  removeFriend: (id) => request(`/api/social/friends/${id}`, { method: 'DELETE' }),
+  blockUser: (userId) => request(`/api/social/users/${userId}/block`, { method: 'PUT' }),
+  unblockUser: (userId) => request(`/api/social/users/${userId}/block`, { method: 'DELETE' }),
+  conversations: () => request('/api/social/dm/conversations'),
+  openConversation: (userId) => request(`/api/social/dm/users/${userId}`, { method: 'POST' }),
+  dmMessages: (id) => request(`/api/social/dm/conversations/${id}/messages`),
+  sendDm: (id, content, attachmentIds = []) => request(`/api/social/dm/conversations/${id}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ content, replyToId })
+    body: JSON.stringify({ content, attachmentIds })
+  }),
+  markDmRead: (id) => request(`/api/social/dm/conversations/${id}/read`, { method: 'POST' }),
+  uploadFiles: (files) => {
+    const body = new FormData();
+    for (const file of files) body.append('files', file);
+    return request('/api/uploads', { method: 'POST', body });
+  },
+  moderation: (guildId) => request(`/api/guilds/${guildId}/moderation`),
+  banMember: (guildId, userId, reason) => request(`/api/guilds/${guildId}/moderation/bans`, {
+    method: 'POST', body: JSON.stringify({ userId, reason })
+  }),
+  unbanMember: (guildId, userId) => request(`/api/guilds/${guildId}/moderation/bans/${userId}`, { method: 'DELETE' }),
+  timeoutMember: (guildId, userId, durationMinutes, reason) => request(`/api/guilds/${guildId}/moderation/timeouts`, {
+    method: 'POST', body: JSON.stringify({ userId, durationMinutes, reason })
+  }),
+  clearTimeout: (guildId, userId) => request(`/api/guilds/${guildId}/moderation/timeouts/${userId}`, { method: 'DELETE' }),
+  report: (guildId, data) => request(`/api/guilds/${guildId}/reports`, { method: 'POST', body: JSON.stringify(data) }),
+  resolveReport: (guildId, reportId, status) => request(`/api/guilds/${guildId}/reports/${reportId}`, {
+    method: 'PATCH', body: JSON.stringify({ status })
+  }),
+  sendMessage: (channelId, content, replyToId = null, attachmentIds = []) => request(`/api/channels/${channelId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ content, replyToId, attachmentIds })
   }),
   updateMessage: (messageId, content) => request(`/api/messages/${messageId}`, {
     method: 'PATCH',

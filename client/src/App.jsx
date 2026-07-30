@@ -52,6 +52,7 @@ export default function App() {
             <Route element={<GuildProvider><VoiceProvider><AppPage /></VoiceProvider></GuildProvider>}>
               <Route path="/app" element={null} />
               <Route path="/app/channels/@me" element={null} />
+              <Route path="/app/channels/@me/:channelId" element={null} />
               <Route path="/app/channels/:guildId" element={null} />
               <Route path="/app/channels/:guildId/:channelId" element={null} />
               <Route path="/app/discovery" element={null} />

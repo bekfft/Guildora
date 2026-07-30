@@ -33,6 +33,15 @@ import {
   deleteGuildInvite,
   listGuildInvites
 } from '../controllers/inviteController.js';
+import {
+  banMember,
+  clearTimeout,
+  createReport,
+  listModeration,
+  resolveReport,
+  timeoutMember,
+  unbanMember
+} from '../controllers/moderationController.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -60,6 +69,13 @@ router.delete('/:id/roles/:roleId', asyncHandler(deleteRole));
 router.put('/:id/members/:memberId/roles', asyncHandler(updateMemberRoles));
 router.patch('/:id/members/:memberId', asyncHandler(updateMemberNickname));
 router.delete('/:id/members/:memberId', asyncHandler(kickMember));
+router.get('/:id/moderation', asyncHandler(listModeration));
+router.post('/:id/moderation/bans', asyncHandler(banMember));
+router.delete('/:id/moderation/bans/:userId', asyncHandler(unbanMember));
+router.post('/:id/moderation/timeouts', asyncHandler(timeoutMember));
+router.delete('/:id/moderation/timeouts/:userId', asyncHandler(clearTimeout));
+router.post('/:id/reports', asyncHandler(createReport));
+router.patch('/:id/reports/:reportId', asyncHandler(resolveReport));
 router.post('/:id/join', asyncHandler(joinGuild));
 router.delete('/:id/leave', asyncHandler(leaveGuild));
 

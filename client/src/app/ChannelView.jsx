@@ -1,8 +1,11 @@
 import {
   Check,
   CornerUpLeft,
+  FileText,
+  Flag,
   Hash,
   LoaderCircle,
+  Paperclip,
   Pencil,
   Send,
   SmilePlus,
@@ -90,12 +93,17 @@ export default function ChannelView({
   const [editContent, setEditContent] = useState('');
   const [replyingTo, setReplyingTo] = useState(null);
   const [reactionPickerId, setReactionPickerId] = useState(null);
+  const [pendingFiles, setPendingFiles] = useState([]);
+  const [composerEmojiOpen, setComposerEmojiOpen] = useState(false);
+  const [typingUsers, setTypingUsers] = useState(new Set());
   const scrollerRef = useRef(null);
   const composerRef = useRef(null);
+  const typingTimerRef = useRef(null);
   const initialScrollDone = useRef(false);
   const draftKey = channel ? `guildora:draft:${channel.id}` : '';
   const canReadHistory = channel?.permissions?.readHistory !== false;
   const canSendMessages = channel?.permissions?.sendMessages !== false;
+  const canAttachFiles = channel?.permissions?.attachFiles !== false;
 
   useEffect(() => {
     if (!channel) return undefined;
@@ -155,6 +163,15 @@ export default function ChannelView({
         setMessages((current) => mergeReaction(current, messageId, reaction));
       }
     };
+    const onTyping = ({ channelId, userId, typing }) => {
+      if (channelId !== channel.id || userId === currentUserId) return;
+      setTypingUsers((current) => {
+        const next = new Set(current);
+        if (typing) next.add(userId);
+        else next.delete(userId);
+        return next;
+      });
+    };
     const onConnectError = async (error) => {
       if (error.message !== 'UNAUTHORIZED') return;
       try {
@@ -168,6 +185,7 @@ export default function ChannelView({
     socket.on('message:update', onUpdate);
     socket.on('message:delete', onDelete);
     socket.on('message:reaction', onReaction);
+    socket.on('channel:typing', onTyping);
     socket.on('connect_error', onConnectError);
     if (!socket.connected) socket.connect();
     socket.emit('channel:join', { channelId: channel.id });
@@ -178,6 +196,7 @@ export default function ChannelView({
       socket.off('message:update', onUpdate);
       socket.off('message:delete', onDelete);
       socket.off('message:reaction', onReaction);
+      socket.off('channel:typing', onTyping);
       socket.off('connect_error', onConnectError);
       socket.off('connect', rejoin);
     };
@@ -235,6 +254,15 @@ export default function ChannelView({
     requestAnimationFrame(() => composerRef.current?.focus());
   }
 
+  function updateDraft(value) {
+    setDraft(value);
+    socket.emit('channel:typing', { channelId: channel.id, typing: Boolean(value) });
+    if (typingTimerRef.current) window.clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = window.setTimeout(() => {
+      socket.emit('channel:typing', { channelId: channel.id, typing: false });
+    }, 1200);
+  }
+
   async function loadOlder() {
     if (!messages[0] || loadingMore) return;
     const previousHeight = scrollerRef.current?.scrollHeight || 0;
@@ -255,13 +283,17 @@ export default function ChannelView({
 
   async function sendMessage() {
     const content = draft.trim();
-    if (!content || sending || !canSendMessages) return;
+    if ((!content && !pendingFiles.length) || sending || !canSendMessages) return;
     setSending(true);
     try {
-      const result = await api.sendMessage(channel.id, content, replyingTo?.id || null);
+      const uploaded = pendingFiles.length ? await api.uploadFiles(pendingFiles) : { attachments: [] };
+      const result = await api.sendMessage(channel.id, content, replyingTo?.id || null, uploaded.attachments.map((item) => item.id));
       setMessages((current) => mergeMessage(current, result.message));
       setDraft('');
       setReplyingTo(null);
+      setPendingFiles([]);
+      setComposerEmojiOpen(false);
+      socket.emit('channel:typing', { channelId: channel.id, typing: false });
       requestAnimationFrame(() => {
         if (scrollerRef.current) scrollerRef.current.scrollTop = scrollerRef.current.scrollHeight;
       });
@@ -298,6 +330,17 @@ export default function ChannelView({
     try {
       await api.deleteMessage(messageId);
       setMessages((current) => current.filter((message) => message.id !== messageId));
+    } catch (error) {
+      onToast(error.message, 'error');
+    }
+  }
+
+  async function reportMessage(message) {
+    const reason = window.prompt('Warum möchtest du diese Nachricht melden?');
+    if (!reason) return;
+    try {
+      await api.report(channel.guild_id, { messageId: message.id, reportedUserId: message.author.id, reason });
+      onToast('Nachricht wurde dem Moderationsteam gemeldet.', 'success');
     } catch (error) {
       onToast(error.message, 'error');
     }
@@ -378,6 +421,16 @@ export default function ChannelView({
                         <button type="button" onClick={() => setEditingId(null)} aria-label="Bearbeiten abbrechen"><X size={17} /></button>
                       </div>
                     ) : <MessageText message={message} />}
+                    {message.attachments?.length > 0 && (
+                      <div className="message-attachments">
+                        {message.attachments.map((attachment) => (
+                          <a className={`message-attachment ${attachment.mime_type.startsWith('image/') ? 'is-image' : ''}`} href={attachment.url} target="_blank" rel="noreferrer" key={attachment.id}>
+                            {attachment.mime_type.startsWith('image/') ? <img src={attachment.url} alt={attachment.name} /> : <FileText size={22} />}
+                            <span>{attachment.name}</span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
                     {(message.reactions || []).length > 0 && (
                       <div className="message-reactions" aria-label="Reaktionen">
                         {message.reactions.map((reaction) => (
@@ -422,6 +475,9 @@ export default function ChannelView({
                           <Trash2 size={15} />
                         </button>
                       )}
+                      {message.author.id !== currentUserId && (
+                        <button type="button" aria-label="Nachricht melden" onClick={() => reportMessage(message)}><Flag size={15} /></button>
+                      )}
                     </div>
                   )}
                   {reactionPickerId === message.id && (
@@ -440,6 +496,7 @@ export default function ChannelView({
         )}
       </div>
       <div className="composer-area">
+        {typingUsers.size > 0 && <div className="typing-indicator">{typingUsers.size === 1 ? 'Ein Mitglied schreibt …' : `${typingUsers.size} Mitglieder schreiben …`}</div>}
         {mentionSuggestions.length > 0 && (
           <div className="mention-suggestions">
             <small>Mitglied erwähnen</small>
@@ -461,7 +518,11 @@ export default function ChannelView({
             <button type="button" aria-label="Antwort abbrechen" onClick={() => setReplyingTo(null)}><X size={16} /></button>
           </div>
         )}
+        {pendingFiles.length > 0 && <div className="pending-attachments">{pendingFiles.map((file, index) => <span key={`${file.name}-${index}`}>{file.name}<button type="button" onClick={() => setPendingFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={13} /></button></span>)}</div>}
+        {composerEmojiOpen && <div className="emoji-picker">{QUICK_REACTIONS.map((emoji) => <button type="button" key={emoji} onClick={() => updateDraft(`${draft}${emoji}`)}>{emoji}</button>)}</div>}
         <div className="composer-shell">
+          {canAttachFiles && <label className="composer-tool" title="Datei anhängen"><Paperclip size={19} /><input type="file" multiple hidden onChange={(event) => setPendingFiles([...event.target.files].slice(0, 5))} /></label>}
+          <button className="composer-tool" type="button" title="Emoji auswählen" onClick={() => setComposerEmojiOpen((current) => !current)}><SmilePlus size={19} /></button>
           <textarea
             ref={composerRef}
             value={draft}
@@ -470,7 +531,7 @@ export default function ChannelView({
             placeholder={canSendMessages ? `Nachricht an #${channel.name}` : 'Du darfst in diesem Channel nicht schreiben.'}
             aria-label={`Nachricht an #${channel.name}`}
             disabled={!canSendMessages}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => updateDraft(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Escape' && replyingTo) {
                 setReplyingTo(null);
@@ -485,7 +546,7 @@ export default function ChannelView({
           <span className={draft.length > 1800 ? 'character-count is-near-limit' : 'character-count'}>
             {draft.length > 1800 ? 2000 - draft.length : ''}
           </span>
-          <button type="button" onClick={sendMessage} disabled={!canSendMessages || !draft.trim() || sending} aria-label="Nachricht senden">
+          <button type="button" onClick={sendMessage} disabled={!canSendMessages || (!draft.trim() && !pendingFiles.length) || sending} aria-label="Nachricht senden">
             {sending ? <LoaderCircle className="spin" size={19} /> : <Send size={19} />}
           </button>
         </div>

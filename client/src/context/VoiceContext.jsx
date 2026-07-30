@@ -77,7 +77,9 @@ export function VoiceProvider({ children }) {
   const deafenedRef = useRef(storedValue('guildora:voice-deafened') === 'true');
   const mutedRef = useRef(storedValue('guildora:voice-muted') === 'true');
   const audioElementsRef = useRef(new Set());
+  const videoElementsRef = useRef(new Set());
   const audioContainerRef = useRef(null);
+  const videoContainerRef = useRef(null);
   const [channel, setChannel] = useState(null);
   const [connectionState, setConnectionState] = useState('idle');
   const [participants, setParticipants] = useState([]);
@@ -89,6 +91,9 @@ export function VoiceProvider({ children }) {
   const [outputDeviceId, setOutputDeviceId] = useState(storedValue('guildora:voice-output'));
   const [needsAudioStart, setNeedsAudioStart] = useState(false);
   const [lastError, setLastError] = useState('');
+  const [cameraEnabled, setCameraEnabled] = useState(false);
+  const [screenShareEnabled, setScreenShareEnabled] = useState(false);
+  const [participantVolumes, setParticipantVolumes] = useState({});
 
   const refreshParticipants = useCallback((room = roomRef.current) => {
     if (!room || room !== roomRef.current) return;
@@ -160,6 +165,8 @@ export function VoiceProvider({ children }) {
   const clearAudioElements = useCallback(() => {
     for (const element of audioElementsRef.current) element.remove();
     audioElementsRef.current.clear();
+    for (const element of videoElementsRef.current) element.remove();
+    videoElementsRef.current.clear();
   }, []);
 
   const leave = useCallback(async () => {
@@ -174,6 +181,8 @@ export function VoiceProvider({ children }) {
     setConnectionState('idle');
     setNeedsAudioStart(false);
     setLastError('');
+    setCameraEnabled(false);
+    setScreenShareEnabled(false);
     clearAudioElements();
     if (room) {
       room.removeAllListeners();
@@ -182,6 +191,15 @@ export function VoiceProvider({ children }) {
   }, [clearAudioElements, clearParticipantSync]);
 
   const attachAudioTrack = useCallback((track) => {
+    if (track.kind === 'video') {
+      const element = track.attach();
+      element.autoplay = true;
+      element.playsInline = true;
+      element.className = `voice-video-track voice-video-track--${track.source || 'camera'}`;
+      videoElementsRef.current.add(element);
+      videoContainerRef.current?.appendChild(element);
+      return;
+    }
     if (track.kind !== 'audio') return;
     const element = track.attach();
     element.autoplay = true;
@@ -194,6 +212,7 @@ export function VoiceProvider({ children }) {
   const detachAudioTrack = useCallback((track) => {
     for (const element of track.detach()) {
       audioElementsRef.current.delete(element);
+      videoElementsRef.current.delete(element);
       element.remove();
     }
   }, []);
@@ -220,10 +239,11 @@ export function VoiceProvider({ children }) {
       throw error;
     }
 
-    const { ParticipantEvent, Room, RoomEvent } = await liveKit();
+    const { DefaultReconnectPolicy, ParticipantEvent, Room, RoomEvent } = await liveKit();
     const room = new Room({
       adaptiveStream: true,
       dynacast: true,
+      reconnectPolicy: new DefaultReconnectPolicy([0, 500, 1000, 2000, 5000, 10_000, 15_000, 30_000]),
       disconnectOnPageLeave: true,
       audioCaptureDefaults: {
         autoGainControl: true,
@@ -289,7 +309,12 @@ export function VoiceProvider({ children }) {
       .on(RoomEvent.TrackMuted, (_publication, participant) => upsertParticipant(participant))
       .on(RoomEvent.TrackUnmuted, (_publication, participant) => upsertParticipant(participant))
       .on(RoomEvent.ConnectionQualityChanged, (_quality, participant) => upsertParticipant(participant))
-      .on(RoomEvent.TrackSubscribed, (track) => {
+      .on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
+        if (track.kind === 'audio' && participant) {
+          const stored = Number(storedValue(`guildora:voice-volume:${participant.identity}`, '100'));
+          track.setVolume(Math.max(0, Math.min(200, stored)) / 100);
+          setParticipantVolumes((current) => ({ ...current, [participant.identity]: stored }));
+        }
         attachAudioTrack(track);
         update();
       })
@@ -305,7 +330,12 @@ export function VoiceProvider({ children }) {
         if (room === roomRef.current) setNeedsAudioStart(!room.canPlaybackAudio);
       })
       .on(RoomEvent.Reconnecting, () => room === roomRef.current && setConnectionState('reconnecting'))
-      .on(RoomEvent.Reconnected, () => room === roomRef.current && setConnectionState('connected'))
+      .on(RoomEvent.Reconnected, () => {
+        if (room !== roomRef.current) return;
+        setConnectionState('connected');
+        setLastError('');
+        refreshParticipants(room);
+      })
       .on(RoomEvent.Disconnected, () => {
         if (room !== roomRef.current) return;
         clearParticipantSync();
@@ -443,6 +473,50 @@ export function VoiceProvider({ children }) {
     setNeedsAudioStart(false);
   }, []);
 
+  const setParticipantVolume = useCallback((participantId, value) => {
+    const normalized = Math.max(0, Math.min(200, Number(value)));
+    setParticipantVolumes((current) => ({ ...current, [participantId]: normalized }));
+    localStorage.setItem(`guildora:voice-volume:${participantId}`, String(normalized));
+    const participant = roomRef.current?.remoteParticipants.get(participantId);
+    for (const publication of participant?.audioTrackPublications?.values?.() || []) {
+      publication.track?.setVolume(normalized / 100);
+    }
+  }, []);
+
+  const toggleCamera = useCallback(async () => {
+    if (!roomRef.current) return;
+    const next = !cameraEnabled;
+    if (!next) {
+      for (const publication of roomRef.current.localParticipant.videoTrackPublications.values()) {
+        if (publication.track?.source === 'camera') detachAudioTrack(publication.track);
+      }
+    }
+    await roomRef.current.localParticipant.setCameraEnabled(next);
+    setCameraEnabled(next);
+    if (next) {
+      for (const publication of roomRef.current.localParticipant.videoTrackPublications.values()) {
+        if (publication.track) attachAudioTrack(publication.track);
+      }
+    }
+  }, [attachAudioTrack, cameraEnabled, detachAudioTrack]);
+
+  const toggleScreenShare = useCallback(async () => {
+    if (!roomRef.current) return;
+    const next = !screenShareEnabled;
+    if (!next) {
+      for (const publication of roomRef.current.localParticipant.videoTrackPublications.values()) {
+        if (publication.track?.source === 'screen_share') detachAudioTrack(publication.track);
+      }
+    }
+    await roomRef.current.localParticipant.setScreenShareEnabled(next);
+    setScreenShareEnabled(next);
+    if (next) {
+      for (const publication of roomRef.current.localParticipant.videoTrackPublications.values()) {
+        if (publication.track?.source === 'screen_share') attachAudioTrack(publication.track);
+      }
+    }
+  }, [attachAudioTrack, detachAudioTrack, screenShareEnabled]);
+
   useEffect(() => {
     const syncParticipants = () => {
       if (document.visibilityState === 'visible' && channel?.id) {
@@ -480,6 +554,9 @@ export function VoiceProvider({ children }) {
     outputs,
     inputDeviceId,
     outputDeviceId,
+    cameraEnabled,
+    screenShareEnabled,
+    participantVolumes,
     needsAudioStart,
     lastError,
     join,
@@ -489,7 +566,10 @@ export function VoiceProvider({ children }) {
     refreshDevices,
     selectInputDevice,
     selectOutputDevice,
-    startAudio
+    startAudio,
+    setParticipantVolume,
+    toggleCamera,
+    toggleScreenShare
   }), [
     channel,
     connectionState,
@@ -504,10 +584,16 @@ export function VoiceProvider({ children }) {
     outputDeviceId,
     outputs,
     participants,
+    participantVolumes,
     refreshDevices,
     selectInputDevice,
     selectOutputDevice,
     startAudio,
+    cameraEnabled,
+    screenShareEnabled,
+    setParticipantVolume,
+    toggleCamera,
+    toggleScreenShare,
     toggleDeafened,
     toggleMuted
   ]);
@@ -516,6 +602,7 @@ export function VoiceProvider({ children }) {
     <VoiceContext.Provider value={value}>
       {children}
       <div className="voice-audio-elements" ref={audioContainerRef} aria-hidden="true" />
+      <div className="voice-video-grid" ref={videoContainerRef} />
     </VoiceContext.Provider>
   );
 }

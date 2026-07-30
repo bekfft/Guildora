@@ -1,6 +1,6 @@
 import {
   BadgeCheck, Check, ChevronRight, CircleUserRound, Copy, FolderPlus, Hash, LayoutDashboard,
-  Link2, LoaderCircle, Lock, Minus, Plus, RotateCcw, Save, Settings2, Shield, Trash2,
+  Gavel, Link2, LoaderCircle, Lock, Minus, Plus, RotateCcw, Save, Settings2, Shield, Trash2,
   UserMinus, Users, Volume2, X
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -43,7 +43,8 @@ const TABS = [
   { id: 'invites', label: 'Einladungen', icon: Link2 },
   { id: 'channels', label: 'Channels', icon: Hash },
   { id: 'roles', label: 'Rollen', icon: Shield },
-  { id: 'members', label: 'Mitglieder', icon: Users }
+  { id: 'members', label: 'Mitglieder', icon: Users },
+  { id: 'moderation', label: 'Moderation', icon: Gavel }
 ];
 
 function memberName(member) {
@@ -83,6 +84,7 @@ export default function ServerSettingsModal({
     || (item.id === 'channels' && capabilities.manageChannels)
     || (item.id === 'roles' && capabilities.manageRoles)
     || (item.id === 'members' && (capabilities.manageServer || capabilities.manageRoles || capabilities.kickMembers))
+    || (item.id === 'moderation' && capabilities.kickMembers)
   ));
   const [tab, setTab] = useState(
     availableTabs.some((item) => item.id === initialTab) ? initialTab : (availableTabs[0]?.id || 'overview')
@@ -107,6 +109,7 @@ export default function ServerSettingsModal({
   const [selectedMemberId, setSelectedMemberId] = useState(null);
   const [invites, setInvites] = useState([]);
   const [inviteDraft, setInviteDraft] = useState({ expiresIn: '86400', maxUses: 'none' });
+  const [moderation, setModeration] = useState({ bans: [], timeouts: [], reports: [], audit_logs: [] });
   const dialogRef = useRef(null);
 
   const selectedRole = guildData.roles.find((role) => role.id === selectedRoleId);
@@ -135,6 +138,11 @@ export default function ServerSettingsModal({
   useEffect(() => {
     if (tab === 'invites') loadInvites();
   }, [tab, guildData.guild.id]);
+
+  useEffect(() => {
+    if (tab !== 'moderation') return;
+    api.moderation(guildData.guild.id).then(setModeration).catch((error) => onToast(error.message, 'error'));
+  }, [tab, guildData.guild.id, onToast]);
 
   function requestClose() {
     if (closing) return;
@@ -338,6 +346,23 @@ export default function ServerSettingsModal({
       'Mitglied entfernt.'
     );
     if (result !== null) setSelectedMemberId(null);
+  }
+
+  async function refreshModeration() {
+    setModeration(await api.moderation(guildData.guild.id));
+  }
+
+  async function moderateMember(member, type) {
+    const reason = window.prompt(type === 'ban' ? 'Grund für die Serversperre:' : 'Grund für den Timeout:') || '';
+    if (type === 'ban') {
+      if (!window.confirm(`${memberName(member)} sperren und vom Server entfernen?`)) return;
+      await run(`moderate-${member.id}`, () => api.banMember(guildData.guild.id, member.user_id, reason), 'Mitglied gesperrt.');
+      setSelectedMemberId(null);
+    } else {
+      const minutes = Number(window.prompt('Timeout in Minuten:', '10'));
+      if (!Number.isInteger(minutes) || minutes < 1) return;
+      await run(`moderate-${member.id}`, () => api.timeoutMember(guildData.guild.id, member.user_id, minutes, reason), 'Timeout gesetzt.');
+    }
   }
 
   return (
@@ -580,11 +605,35 @@ export default function ServerSettingsModal({
                     onSaveNickname={saveMemberNickname}
                     onToggleRole={toggleMemberRole}
                     onKick={kick}
+                    onBan={(member) => moderateMember(member, 'ban')}
+                    onTimeout={(member) => moderateMember(member, 'timeout')}
                   />
                 ) : (
                   <div className="member-management__empty"><CircleUserRound size={38} /><p>Wähle ein Mitglied aus.</p></div>
                 )}
               </div>
+            </div>
+          )}
+          {tab === 'moderation' && (
+            <div className="settings-page settings-page--wide moderation-page">
+              <header><h2>Moderation & Audit-Log</h2><p>Bearbeite Meldungen, Sperren und aktive Timeouts nachvollziehbar.</p></header>
+              <h3>Offene Meldungen</h3>
+              <div className="moderation-list">
+                {moderation.reports.filter((item) => item.status === 'open').map((report) => (
+                  <article key={report.id}>
+                    <div><strong>@{report.reported_username || 'unbekannt'}</strong><span>{report.reason}</span><small>Gemeldet von @{report.reporter_username}</small></div>
+                    <button type="button" onClick={async () => { await api.resolveReport(guildData.guild.id, report.id, 'resolved'); await refreshModeration(); }}>Erledigt</button>
+                    <button type="button" onClick={async () => { await api.resolveReport(guildData.guild.id, report.id, 'dismissed'); await refreshModeration(); }}>Verwerfen</button>
+                  </article>
+                ))}
+                {!moderation.reports.some((item) => item.status === 'open') && <p>Keine offenen Meldungen.</p>}
+              </div>
+              <h3>Serversperren</h3>
+              <div className="moderation-list">{moderation.bans.map((ban) => <article key={ban.user_id}><div><strong>@{ban.username}</strong><span>{ban.reason || 'Kein Grund angegeben'}</span></div><button type="button" onClick={async () => { await api.unbanMember(guildData.guild.id, ban.user_id); await refreshModeration(); }}>Entsperren</button></article>)}</div>
+              <h3>Aktive Timeouts</h3>
+              <div className="moderation-list">{moderation.timeouts.map((timeout) => <article key={timeout.user_id}><div><strong>@{timeout.username}</strong><span>Bis {new Date(timeout.expires_at).toLocaleString('de-DE')}</span></div><button type="button" onClick={async () => { await api.clearTimeout(guildData.guild.id, timeout.user_id); await refreshModeration(); }}>Aufheben</button></article>)}</div>
+              <h3>Audit-Log</h3>
+              <div className="audit-list">{moderation.audit_logs.map((log) => <article key={log.id}><strong>{log.action}</strong><span>@{log.actor_username}{log.target_username ? ` → @${log.target_username}` : ''}</span><time>{new Date(log.created_at).toLocaleString('de-DE')}</time></article>)}</div>
             </div>
           )}
         </main>
@@ -789,7 +838,7 @@ export function ChannelPermissionEditor({ guildId, channel, roles, onToast }) {
   );
 }
 
-function MemberEditor({ member, roles, ownerId, capabilities, busy, onSaveNickname, onToggleRole, onKick }) {
+function MemberEditor({ member, roles, ownerId, capabilities, busy, onSaveNickname, onToggleRole, onKick, onBan, onTimeout }) {
   const [nickname, setNickname] = useState(member.nickname || '');
   useEffect(() => setNickname(member.nickname || ''), [member.id, member.nickname]);
   return (
@@ -824,7 +873,11 @@ function MemberEditor({ member, roles, ownerId, capabilities, busy, onSaveNickna
         </>
       )}
       {capabilities.kickMembers && member.user_id !== ownerId && (
-        <button className="member-kick-button" type="button" onClick={() => onKick(member)}><UserMinus size={17} /> Vom Server entfernen</button>
+        <div className="member-moderation-actions">
+          <button type="button" onClick={() => onTimeout(member)}>Timeout</button>
+          <button type="button" onClick={() => onBan(member)}>Sperren</button>
+          <button className="member-kick-button" type="button" onClick={() => onKick(member)}><UserMinus size={17} /> Entfernen</button>
+        </div>
       )}
     </aside>
   );

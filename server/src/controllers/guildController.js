@@ -9,6 +9,7 @@ import {
   unreadCountForGuild,
   unreadCountsForChannels
 } from '../utils/unread.js';
+import { requireNotBanned } from '../utils/moderation.js';
 
 function bool(value) {
   return Boolean(value);
@@ -209,6 +210,7 @@ export async function getGuildMembers(req, res) {
 
 export async function joinGuild(req, res) {
   const guild = await guildOrThrow(req.params.id);
+  await requireNotBanned(guild.id, req.userId);
   if (!bool(guild.is_public)) throw new ApiError(403, 'GUILD_NOT_PUBLIC', 'Dieser Server ist nicht öffentlich.');
   if (await membership(guild.id, req.userId)) {
     throw new ApiError(409, 'ALREADY_MEMBER', 'Du bist diesem Server bereits beigetreten.');

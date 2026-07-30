@@ -5,8 +5,11 @@ const content = z.string({ required_error: 'Bitte gib eine Nachricht ein.' })
   .refine((value) => value.trim().length > 0, 'Eine Nachricht darf nicht leer sein.');
 
 export const createMessageSchema = z.object({
-  content,
-  replyToId: z.string().uuid('Die Antwortreferenz ist ungültig.').nullable().optional()
+  content: z.string().max(2000).optional().default(''),
+  replyToId: z.string().uuid('Die Antwortreferenz ist ungültig.').nullable().optional(),
+  attachmentIds: z.array(z.string().uuid()).max(5).optional().default([])
+}).refine((data) => data.content.trim().length > 0 || data.attachmentIds.length > 0, {
+  message: 'Eine Nachricht braucht Text oder einen Anhang.'
 });
 
 export const updateMessageSchema = z.object({

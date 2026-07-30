@@ -202,12 +202,19 @@ Auswertung erfolgt zentral im Backend und schützt Channel-Liste,
 Nachrichtenverlauf, Senden, Löschen fremder Nachrichten und Socket.IO-Beitritte.
 Serverbesitzer und Rollen mit Serververwaltung behalten administrativen Zugriff.
 
+## Aktueller Funktionsumfang
+
+- Antworten, Reaktionen, Erwähnungen, Emoji-Auswahl und geschützte Dateianhänge
+- Live-Typing, Lesestatus, ungelesene Marker und Benachrichtigungen
+- Freundschaftsanfragen, Blockierungen und Direktnachrichten
+- Servermoderation mit Sperren, Timeouts, Meldungen und Audit-Log
+- Voice-Channels mit individueller Nutzerlautstärke, Kamera und Bildschirmfreigabe
+
 ## Nächste Phase
 
-- Antworten, Reaktionen und Erwähnungen
-- Anhänge und Emoji-Auswahl
-- Typing-Indikatoren, Lesestatus und ungelesene Marker
-- Direktnachrichten und Benachrichtigungen
+- Gruppen-Direktnachrichten und Threads
+- Mobile Push-Benachrichtigungen
+- Digitale Signierung des Windows-Installers
 
 ## Voice-Channels
 

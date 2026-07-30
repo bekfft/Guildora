@@ -6,6 +6,7 @@ import ChannelSettingsModal from '../app/ChannelSettingsModal.jsx';
 import ChannelView from '../app/ChannelView.jsx';
 import CategorySettingsModal from '../app/CategorySettingsModal.jsx';
 import DiscoveryPage from '../app/DiscoveryPage.jsx';
+import DirectMessageView from '../app/DirectMessageView.jsx';
 import FriendsView from '../app/FriendsView.jsx';
 import GuildModal from '../app/GuildModal.jsx';
 import MainHeader from '../app/MainHeader.jsx';
@@ -32,6 +33,7 @@ export default function AppPage() {
   const navigate = useNavigate();
   const [guildData, setGuildData] = useState(null);
   const [members, setMembers] = useState([]);
+  const [conversations, setConversations] = useState([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [membersVisible, setMembersVisible] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -49,6 +51,7 @@ export default function AppPage() {
   const guildRealtimeRefreshTimer = useRef(null);
   const isDiscovery = location.pathname === '/app/discovery';
   const isHome = location.pathname === '/app/channels/@me';
+  const isDirect = location.pathname.startsWith('/app/channels/@me/') && Boolean(channelId);
   const focusMessageId = new URLSearchParams(location.search).get('message');
 
   const showToast = useCallback((message, type = 'info') => {
@@ -62,7 +65,7 @@ export default function AppPage() {
   }, []);
 
   const refreshGuildData = useCallback(async () => {
-    if (!guildId) return;
+    if (!guildId || guildId === '@me') return;
     const [details, memberResult] = await Promise.all([api.guild(guildId), api.guildMembers(guildId)]);
     setGuildData(details);
     setMembers(memberResult.members);
@@ -73,6 +76,11 @@ export default function AppPage() {
       navigate(target ? `/app/channels/${guildId}/${target.id}` : '/app/channels/@me', { replace: true });
     }
   }, [channelId, guildId, navigate]);
+
+  const refreshConversations = useCallback(async () => {
+    const result = await api.conversations();
+    setConversations(result.conversations);
+  }, []);
 
   useEffect(() => () => {
     toastTimers.current.forEach((timer) => window.clearTimeout(timer));
@@ -87,13 +95,35 @@ export default function AppPage() {
   }, []);
 
   useEffect(() => {
+    refreshConversations().catch(() => {});
+    const refresh = () => refreshConversations().catch(() => {});
+    const notifyDm = ({ conversationId, message }) => {
+      refresh();
+      if (conversationId === channelId && isDirect) return;
+      showToast(`${message.author.display_name || message.author.username} hat dir geschrieben.`, 'info');
+      if (localStorage.getItem('guildora:desktop-notifications') === 'enabled' && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification('Neue Direktnachricht', { body: `${message.author.display_name || message.author.username}: ${message.content || 'Anhang'}` });
+      }
+    };
+    socket.on('dm:refresh', refresh);
+    socket.on('social:refresh', refresh);
+    socket.on('dm:notification', notifyDm);
+    return () => {
+      socket.off('dm:refresh', refresh);
+      socket.off('social:refresh', refresh);
+      socket.off('dm:notification', notifyDm);
+    };
+  }, [channelId, isDirect, refreshConversations, showToast]);
+
+  useEffect(() => {
     if (location.pathname === '/app') navigate('/app/channels/@me', { replace: true });
   }, [location.pathname, navigate]);
 
   useEffect(() => {
-    if (!guildId) {
+    if (!guildId || guildId === '@me') {
       setGuildData(null);
       setMembers([]);
+      setLoadingDetails(false);
       return;
     }
     let active = true;
@@ -185,11 +215,11 @@ export default function AppPage() {
   }, [guildId, navigate, refreshGuildData, showToast, voice.channel?.guild_id, voice.leave]);
 
   useEffect(() => {
-    if (guildId && channelId) localStorage.setItem(`guildora:last-channel:${guildId}`, channelId);
+    if (guildId && guildId !== '@me' && channelId) localStorage.setItem(`guildora:last-channel:${guildId}`, channelId);
   }, [guildId, channelId]);
 
   useEffect(() => {
-    if (!guildId) return undefined;
+    if (!guildId || guildId === '@me') return undefined;
     const joinGuildPresence = () => socket.emit('guild:join', { guildId });
     const updatePresence = ({ userId, status }) => {
       setMembers((current) => current.map((member) => (
@@ -207,6 +237,7 @@ export default function AppPage() {
   }, [guildId]);
 
   const activeChannel = guildData?.channels.find((channel) => channel.id === channelId);
+  const activeConversation = conversations.find((conversation) => conversation.id === channelId);
   const currentMember = members.find((member) => member.user_id === user.id);
   const isGuildOwner = guildData?.guild.owner_id === user.id;
   const capabilities = {
@@ -307,7 +338,7 @@ export default function AppPage() {
         />
         {!isDiscovery && (
           <ChannelSidebar
-            guildData={isHome ? null : guildData}
+            guildData={isHome || isDirect ? null : guildData}
             channelId={channelId}
             user={user}
             voice={voice}
@@ -330,6 +361,7 @@ export default function AppPage() {
             onDeleteCategory={handleQuickDeleteCategory}
             onMoveChannel={handleMoveChannel}
             onNavigate={() => setDrawerOpen(false)}
+            conversations={conversations}
           />
         )}
       </div>
@@ -344,6 +376,7 @@ export default function AppPage() {
           <MainHeader
             channel={activeChannel}
             isHome={isHome}
+            directUser={isDirect ? activeConversation?.user : null}
             membersVisible={membersVisible}
             notificationCount={notificationCount}
             onToggleMembers={() => setMembersVisible((value) => !value)}
@@ -352,7 +385,20 @@ export default function AppPage() {
             onOpenNotifications={() => setNotificationsOpen(true)}
             onOpenSearch={() => setSearchOpen(true)}
           />
-          {isHome ? <FriendsView /> : (
+          {isHome ? (
+            <FriendsView
+              onOpenDm={(id) => navigate(`/app/channels/@me/${id}`)}
+              onToast={showToast}
+              onConversationsChanged={() => refreshConversations().catch(() => {})}
+            />
+          ) : isDirect ? (
+            <DirectMessageView
+              conversation={activeConversation}
+              currentUserId={user.id}
+              onToast={showToast}
+              onRefresh={() => refreshConversations().catch(() => {})}
+            />
+          ) : (
             <ChannelView
               key={`${activeChannel?.id || 'loading'}:${focusMessageId || ''}`}
               channel={loadingDetails ? null : activeChannel}
@@ -367,9 +413,9 @@ export default function AppPage() {
         </section>
       )}
 
-      {!isDiscovery && !isHome && membersVisible && <MemberList members={members} loading={loadingDetails} />}
+      {!isDiscovery && !isHome && !isDirect && membersVisible && <MemberList members={members} loading={loadingDetails} />}
 
-      {(guildsLoading || (loadingDetails && !guildData)) && !isDiscovery && <div className="sidebar-loading" aria-hidden="true"><span /><span /><span /></div>}
+      {(guildsLoading || (loadingDetails && !guildData && !isDirect)) && !isDiscovery && <div className="sidebar-loading" aria-hidden="true"><span /><span /><span /></div>}
       {guildModalOpen && <GuildModal onClose={() => setGuildModalOpen(false)} onToast={showToast} />}
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
       {serverSettingsTab && guildData && (

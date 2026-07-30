@@ -4,6 +4,7 @@ import { ApiError } from '../middleware/errorHandler.js';
 import { requirePermission } from './guildAdminController.js';
 import { createInviteSchema, inviteCodeSchema } from '../validation/inviteSchemas.js';
 import { emitGuildRefresh } from '../realtime.js';
+import { requireNotBanned } from '../utils/moderation.js';
 
 function timestamp(value) {
   return value instanceof Date ? value.toISOString() : value;
@@ -141,6 +142,7 @@ export async function joinWithInvite(req, res) {
   const code = inviteCodeSchema.parse(req.params.code);
   const invite = await inviteWithDetails(code);
   if (!invite) throw new ApiError(404, 'INVITE_NOT_FOUND', 'Diese Einladung ist ungültig oder wurde gelöscht.');
+  await requireNotBanned(invite.guild_id, req.userId);
 
   const currentMembership = await db.get(
     'SELECT id FROM guild_members WHERE guild_id = ? AND user_id = ?',

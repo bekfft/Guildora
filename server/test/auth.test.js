@@ -10,6 +10,7 @@ import { io as connectSocket } from 'socket.io-client';
 const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'guildora-test-'));
 process.env.NODE_ENV = 'test';
 process.env.SQLITE_PATH = path.join(temporaryDirectory, 'auth.sqlite');
+process.env.UPLOAD_DIR = path.join(temporaryDirectory, 'uploads');
 process.env.JWT_ACCESS_SECRET = 'test-access-secret-with-sufficient-length';
 process.env.REFRESH_TOKEN_SECRET = 'test-refresh-secret-with-sufficient-length';
 process.env.LIVEKIT_URL = 'ws://127.0.0.1:7880';
@@ -922,4 +923,104 @@ test('Servereinladungen haben Vorschau, Limits, Beitritt und Widerruf', async ()
 
   const revokedPreview = await request(`/api/invites/${secondInviteBody.invite.code}`);
   assert.equal(revokedPreview.status, 404);
+});
+
+test('Freunde, Direktnachrichten, Anhänge und Moderation funktionieren vollständig', async () => {
+  const friendId = crypto.randomUUID();
+  await db.run(
+    `INSERT INTO users (id, email, username, display_name, password_hash, birthdate)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [friendId, 'social.friend@example.de', 'social.friend', 'Social Friend', 'not-used', '1995-05-05']
+  );
+  const friendCookie = `access_token=${signAccessToken(friendId)}`;
+
+  const requestResponse = await request('/api/social/friends', {
+    cookie: authCookie,
+    body: { username: 'social.friend' }
+  });
+  assert.equal(requestResponse.status, 201);
+  const friendshipId = (await requestResponse.json()).request.id;
+  const incoming = await request('/api/social/friends', { cookie: friendCookie });
+  assert.equal((await incoming.json()).friends[0].state, 'incoming');
+  assert.equal((await request(`/api/social/friends/${friendshipId}`, {
+    method: 'PATCH',
+    cookie: friendCookie,
+    body: { action: 'accept' }
+  })).status, 200);
+
+  const conversationResponse = await request(`/api/social/dm/users/${friendId}`, {
+    method: 'POST',
+    cookie: authCookie
+  });
+  assert.equal(conversationResponse.status, 201);
+  const conversationId = (await conversationResponse.json()).conversation.id;
+  const ownerDmSocket = connectSocket(baseUrl, {
+    path: '/api/socket.io',
+    transports: ['websocket'],
+    extraHeaders: { Cookie: authCookie }
+  });
+  const friendDmSocket = connectSocket(baseUrl, {
+    path: '/api/socket.io',
+    transports: ['websocket'],
+    extraHeaders: { Cookie: friendCookie }
+  });
+  await Promise.all([
+    new Promise((resolve, reject) => { ownerDmSocket.once('connect', resolve); ownerDmSocket.once('connect_error', reject); }),
+    new Promise((resolve, reject) => { friendDmSocket.once('connect', resolve); friendDmSocket.once('connect_error', reject); })
+  ]);
+  await Promise.all([
+    new Promise((resolve) => ownerDmSocket.emit('dm:join', { conversationId }, resolve)),
+    new Promise((resolve) => friendDmSocket.emit('dm:join', { conversationId }, resolve))
+  ]);
+  const typingEvent = new Promise((resolve) => ownerDmSocket.once('dm:typing', resolve));
+  friendDmSocket.emit('dm:typing', { conversationId, typing: true });
+  assert.deepEqual(await typingEvent, { conversationId, userId: friendId, typing: true });
+  const dm = await request(`/api/social/dm/conversations/${conversationId}/messages`, {
+    cookie: authCookie,
+    body: { content: 'Hallo per Direktnachricht', attachmentIds: [] }
+  });
+  assert.equal(dm.status, 201);
+  const dmMessages = await request(`/api/social/dm/conversations/${conversationId}/messages`, { cookie: friendCookie });
+  assert.equal((await dmMessages.json()).messages[0].content, 'Hallo per Direktnachricht');
+  assert.equal((await request(`/api/social/dm/conversations/${conversationId}/read`, {
+    method: 'POST',
+    cookie: friendCookie
+  })).status, 200);
+
+  const form = new FormData();
+  form.append('files', new Blob(['Guildora Upload'], { type: 'text/plain' }), 'notiz.txt');
+  const upload = await fetch(`${baseUrl}/api/uploads`, {
+    method: 'POST',
+    headers: { Cookie: authCookie },
+    body: form
+  });
+  assert.equal(upload.status, 201);
+  const attachmentId = (await upload.json()).attachments[0].id;
+  const message = await request(`/api/channels/${createdChannelId}/messages`, {
+    cookie: authCookie,
+    body: { content: '', attachmentIds: [attachmentId] }
+  });
+  assert.equal(message.status, 201);
+  const messageBody = await message.json();
+  assert.equal(messageBody.message.attachments[0].name, 'notiz.txt');
+  const download = await request(`/api/uploads/${attachmentId}`, { cookie: authCookie });
+  assert.equal(download.status, 200);
+  assert.equal(await download.text(), 'Guildora Upload');
+
+  await db.run(
+    'INSERT INTO guild_members (id, guild_id, user_id) VALUES (?, ?, ?)',
+    [crypto.randomUUID(), createdGuildId, friendId]
+  );
+  const ban = await request(`/api/guilds/${createdGuildId}/moderation/bans`, {
+    cookie: authCookie,
+    body: { userId: friendId, reason: 'Integrationstest' }
+  });
+  assert.equal(ban.status, 204);
+  assert.equal(await db.get('SELECT id FROM guild_members WHERE guild_id = ? AND user_id = ?', [createdGuildId, friendId]), null);
+  const audit = await request(`/api/guilds/${createdGuildId}/moderation`, { cookie: authCookie });
+  const auditBody = await audit.json();
+  assert.equal(auditBody.bans[0].user_id, friendId);
+  assert.equal(auditBody.audit_logs[0].action, 'member.ban');
+  ownerDmSocket.disconnect();
+  friendDmSocket.disconnect();
 });

@@ -4,6 +4,7 @@ import { ApiError } from '../middleware/errorHandler.js';
 import { emitToChannel, emitToUsers } from '../realtime.js';
 import { requireChannelPermission } from '../utils/channelPermissions.js';
 import { createNotification } from '../utils/notifications.js';
+import { requireNotTimedOut } from '../utils/moderation.js';
 import {
   createMessageSchema,
   messageQuerySchema,
@@ -63,7 +64,7 @@ export async function hydrateMessages(rows) {
   if (!rows.length) return [];
   const ids = rows.map((message) => message.id);
   const markerList = placeholders(ids);
-  const [reactionRows, mentionRows] = await Promise.all([
+  const [reactionRows, mentionRows, attachmentRows] = await Promise.all([
     db.all(
       `SELECT message_id, emoji, user_id
        FROM message_reactions
@@ -77,6 +78,11 @@ export async function hydrateMessages(rows) {
        JOIN users u ON u.id = mm.user_id
        WHERE mm.message_id IN (${markerList})
        ORDER BY u.username ASC`,
+      ids
+    ),
+    db.all(
+      `SELECT id, message_id, original_name, mime_type, size_bytes
+       FROM attachments WHERE message_id IN (${markerList}) ORDER BY created_at`,
       ids
     )
   ]);
@@ -103,10 +109,24 @@ export async function hydrateMessages(rows) {
     mentionsByMessage.set(mention.message_id, mentions);
   }
 
+  const attachmentsByMessage = new Map();
+  for (const attachment of attachmentRows) {
+    const list = attachmentsByMessage.get(attachment.message_id) || [];
+    list.push({
+      id: attachment.id,
+      name: attachment.original_name,
+      mime_type: attachment.mime_type,
+      size_bytes: Number(attachment.size_bytes),
+      url: `/api/uploads/${attachment.id}`
+    });
+    attachmentsByMessage.set(attachment.message_id, list);
+  }
+
   return rows.map((row) => ({
     ...baseMessageResponse(row),
     reactions: [...(reactionsByMessage.get(row.id)?.values() || [])],
-    mentions: mentionsByMessage.get(row.id) || []
+    mentions: mentionsByMessage.get(row.id) || [],
+    attachments: attachmentsByMessage.get(row.id) || []
   }));
 }
 
@@ -226,8 +246,18 @@ export async function getMessages(req, res) {
 }
 
 export async function createMessage(req, res) {
-  await channelAccess(req.params.channelId, req.userId, 'sendMessages');
+  const permissions = await channelAccess(req.params.channelId, req.userId, 'sendMessages');
+  await requireNotTimedOut(permissions.guildId, req.userId);
   const data = createMessageSchema.parse(req.body);
+  if (data.attachmentIds.length) await channelAccess(req.params.channelId, req.userId, 'attachFiles');
+  const attachments = data.attachmentIds.length ? await db.all(
+    `SELECT id FROM attachments WHERE owner_id = ? AND message_id IS NULL AND dm_message_id IS NULL
+     AND id IN (${data.attachmentIds.map(() => '?').join(',')})`,
+    [req.userId, ...data.attachmentIds]
+  ) : [];
+  if (attachments.length !== data.attachmentIds.length) {
+    throw new ApiError(400, 'INVALID_ATTACHMENTS', 'Mindestens ein Anhang ist ungültig.');
+  }
   let replyTarget = null;
   if (data.replyToId) {
     replyTarget = await messageOrThrow(data.replyToId);
@@ -242,8 +272,11 @@ export async function createMessage(req, res) {
     `INSERT INTO messages
      (id, channel_id, author_id, content, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [id, req.params.channelId, req.userId, data.content, createdAt, createdAt]
+    [id, req.params.channelId, req.userId, data.content.trim(), createdAt, createdAt]
   );
+  for (const attachment of attachments) {
+    await db.run('UPDATE attachments SET message_id = ? WHERE id = ?', [id, attachment.id]);
+  }
   if (data.replyToId) {
     await db.run(
       'INSERT INTO message_replies (message_id, reply_to_id) VALUES (?, ?)',

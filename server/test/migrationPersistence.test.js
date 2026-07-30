@@ -140,7 +140,7 @@ test('Migrationen laufen nur einmal und erhalten Server-, Rollen- und Channel-Zu
     attach_files: 1,
     manage_messages: 1
   });
-  assert.equal(migrationCount.count, 10);
+  assert.equal(migrationCount.count, 11);
   const backups = fs.readdirSync(path.join(temporaryDirectory, 'backups'));
   assert.equal(backups.length, 2);
   assert.ok(backups.some((backup) => /^guildora-before-migration-baseline-.+\.sqlite$/.test(backup)));

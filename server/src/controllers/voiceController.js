@@ -2,6 +2,7 @@ import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
 import { db } from '../db/index.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { requireChannelPermission } from '../utils/channelPermissions.js';
+import { requireNotTimedOut } from '../utils/moderation.js';
 
 function liveKitConfig() {
   const url = process.env.LIVEKIT_URL?.trim();
@@ -52,6 +53,7 @@ export async function createVoiceToken(req, res) {
   if (permissions.channelType !== 'voice') {
     throw new ApiError(400, 'NOT_A_VOICE_CHANNEL', 'Dieser Channel ist kein Sprachkanal.');
   }
+  await requireNotTimedOut(permissions.guildId, req.userId);
 
   const config = liveKitConfig();
   if (!config) {

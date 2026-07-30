@@ -4754,3 +4754,33 @@ html.is-desktop .modal-overlay {
     margin-left: 0;
   }
 }
+/* Social, Direktnachrichten, Uploads und Moderation */
+.friend-add,.friend-row,.dm-navigation-item,.pending-attachments,.typing-indicator,.moderation-list article,.audit-list article{display:flex;align-items:center;gap:12px}
+.friend-add{margin:20px 28px 8px;padding:11px 14px;border-radius:10px;background:var(--background-tertiary)}
+.friend-add input{flex:1;border:0;outline:0;color:var(--text-normal);background:transparent}
+.friend-search-results,.friends-list{margin:0 28px}
+.friend-row{min-height:62px;padding:10px 6px;border-bottom:1px solid rgb(255 255 255 / 6%)}
+.friend-row>div:nth-child(2){display:flex;flex:1;flex-direction:column}.friend-row small{color:var(--text-muted)}
+.friend-avatar{display:grid;width:40px;height:40px;place-items:center;overflow:hidden;border-radius:50%;background:var(--brand);font-weight:700}
+.friend-avatar img,.mini-avatar img{width:100%;height:100%;object-fit:cover}.friend-avatar.is-online{box-shadow:0 0 0 3px var(--green)}
+.friend-actions{display:flex!important;flex:initial!important;flex-direction:row!important;gap:6px}
+.friend-actions button,.friend-row>button,.moderation-list button{padding:8px 11px;border:0;border-radius:7px;color:var(--text-normal);background:var(--background-tertiary)}
+.dm-navigation-item{margin:2px 8px;padding:7px 9px;border-radius:6px;color:var(--text-muted);text-decoration:none}
+.dm-navigation-item:hover,.dm-navigation-item.is-active{color:var(--text-normal);background:var(--background-modifier-selected)}
+.dm-navigation-item>span:nth-child(2){flex:1;overflow:hidden;text-overflow:ellipsis}.dm-navigation-item>strong{padding:2px 6px;border-radius:10px;background:var(--brand);font-size:11px}
+.dm-welcome{padding:46px 22px 20px}.dm-welcome h1{margin:13px 0 4px}.dm-welcome p{margin:0;color:var(--text-muted)}.dm-view .messages-list:not(:empty){margin-top:0}.dm-view .message-row{opacity:1;animation:none}
+.composer-shell{display:flex;align-items:flex-end}.composer-shell textarea{flex:1}.composer-tool{display:grid;flex:0 0 36px;padding:7px;place-items:center;border:0;color:var(--text-muted);background:transparent;cursor:pointer}
+.typing-indicator{min-height:22px;padding:0 12px;color:var(--text-muted);font-size:12px}
+.pending-attachments{flex-wrap:wrap;padding:6px 8px}.pending-attachments span{display:flex;align-items:center;gap:5px;padding:5px 8px;border-radius:6px;background:var(--background-tertiary);font-size:12px}
+.pending-attachments button{display:grid;padding:0;border:0;place-items:center;color:inherit;background:none}
+.emoji-picker{display:flex;position:absolute;right:18px;bottom:64px;z-index:10;flex-wrap:wrap;width:250px;padding:10px;border:1px solid rgb(255 255 255 / 8%);border-radius:10px;background:var(--background-secondary);box-shadow:0 12px 32px rgb(0 0 0 / 35%)}
+.emoji-picker button{padding:6px;border:0;background:none;font-size:21px}.composer-area{position:relative}
+.message-attachments{display:flex;flex-wrap:wrap;gap:8px;margin-top:7px}.message-attachment{display:flex;align-items:center;gap:9px;max-width:360px;padding:9px;border-radius:8px;color:var(--text-normal);background:var(--background-tertiary);text-decoration:none}
+.message-attachment.is-image{display:block;padding:4px}.message-attachment img{display:block;max-width:320px;max-height:240px;border-radius:6px;object-fit:contain}
+.moderation-page h3{margin:24px 0 8px}.moderation-list,.audit-list{display:flex;flex-direction:column;gap:7px}
+.moderation-list article,.audit-list article{padding:11px;border-radius:8px;background:var(--background-secondary)}
+.moderation-list article>div{display:flex;flex:1;flex-direction:column}.moderation-list span,.moderation-list small,.audit-list span,.audit-list time{color:var(--text-muted);font-size:12px}
+.audit-list article strong{min-width:170px}.audit-list article span{flex:1}.member-moderation-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:18px}
+.voice-participant-volume{width:58px;height:3px;margin-left:auto}.voice-video-grid{display:none;position:fixed;right:24px;bottom:100px;z-index:80;grid-template-columns:repeat(2,minmax(180px,320px));gap:8px;padding:8px;border-radius:12px;background:#111}
+.voice-video-grid:not(:empty){display:grid}.voice-video-track{width:100%;max-height:240px;border-radius:8px;background:#000;object-fit:cover}.voice-video-track--screen_share{grid-column:1/-1;max-height:60vh;object-fit:contain}
+@media(max-width:700px){.friend-search-results,.friends-list{margin-inline:12px}.friend-add{margin-inline:12px}.voice-video-grid{inset:90px 8px auto;grid-template-columns:1fr}.message-attachment img{max-width:240px}}
