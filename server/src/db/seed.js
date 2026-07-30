@@ -11,13 +11,6 @@ const OFFICIAL_GUILD = {
   bannerUrl: '/assets/guildora-official-banner.png'
 };
 
-const LEGACY_DEMO_SLUGS = ['pixelwelten', 'code-und-kaffee', 'klangraum'];
-const LEGACY_DEMO_EMAILS = [
-  'admin@guildora.local',
-  'moderation@guildora.local',
-  'community@guildora.local'
-];
-
 async function ensureCategory(guildId, name, position) {
   let category = await db.get(
     'SELECT id FROM channel_categories WHERE guild_id = ? AND name = ?',
@@ -58,11 +51,6 @@ async function ensureRole(guildId, name, color, position, isDefault = false) {
       'INSERT INTO roles (id, guild_id, name, color, position, is_default) VALUES (?, ?, ?, ?, ?, ?)',
       [role.id, guildId, name, color, position, isDefault]
     );
-  } else {
-    await db.run(
-      'UPDATE roles SET name = ?, color = ?, position = ?, is_default = ? WHERE id = ?',
-      [name, color, position, isDefault, role.id]
-    );
   }
   return role.id;
 }
@@ -78,26 +66,6 @@ async function ensureOwnerMembership(guildId, ownerId) {
       'INSERT INTO guild_members (id, guild_id, user_id) VALUES (?, ?, ?)',
       [member.id, guildId, ownerId]
     );
-  }
-  await db.run('DELETE FROM member_roles WHERE member_id = ?', [member.id]);
-}
-
-async function removeLegacyDemoData(officialGuildId) {
-  for (const email of LEGACY_DEMO_EMAILS) {
-    const demoUser = await db.get('SELECT id FROM users WHERE email = ?', [email]);
-    if (!demoUser) continue;
-    await db.run(
-      'DELETE FROM guild_members WHERE guild_id = ? AND user_id = ?',
-      [officialGuildId, demoUser.id]
-    );
-  }
-
-  for (const slug of LEGACY_DEMO_SLUGS) {
-    await db.run('DELETE FROM guilds WHERE slug = ?', [slug]);
-  }
-
-  for (const email of LEGACY_DEMO_EMAILS) {
-    await db.run('DELETE FROM users WHERE email = ?', [email]);
   }
 }
 
@@ -130,47 +98,27 @@ try {
         OFFICIAL_GUILD.category
       ]
     );
+    const information = await ensureCategory(guild.id, 'INFORMATIONEN', 0);
+    const community = await ensureCategory(guild.id, 'COMMUNITY', 10);
+    const support = await ensureCategory(guild.id, 'SUPPORT', 20);
+
+    await ensureChannel(guild.id, information, { name: 'willkommen', type: 'text', topic: 'Start hier' }, 0);
+    await ensureChannel(guild.id, information, { name: 'ankündigungen', type: 'text' }, 10);
+    await ensureChannel(guild.id, information, { name: 'regeln', type: 'text' }, 20);
+    await ensureChannel(guild.id, community, { name: 'allgemein', type: 'text' }, 0);
+    await ensureChannel(guild.id, community, { name: 'vorstellungen', type: 'text' }, 10);
+    await ensureChannel(guild.id, community, { name: 'feedback', type: 'text' }, 20);
+    await ensureChannel(guild.id, community, { name: 'Allgemeiner Chat', type: 'voice' }, 30);
+    await ensureChannel(guild.id, community, { name: 'Musik', type: 'voice' }, 40);
+    await ensureChannel(guild.id, support, { name: 'hilfe', type: 'text' }, 0);
+    await ensureChannel(guild.id, support, { name: 'bug-reports', type: 'text' }, 10);
+
+    await ensureRole(guild.id, '@everyone', null, 0, true);
+    await ensureOwnerMembership(guild.id, owner.id);
+    console.log('Guildora Official wurde einmalig angelegt.');
   } else {
-    await db.run(
-      `UPDATE guilds
-       SET name = ?, description = ?, icon_url = ?, banner_url = ?, owner_id = ?, is_public = ?,
-           is_official = ?, is_verified = ?, category = ?
-       WHERE id = ?`,
-      [
-        OFFICIAL_GUILD.name,
-        OFFICIAL_GUILD.description,
-        OFFICIAL_GUILD.iconUrl,
-        OFFICIAL_GUILD.bannerUrl,
-        owner.id,
-        true,
-        true,
-        true,
-        OFFICIAL_GUILD.category,
-        guild.id
-      ]
-    );
+    console.log('Guildora Official existiert bereits; gespeicherte Einstellungen bleiben unverändert.');
   }
-
-  const information = await ensureCategory(guild.id, 'INFORMATIONEN', 0);
-  const community = await ensureCategory(guild.id, 'COMMUNITY', 10);
-  const support = await ensureCategory(guild.id, 'SUPPORT', 20);
-
-  await ensureChannel(guild.id, information, { name: 'willkommen', type: 'text', topic: 'Start hier' }, 0);
-  await ensureChannel(guild.id, information, { name: 'ankündigungen', type: 'text' }, 10);
-  await ensureChannel(guild.id, information, { name: 'regeln', type: 'text' }, 20);
-  await ensureChannel(guild.id, community, { name: 'allgemein', type: 'text' }, 0);
-  await ensureChannel(guild.id, community, { name: 'vorstellungen', type: 'text' }, 10);
-  await ensureChannel(guild.id, community, { name: 'feedback', type: 'text' }, 20);
-  await ensureChannel(guild.id, community, { name: 'Allgemeiner Chat', type: 'voice' }, 30);
-  await ensureChannel(guild.id, community, { name: 'Musik', type: 'voice' }, 40);
-  await ensureChannel(guild.id, support, { name: 'hilfe', type: 'text' }, 0);
-  await ensureChannel(guild.id, support, { name: 'bug-reports', type: 'text' }, 10);
-
-  await ensureRole(guild.id, '@everyone', null, 0, true);
-  await ensureOwnerMembership(guild.id, owner.id);
-  await removeLegacyDemoData(guild.id);
-
-  console.log('Guildora Official wurde idempotent mit bekfft als Besitzer synchronisiert.');
 } catch (error) {
   console.error('Seed fehlgeschlagen:', error);
   process.exitCode = 1;
