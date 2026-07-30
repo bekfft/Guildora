@@ -180,6 +180,7 @@ export default function ProfileModal({
   if (!profile) return null;
 
   const relationship = profile.relationship?.state;
+  const displayName = profile.server_profile?.nickname || nameOf(profile);
   return (
     <Modal title="Profil" onClose={onClose}>
       <article className="full-profile">
@@ -190,12 +191,12 @@ export default function ProfileModal({
         <div className="full-profile__identity">
           <div className="full-profile__avatar">
             <span className="full-profile__avatar-media">
-              {profile.avatar_url ? <img src={profile.avatar_url} alt="" /> : nameOf(profile)[0].toUpperCase()}
+              {profile.avatar_url ? <img src={profile.avatar_url} alt="" /> : displayName[0].toUpperCase()}
             </span>
             <i className={`status-dot status-dot--${profile.status}`} />
           </div>
           <div>
-            <h2>{nameOf(profile)}</h2>
+            <h2>{displayName}</h2>
             <p>@{profile.username}</p>
             {profile.custom_status && <span>{profile.custom_status}</span>}
           </div>

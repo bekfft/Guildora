@@ -6694,7 +6694,7 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
 .full-profile__identity {
   display: grid;
   grid-template-columns: 92px minmax(0, 1fr);
-  align-items: end;
+  align-items: start;
   gap: 15px;
   margin: -45px 24px 0;
 }
@@ -6747,6 +6747,11 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
 .full-profile__identity h2 {
   margin: 0;
   font-size: 22px;
+}
+
+.full-profile__identity > div:last-child {
+  min-width: 0;
+  padding-top: 54px;
 }
 
 .full-profile__identity p {
@@ -7210,6 +7215,10 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
   .full-profile__identity {
     grid-template-columns: 78px minmax(0, 1fr);
     margin: -39px 16px 0;
+  }
+
+  .full-profile__identity > div:last-child {
+    padding-top: 47px;
   }
 
   .full-profile__avatar {

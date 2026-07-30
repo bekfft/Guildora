@@ -7,6 +7,10 @@ const appCss = fs.readFileSync(
   path.resolve(__dirname, '..', '..', 'client', 'src', 'styles', 'app.css'),
   'utf8'
 );
+const profileModal = fs.readFileSync(
+  path.resolve(__dirname, '..', '..', 'client', 'src', 'app', 'ProfileModal.jsx'),
+  'utf8'
+);
 
 test('Avatarbilder bleiben unabhängig vom Seitenverhältnis in ihrem festen Rahmen', () => {
   const imageRule = appCss.match(
@@ -22,4 +26,10 @@ test('Avatarbilder bleiben unabhängig vom Seitenverhältnis in ihrem festen Rah
   assert.match(imageRule[1], /width:\s*100%/);
   assert.match(imageRule[1], /height:\s*100%/);
   assert.match(imageRule[1], /object-fit:\s*cover/);
+});
+
+test('Serverprofile zeigen den Servernamen vollständig unterhalb des Banners', () => {
+  assert.match(profileModal, /const displayName = profile\.server_profile\?\.nickname \|\| nameOf\(profile\)/);
+  assert.match(profileModal, /<h2>\{displayName\}<\/h2>/);
+  assert.match(appCss, /\.full-profile__identity > div:last-child\s*\{[^}]*padding-top:\s*54px/s);
 });
