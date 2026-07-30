@@ -5159,74 +5159,51 @@ html.is-desktop .modal-overlay {
 }
 
 .profile-badges {
-  margin: 13px 16px 0;
-  padding: 10px;
-  border: 1px solid rgb(255 255 255 / 8%);
-  border-radius: 9px;
-  background: linear-gradient(145deg, rgb(255 255 255 / 4%), rgb(255 255 255 / 1%));
-}
-
-.profile-badges > header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  color: var(--channel-idle);
-  font-size: 9px;
-  letter-spacing: .08em;
-}
-
-.profile-badges > header > span {
-  display: grid;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 9px;
-  color: var(--channel-hover);
-  background: rgb(255 255 255 / 7%);
-  font-size: 9px;
-  letter-spacing: 0;
-  place-items: center;
+  width: fit-content;
+  max-width: calc(100% - 32px);
+  margin: 8px 16px 0;
+  padding: 4px;
+  border: 1px solid rgb(255 255 255 / 7%);
+  border-radius: 7px;
+  background: #1e1f22;
 }
 
 .profile-badges__row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 2px;
 }
 
 .profile-badges__row > button,
 .profile-badge-detail > span {
   position: relative;
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 24px;
+  height: 24px;
   flex: 0 0 auto;
   overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 20%);
-  border-radius: 9px;
+  border: 0;
+  border-radius: 5px;
   color: #fff;
   background: linear-gradient(145deg, var(--badge-start), var(--badge-end));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 22%),
-    0 4px 10px rgb(0 0 0 / 22%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 14%);
   place-items: center;
 }
 
 .profile-badges__row > button {
   padding: 0;
   cursor: pointer;
-  transition: transform 130ms ease, filter 130ms ease, box-shadow 130ms ease;
+  transition: filter 120ms ease, box-shadow 120ms ease;
 }
 
 .profile-badges__row > button::after,
 .profile-badge-detail > span::after {
   position: absolute;
-  top: -20px;
-  left: -13px;
-  width: 26px;
-  height: 55px;
-  background: rgb(255 255 255 / 13%);
+  top: -14px;
+  left: -10px;
+  width: 18px;
+  height: 38px;
+  background: rgb(255 255 255 / 9%);
   content: "";
   pointer-events: none;
   transform: rotate(32deg);
@@ -5235,27 +5212,26 @@ html.is-desktop .modal-overlay {
 .profile-badges__row > button:hover,
 .profile-badges__row > button.is-active {
   z-index: 1;
-  filter: brightness(1.12);
+  filter: brightness(1.14);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 28%),
-    0 0 0 2px #111214,
-    0 0 0 4px var(--badge-start),
-    0 7px 16px rgb(0 0 0 / 32%);
-  transform: translateY(-2px);
+    inset 0 1px 0 rgb(255 255 255 / 18%),
+    0 0 0 1px #1e1f22,
+    0 0 0 2px var(--badge-start);
 }
 
 .profile-badges__row > button:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 2px;
+  outline: 1px solid #fff;
+  outline-offset: 1px;
 }
 
 .profile-badge-detail {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
+  width: 214px;
+  grid-template-columns: 24px minmax(0, 1fr);
   align-items: start;
-  gap: 9px;
-  margin-top: 10px;
-  padding-top: 10px;
+  gap: 7px;
+  margin-top: 6px;
+  padding: 7px 3px 2px;
   border-top: 1px solid rgb(255 255 255 / 7%);
 }
 
@@ -5266,14 +5242,14 @@ html.is-desktop .modal-overlay {
 .profile-badge-detail strong {
   display: block;
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .profile-badge-detail p {
   margin: 2px 0 0;
   color: var(--channel-idle);
-  font-size: 9px;
-  line-height: 1.35;
+  font-size: 8px;
+  line-height: 1.4;
 }
 
 .profile-role-chip {
@@ -5465,12 +5441,12 @@ html.is-desktop .modal-overlay {
   }
 
   .profile-badges__row {
-    gap: 8px;
+    gap: 3px;
   }
 
   .profile-badges__row > button {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
   }
 }

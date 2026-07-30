@@ -30,7 +30,7 @@ const BADGE_ICONS = {
 
 function BadgeIcon({ name }) {
   const Icon = BADGE_ICONS[name] || ShieldCheck;
-  return <Icon aria-hidden="true" size={17} strokeWidth={2.25} />;
+  return <Icon aria-hidden="true" size={14} strokeWidth={2.2} />;
 }
 
 export default function MemberList({
@@ -148,10 +148,6 @@ export default function MemberList({
           <p>@{selected.username}</p>
           {selectedBadges.length > 0 && (
             <section className="profile-badges" aria-label="Globale Profilabzeichen">
-              <header>
-                <strong>PROFILABZEICHEN</strong>
-                <span>{selectedBadges.length}</span>
-              </header>
               <div className="profile-badges__row">
                 {selectedBadges.map((badge) => (
                   <button
