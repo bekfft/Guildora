@@ -28,14 +28,21 @@ test('Avatarbilder bleiben unabhängig vom Seitenverhältnis in ihrem festen Rah
   assert.match(imageRule[1], /object-fit:\s*cover/);
 });
 
-test('Voice-Avatare bleiben auch bei detailreichen Hochformatbildern erkennbar', () => {
+test('Voice-Avatare verwenden denselben neutralen Bildrahmen wie die Mitgliederliste', () => {
   assert.match(
     appCss,
-    /\.voice-participant\s*\{[^}]*min-height:\s*38px;[^}]*grid-template-columns:\s*30px minmax\(0,\s*1fr\) auto;/s
+    /\.voice-participant\s*\{[^}]*min-height:\s*40px;[^}]*grid-template-columns:\s*32px minmax\(0,\s*1fr\) auto;/s
   );
-  assert.match(
-    appCss,
-    /\.voice-participant__avatar\s*\{[^}]*width:\s*30px;[^}]*height:\s*30px;[^}]*overflow:\s*hidden;/s
+  const voiceAvatarRule = appCss.match(/\.voice-participant__avatar\s*\{([^}]+)\}/);
+  assert.ok(voiceAvatarRule, 'Voice-Avatar-Regel fehlt.');
+  assert.match(voiceAvatarRule[1], /width:\s*32px/);
+  assert.match(voiceAvatarRule[1], /height:\s*32px/);
+  assert.match(voiceAvatarRule[1], /overflow:\s*hidden/);
+  assert.match(voiceAvatarRule[1], /border:\s*0/);
+  assert.doesNotMatch(
+    voiceAvatarRule[1],
+    /border:\s*2px solid transparent/,
+    'Der transparente Voice-Rahmen darf den Markenverlauf nicht rot oder lila durchscheinen lassen.'
   );
 });
 
