@@ -26,9 +26,8 @@ win:
   # certificateFile: ${env.CSC_LINK}
   # certificatePassword: ${env.CSC_KEY_PASSWORD}
 nsis:
-  oneClick: false
+  oneClick: true
   perMachine: false
-  allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   deleteAppDataOnUninstall: false

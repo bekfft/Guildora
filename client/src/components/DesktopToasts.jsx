@@ -17,7 +17,7 @@ export default function DesktopToasts() {
           <strong>Version {desktop.update.version} ist bereit</strong>
           <span>Jetzt still aktualisieren oder beim nächsten vollständigen Beenden automatisch installieren.</span>
           <div>
-            <button type="button" onClick={desktop.installUpdate}>Jetzt neu starten</button>
+            <button type="button" onClick={desktop.installUpdate}>Jetzt still aktualisieren</button>
             <button type="button" onClick={desktop.dismissUpdate}>Später</button>
           </div>
         </div>

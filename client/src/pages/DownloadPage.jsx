@@ -36,7 +36,7 @@ export default function DownloadPage() {
           <div>
             <RefreshCw />
             <h2>Updates passieren automatisch</h2>
-            <p>Guildora lädt neue Desktop-Versionen im Hintergrund und fragt dich vor dem Neustart.</p>
+            <p>Guildora lädt neue Desktop-Versionen im Hintergrund und installiert sie still, sobald du die App vollständig beendest.</p>
           </div>
           <div>
             <CheckCircle2 />

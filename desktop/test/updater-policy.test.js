@@ -34,3 +34,10 @@ test('Desktop-Releases verwenden den vorgeschriebenen Guildora-Tag', () => {
   assert.match(builderConfig, /tagNamePrefix:\s*desktop-v/);
   assert.match(builderConfig, /releaseType:\s*release/);
 });
+
+test('Windows-Updates verwenden einen stillen One-Click-Installer ohne Auswahlseiten', () => {
+  const builderConfig = read('electron-builder.yml');
+  assert.match(builderConfig, /oneClick:\s*true/);
+  assert.match(builderConfig, /perMachine:\s*false/);
+  assert.doesNotMatch(builderConfig, /allowToChangeInstallationDirectory:\s*true/);
+});
