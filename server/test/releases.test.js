@@ -7,10 +7,14 @@ import { clearReleaseCache } from '../src/services/releaseService.js';
 const originalFetch = global.fetch;
 let server;
 let baseUrl;
+let githubApiAvailable = true;
 
 before(async () => {
   global.fetch = (input, options) => {
     if (String(input).startsWith('https://api.github.com/')) {
+      if (!githubApiAvailable) {
+        return Promise.resolve(new Response('rate limited', { status: 403 }));
+      }
       return Promise.resolve(new Response(JSON.stringify({
         tag_name: 'desktop-v1.2.3',
         published_at: '2026-07-30T12:00:00Z',
@@ -20,6 +24,18 @@ before(async () => {
           browser_download_url: 'https://github.com/bekfft/Guildora/releases/download/desktop-v1.2.3/Guildora-Setup-1.2.3.exe'
         }]
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    }
+    if (String(input) === 'https://github.com/bekfft/Guildora/releases/latest') {
+      return Promise.resolve(new Response(null, {
+        status: 302,
+        headers: { Location: 'https://github.com/bekfft/Guildora/releases/tag/desktop-v1.2.4' }
+      }));
+    }
+    if (String(input).includes('/releases/expanded_assets/desktop-v1.2.4')) {
+      return Promise.resolve(new Response(
+        '<a href="/bekfft/Guildora/releases/download/desktop-v1.2.4/Guildora-Setup-1.2.4.exe">Installer</a>',
+        { status: 200, headers: { 'Content-Type': 'text/html' } }
+      ));
     }
     return originalFetch(input, options);
   };
@@ -46,4 +62,22 @@ test('leitet den Download mit 302 direkt zu GitHub weiter', async () => {
   const response = await originalFetch(`${baseUrl}/api/download/windows`, { redirect: 'manual' });
   assert.equal(response.status, 302);
   assert.match(response.headers.get('location'), /^https:\/\/github\.com\//);
+});
+
+test('nutzt bei erreichtem GitHub-API-Limit die öffentliche Release-Seite', async () => {
+  githubApiAvailable = false;
+  clearReleaseCache();
+  try {
+    const response = await originalFetch(`${baseUrl}/api/releases/latest`);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.version, '1.2.4');
+    assert.equal(
+      body.windows.url,
+      'https://github.com/bekfft/Guildora/releases/download/desktop-v1.2.4/Guildora-Setup-1.2.4.exe'
+    );
+  } finally {
+    githubApiAvailable = true;
+    clearReleaseCache();
+  }
 });

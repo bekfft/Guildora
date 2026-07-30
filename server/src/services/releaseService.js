@@ -1,3 +1,5 @@
+import { ApiError } from '../middleware/errorHandler.js';
+
 const CACHE_TTL_MS = 15 * 60 * 1000;
 const GITHUB_OWNER = process.env.GITHUB_OWNER || 'bekfft';
 const GITHUB_REPO = process.env.GITHUB_REPO || 'Guildora';
@@ -26,6 +28,46 @@ function normalizeRelease(release) {
   };
 }
 
+async function fetchLatestReleaseFromPage(signal) {
+  const latestResponse = await fetch(
+    `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
+    {
+      headers: { 'User-Agent': 'Guildora-Server' },
+      redirect: 'manual',
+      signal
+    }
+  );
+  const location = latestResponse.headers.get('location') || latestResponse.url;
+  const tag = decodeURIComponent(location.split('/').filter(Boolean).at(-1) || '');
+  const version = tag.replace(/^desktop-v|^v/i, '');
+  if (!latestResponse.ok && latestResponse.status !== 302) {
+    throw new Error(`GitHub-Release-Seite antwortete mit HTTP ${latestResponse.status}.`);
+  }
+  if (!tag || !version || version === tag) throw new Error('Der aktuelle Release-Tag konnte nicht ermittelt werden.');
+
+  const installerName = `Guildora-Setup-${version}.exe`;
+  const assetsResponse = await fetch(
+    `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/expanded_assets/${encodeURIComponent(tag)}`,
+    { headers: { 'User-Agent': 'Guildora-Server' }, signal }
+  );
+  if (!assetsResponse.ok) {
+    throw new Error(`GitHub-Assets antworteten mit HTTP ${assetsResponse.status}.`);
+  }
+  const assetsHtml = await assetsResponse.text();
+  if (!assetsHtml.includes(installerName)) {
+    throw new Error('Im neuesten Release fehlt der Windows-Installer.');
+  }
+
+  return {
+    version,
+    publishedAt: null,
+    windows: {
+      url: `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(installerName)}`,
+      sizeBytes: 0
+    }
+  };
+}
+
 async function fetchLatestRelease() {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 6_000);
@@ -36,12 +78,17 @@ async function fetchLatestRelease() {
       'X-GitHub-Api-Version': '2022-11-28'
     };
     if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-    const response = await fetch(
-      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
-      { headers, signal: controller.signal }
-    );
-    if (!response.ok) throw new Error(`GitHub antwortete mit HTTP ${response.status}.`);
-    const normalized = normalizeRelease(await response.json());
+    let normalized;
+    try {
+      const response = await fetch(
+        `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
+        { headers, signal: controller.signal }
+      );
+      if (!response.ok) throw new Error(`GitHub antwortete mit HTTP ${response.status}.`);
+      normalized = normalizeRelease(await response.json());
+    } catch {
+      normalized = await fetchLatestReleaseFromPage(controller.signal);
+    }
     cachedRelease = normalized;
     cachedAt = Date.now();
     return normalized;
@@ -72,4 +119,3 @@ export function clearReleaseCache() {
 }
 
 export { normalizeRelease };
-import { ApiError } from '../middleware/errorHandler.js';
