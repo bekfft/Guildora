@@ -40,14 +40,6 @@ Guildora ist unter `https://bekfft.de` erreichbar. Cloudflare verwaltet den
 DNS-Eintrag; Caddy terminiert HTTPS und leitet Web-App und API getrennt an die
 lokalen Guildora-Dienste weiter.
 
-Der bisherige ngrok-Tunnel kann während der Umstellung vorübergehend parallel
-betrieben werden:
-
-```powershell
-ngrok config add-authtoken <DEIN_NGROK_AUTHTOKEN>
-npm run tunnel
-```
-
 Frontend, API und Socket.IO laufen gemeinsam über die Produktionsdomain.
 
 Der Vite-Server leitet HTTP- und WebSocket-Aufrufe unter `/api` an die API weiter. Das
@@ -163,7 +155,7 @@ angezeigt und können jederzeit widerrufen werden.
 Einladungen speichern ausschließlich einen zufälligen Code. Der vollständige
 Link wird im Browser als `/invite/<code>` unter der aktuell geöffneten Domain
 gebildet. Dadurch funktionieren bestehende Codes beim Wechsel von localhost
-oder ngrok auf die spätere Produktionsdomain ohne Migration weiter.
+auf die Produktionsdomain ohne Migration weiter.
 
 Die öffentliche Vorschau zeigt Servername, Beschreibung und Mitgliederzahl.
 Nicht angemeldete Besucher kehren nach Login oder Registrierung automatisch zur
@@ -237,8 +229,8 @@ Beitrittsversuch zeigt eine verständliche Fehlermeldung.
 Für einen lokalen Integrationstest kann ein LiveKit-Server im Dev-Modus
 gestartet und der Server mit den dazugehörigen lokalen Zugangsdaten ausgeführt
 werden. Für öffentliche Nutzung sind eine eigene LiveKit-Cloud-Instanz oder ein
-öffentlich erreichbarer SFU samt TURN erforderlich; der normale HTTP-ngrok-
-Tunnel transportiert die WebRTC-Medienports nicht.
+öffentlich erreichbarer SFU samt TURN erforderlich; der normale HTTP-Reverse-
+Proxy transportiert die WebRTC-Medienports nicht.
 
 ## Windows-Desktop-App
 
@@ -250,7 +242,7 @@ Für GitHub Releases wird bis zu einer späteren Änderung `bekfft/Guildora`
 verwendet. Lokal und auf dem Server können `GITHUB_OWNER` und `GITHUB_REPO`
 überschrieben werden. Die Remote-Konfiguration liegt in
 `desktop-config.json`; der Installer und `latest.yml` liegen ausschließlich bei
-GitHub und werden nie durch ngrok übertragen.
+GitHub und werden nicht durch den Guildora-Webserver übertragen.
 
 ```powershell
 # Web-Client auf dem Standard-Port 5173 starten
@@ -300,17 +292,9 @@ sachlich, wie die Warnung zu erkennen und manuell zu bestätigen ist. Später
 genügen `CSC_LINK` und `CSC_KEY_PASSWORD`; die vorbereiteten Builder-Felder
 stehen kommentiert in `desktop/electron-builder.yml`.
 
-### Umzug auf eine eigene Domain
+### Produktionsdomain
 
-Die Reihenfolge ist verbindlich, damit bestehende Desktop-Sitzungen nicht
-unnötig ausgeloggt oder auf eine unvorbereitete Adresse geschickt werden:
-
-1. Neue Domain aufsetzen und Server sowie Client dort erreichbar machen.
-2. CORS-Origin und Cookie-Flags im Server auf die neue Domain umstellen.
-3. Erst danach `appUrl` in `desktop-config.json` ändern und committen.
-4. Den ngrok-Tunnel mindestens eine Woche parallel weiterlaufen lassen.
-5. Optional ein neues Desktop-Release mit angepasstem Fallback erstellen.
-
-Schritt 3 darf nicht vor Schritt 2 passieren: Andernfalls wechseln alle
-laufenden Desktop-Clients auf eine Domain, die ihre Auth-Cookies noch nicht
-korrekt akzeptiert.
+Die öffentliche Guildora-Adresse ist ausschließlich `https://bekfft.de`.
+Cloudflare arbeitet als vorgeschalteter Proxy mit dem Modus „Vollständig
+(strikt)“; Caddy stellt das gültige Ursprungszertifikat bereit. Client,
+API-CORS, Remote-Konfiguration und Desktop-Fallback verwenden dieselbe Domain.

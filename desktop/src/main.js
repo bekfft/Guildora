@@ -1,5 +1,5 @@
 const path = require('node:path');
-const { app, ipcMain, session, shell } = require('electron');
+const { app, ipcMain, shell } = require('electron');
 const semver = require('semver');
 const { CONFIG_REFRESH_MS, APP_PROTOCOL } = require('./config');
 const { resolveAppUrl, refreshRemoteConfig } = require('./bootstrap');
@@ -100,10 +100,6 @@ app.on('open-url', (event, url) => {
 });
 
 app.whenReady().then(async () => {
-  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
-    details.requestHeaders['ngrok-skip-browser-warning'] = '1';
-    callback({ requestHeaders: details.requestHeaders });
-  });
   const bootstrap = await resolveAppUrl();
   currentConfig = bootstrap.config;
   writeSettings({});

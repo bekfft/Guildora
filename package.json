@@ -13,7 +13,6 @@
     "migrate": "npm run migrate --workspace server",
     "seed": "npm run seed --workspace server",
     "test": "npm run test --workspace server",
-    "tunnel": "ngrok http 5174 --url https://alvin-thrushlike-florence.ngrok-free.dev",
     "desktop:dev": "npm run dev --workspace guildora-desktop",
     "desktop:build": "npm run build --workspace guildora-desktop",
     "desktop:release": "npm run release --workspace guildora-desktop --"
