@@ -34,18 +34,21 @@ Danach sind die Anwendungen erreichbar:
 - API: `http://localhost:3001`
 - Healthcheck: `http://localhost:3001/api/health`
 
-## Öffentlicher Testzugang mit ngrok
+## Öffentlicher Zugang
 
-Guildora ist für `https://alvin-thrushlike-florence.ngrok-free.dev` vorbereitet.
-Nach der einmaligen Anmeldung des ngrok-Agenten kann der Tunnel im Projektordner
-gestartet werden:
+Guildora ist unter `https://bekfft.de` erreichbar. Cloudflare verwaltet den
+DNS-Eintrag; Caddy terminiert HTTPS und leitet Web-App und API getrennt an die
+lokalen Guildora-Dienste weiter.
+
+Der bisherige ngrok-Tunnel kann während der Umstellung vorübergehend parallel
+betrieben werden:
 
 ```powershell
 ngrok config add-authtoken <DEIN_NGROK_AUTHTOKEN>
 npm run tunnel
 ```
 
-Frontend, API und Socket.IO laufen gemeinsam über diese eine öffentliche URL.
+Frontend, API und Socket.IO laufen gemeinsam über die Produktionsdomain.
 
 Der Vite-Server leitet HTTP- und WebSocket-Aufrufe unter `/api` an die API weiter. Das
 Root-Skript startet Frontend und Backend gemeinsam. Alternativ können beide

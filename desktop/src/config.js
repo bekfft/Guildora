@@ -1,5 +1,5 @@
 const FALLBACK_URL = process.env.APP_URL
-  ?? 'https://alvin-thrushlike-florence.ngrok-free.dev';
+  ?? 'https://bekfft.de';
 const DEV_URL = process.env.APP_URL ?? 'http://localhost:5173';
 const GITHUB_OWNER = process.env.GITHUB_OWNER ?? 'bekfft';
 const GITHUB_REPO = process.env.GITHUB_REPO ?? 'Guildora';

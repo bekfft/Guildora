@@ -8,7 +8,7 @@ export default defineConfig({
   server: {
     port: 5174,
     strictPort: true,
-    allowedHosts: ['alvin-thrushlike-florence.ngrok-free.dev'],
+    allowedHosts: ['bekfft.de', 'alvin-thrushlike-florence.ngrok-free.dev'],
     proxy: {
       '/api': {
         target: apiProxyTarget,

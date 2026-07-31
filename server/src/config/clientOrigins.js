@@ -7,6 +7,6 @@ export const clientOrigins = [
   ...configuredOrigins,
   'http://localhost:5173',
   'http://localhost:5174',
+  'https://bekfft.de',
   'https://alvin-thrushlike-florence.ngrok-free.dev'
 ];
-
