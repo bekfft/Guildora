@@ -141,6 +141,23 @@ export default function AppPage() {
   useEffect(() => {
     refreshConversations().catch(() => {});
     const refresh = () => refreshConversations().catch(() => {});
+    const notifyFriendRequest = ({ request } = {}) => {
+      if (!request?.user) return;
+      const sender = request.user.display_name || request.user.username;
+      showToast(`${sender} hat dir eine Freundschaftsanfrage gesendet.`, 'info');
+      if (
+        settings?.desktop_notifications
+        && settings?.notify_friend_requests
+        && !inQuietHours(settings)
+        && 'Notification' in window
+        && Notification.permission === 'granted'
+      ) {
+        new Notification('Neue Freundschaftsanfrage', {
+          body: `${sender} möchte dich als Freund hinzufügen.`,
+          icon: request.user.avatar_url || '/icons/guildora-192.png'
+        });
+      }
+    };
     const notifyDm = ({ conversationId, message }) => {
       refresh();
       if (conversationId === channelId && isDirect) return;
@@ -151,10 +168,12 @@ export default function AppPage() {
     };
     socket.on('dm:refresh', refresh);
     socket.on('social:refresh', refresh);
+    socket.on('social:friend-request', notifyFriendRequest);
     socket.on('dm:notification', notifyDm);
     return () => {
       socket.off('dm:refresh', refresh);
       socket.off('social:refresh', refresh);
+      socket.off('social:friend-request', notifyFriendRequest);
       socket.off('dm:notification', notifyDm);
     };
   }, [channelId, isDirect, refreshConversations, settings, showToast]);

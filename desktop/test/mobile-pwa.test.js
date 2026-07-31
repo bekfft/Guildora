@@ -34,7 +34,8 @@ test('Standalone-Modus und iPhone-Safe-Areas werden im App-Layout berücksichtig
   assert.match(tokensCss, /--safe-area-top:\s*env\(safe-area-inset-top/);
   assert.match(tokensCss, /--safe-area-bottom:\s*env\(safe-area-inset-bottom/);
   assert.match(appCss, /calc\(var\(--titlebar-height\) \+ var\(--safe-area-top\)\)/);
-  assert.match(appCss, /var\(--safe-area-bottom\)/);
+  assert.match(appCss, /html\[data-display-mode="standalone"\] \.app-main\s*\{[^}]*padding-bottom:\s*var\(--safe-area-bottom\)/s);
+  assert.match(appCss, /html\[data-display-mode="standalone"\] \.app-navigation\s*\{[^}]*padding-bottom:\s*var\(--safe-area-bottom\)/s);
   assert.match(appCss, /\.app-navigation\s*\{[\s\S]*?height:\s*auto;/);
 });
 

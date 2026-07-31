@@ -43,3 +43,11 @@ test('Mobile Freundeansicht nutzt nur den äußeren Scrollbereich', () => {
     /@media \(max-width: 900px\)[\s\S]*?\.friends-list\s*\{[^}]*overflow:\s*visible[^}]*flex:\s*0 0 auto/s
   );
 });
+
+test('Offene Freundschaftsanfragen sind sichtbar und eindeutig beschriftet', () => {
+  assert.match(friendsView, /friends-tab-count is-new/);
+  assert.match(friendsView, /Möchte dich als Freund hinzufügen/);
+  assert.match(friendsView, /Anfrage gesendet/);
+  assert.match(friendsView, /setTab\('Ausstehend'\)/);
+  assert.match(appCss, /\.friends-tab-count\.is-new\s*\{[^}]*background:\s*var\(--danger\)/s);
+});

@@ -1006,6 +1006,8 @@ test('Freunde, Direktnachrichten, Anhänge und Moderation funktionieren vollstä
   });
   assert.equal(requestResponse.status, 201);
   const friendshipId = (await requestResponse.json()).request.id;
+  const outgoing = await request('/api/social/friends', { cookie: authCookie });
+  assert.equal((await outgoing.json()).friends[0].state, 'outgoing');
   const incoming = await request('/api/social/friends', { cookie: friendCookie });
   assert.equal((await incoming.json()).friends[0].state, 'incoming');
   assert.equal((await request(`/api/social/friends/${friendshipId}`, {

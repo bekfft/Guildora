@@ -3,7 +3,7 @@
   inset:
     calc(var(--titlebar-height) + var(--safe-area-top))
     var(--safe-area-right)
-    var(--safe-area-bottom)
+    0
     var(--safe-area-left);
   display: grid;
   grid-template-columns: 312px minmax(0, 1fr) 240px;
@@ -84,7 +84,7 @@
   background: var(--bg-sidebar);
   cursor: pointer;
   place-items: center;
-  transition: border-radius 150ms ease-out, color 150ms ease-out, background 150ms ease-out;
+  transition: border-radius 150ms ease-out, filter 150ms ease-out, transform 150ms ease-out;
 }
 
 .server-button img,
@@ -111,14 +111,19 @@
 .server-button:hover,
 .server-button.is-active {
   border-radius: 12px;
-  color: #fff;
-  background: var(--brand);
+  color: inherit;
+  background: var(--bg-sidebar);
+}
+
+.server-button:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
 }
 
 .server-button--home {
-  color: var(--brand-light);
+  color: inherit;
   padding: 6px;
-  background: #fff;
+  background: var(--bg-sidebar);
 }
 
 .server-button--home .brand-logo {
@@ -1949,12 +1954,52 @@
 
 .friends-tabs button,
 .category-chips button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 10px;
   border: 0;
   border-radius: 5px;
   color: var(--channel-hover);
   background: transparent;
   cursor: pointer;
+}
+
+.friends-tab-count {
+  display: inline-grid;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  color: var(--text-primary);
+  background: var(--bg-active);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  place-items: center;
+}
+
+.friends-tab-count.is-new {
+  color: #fff;
+  background: var(--danger);
+}
+
+html[data-display-mode="standalone"] .app-main {
+  padding-bottom: var(--safe-area-bottom);
+}
+
+html[data-display-mode="standalone"] .app-navigation {
+  padding-bottom: var(--safe-area-bottom);
+  background:
+    linear-gradient(
+      to right,
+      var(--bg-rail) 0 72px,
+      var(--bg-sidebar) 72px 100%
+    );
+}
+
+html[data-display-mode="standalone"] .member-list {
+  padding-bottom: var(--safe-area-bottom);
 }
 
 .friends-tabs button:hover,
@@ -3040,7 +3085,7 @@ html.is-desktop .modal-overlay {
     position: fixed;
     z-index: 80;
     top: calc(var(--titlebar-height) + var(--safe-area-top));
-    bottom: var(--safe-area-bottom);
+    bottom: 0;
     left: var(--safe-area-left);
     width: 312px;
     height: auto;

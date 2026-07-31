@@ -59,6 +59,14 @@ export default function FriendsView({ onOpenDm, onOpenProfile, onToast, onConver
     if (tab === 'Ausstehend') return ['incoming', 'outgoing'].includes(friend.state);
     return friend.state === 'blocked';
   }), [friends, tab]);
+  const pendingCount = useMemo(
+    () => friends.filter((friend) => ['incoming', 'outgoing'].includes(friend.state)).length,
+    [friends]
+  );
+  const incomingCount = useMemo(
+    () => friends.filter((friend) => friend.state === 'incoming').length,
+    [friends]
+  );
 
   async function action(run, success) {
     try {
@@ -86,7 +94,16 @@ export default function FriendsView({ onOpenDm, onOpenProfile, onToast, onConver
   return (
     <section className="friends-view">
       <div className="friends-tabs" role="tablist" aria-label="Freundesfilter">
-        {TABS.map((item) => <button type="button" role="tab" aria-selected={tab === item} className={tab === item ? 'is-active' : ''} onClick={() => setTab(item)} key={item}>{item}</button>)}
+        {TABS.map((item) => (
+          <button type="button" role="tab" aria-selected={tab === item} className={tab === item ? 'is-active' : ''} onClick={() => setTab(item)} key={item}>
+            {item}
+            {item === 'Ausstehend' && pendingCount > 0 && (
+              <span className={incomingCount > 0 ? 'friends-tab-count is-new' : 'friends-tab-count'}>
+                {pendingCount}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
       <div className="friends-content">
         <div className="friend-add">
@@ -99,7 +116,7 @@ export default function FriendsView({ onOpenDm, onOpenProfile, onToast, onConver
               <div className="friend-row" key={user.id}>
                 <button className="friend-avatar" type="button" onClick={() => onOpenProfile(user.id)}>{user.avatar_url ? <img src={user.avatar_url} alt="" /> : nameOf(user)[0].toUpperCase()}</button>
                 <button className="friend-name-button" type="button" onClick={() => onOpenProfile(user.id)}><strong>{nameOf(user)}</strong><small>@{user.username}</small></button>
-                {!user.relationship && <button type="button" onClick={() => action(() => api.addFriend(user.username), 'Anfrage gesendet.')}><UserPlus size={17} /> Hinzufügen</button>}
+                {!user.relationship && <button type="button" onClick={() => action(async () => { await api.addFriend(user.username); setTab('Ausstehend'); }, 'Anfrage gesendet.')}><UserPlus size={17} /> Hinzufügen</button>}
                 {user.relationship === 'incoming' && <button type="button" onClick={() => setTab('Ausstehend')}>Anfrage ansehen</button>}
                 {user.relationship === 'accepted' && <button type="button" onClick={() => openDm(user.id)}><MessageCircle size={17} /> Nachricht</button>}
                 {user.relationship === 'outgoing' && <small>Anfrage gesendet</small>}
@@ -109,11 +126,25 @@ export default function FriendsView({ onOpenDm, onOpenProfile, onToast, onConver
           </div>
         )}
         <div className="friends-list">
-          {!loading && visible.length === 0 && <div className="friends-empty"><h2>Hier ist es noch ganz ruhig</h2><p>In „{tab}“ gibt es aktuell nichts zu sehen.</p></div>}
+          {!loading && visible.length === 0 && (
+            <div className="friends-empty">
+              <h2>{tab === 'Ausstehend' ? 'Keine offenen Anfragen' : 'Hier ist es noch ganz ruhig'}</h2>
+              <p>{tab === 'Ausstehend' ? 'Gesendete und empfangene Freundschaftsanfragen erscheinen hier.' : `In „${tab}“ gibt es aktuell nichts zu sehen.`}</p>
+            </div>
+          )}
           {visible.map((friend) => (
             <div className="friend-row" key={friend.id}>
               <button className={`friend-avatar is-${friend.user.status}`} type="button" onClick={() => onOpenProfile(friend.user.id)}>{friend.user.avatar_url ? <img src={friend.user.avatar_url} alt="" /> : nameOf(friend.user)[0].toUpperCase()}</button>
-              <button className="friend-name-button" type="button" onClick={() => onOpenProfile(friend.user.id)}><strong>{nameOf(friend.user)}</strong><small>@{friend.user.username} · {friend.user.status === 'online' ? 'Online' : 'Offline'}</small></button>
+              <button className="friend-name-button" type="button" onClick={() => onOpenProfile(friend.user.id)}>
+                <strong>{nameOf(friend.user)}</strong>
+                <small>
+                  @{friend.user.username}
+                  {friend.state === 'incoming' && ' · Möchte dich als Freund hinzufügen'}
+                  {friend.state === 'outgoing' && ' · Anfrage gesendet'}
+                  {friend.state === 'accepted' && ` · ${friend.user.status === 'online' ? 'Online' : 'Offline'}`}
+                  {friend.state === 'blocked' && ' · Blockiert'}
+                </small>
+              </button>
               <div className="friend-actions">
                 {friend.state === 'accepted' && <>
                   <button type="button" title="Nachricht" onClick={() => openDm(friend.user.id)}><MessageCircle size={17} /></button>

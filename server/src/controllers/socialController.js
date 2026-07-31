@@ -137,6 +137,14 @@ export async function createFriendRequest(req, res) {
     [id, req.userId, target.id, 'pending']
   );
   await notifySocial([req.userId, target.id]);
+  const requester = await db.get(`SELECT ${USER_FIELDS} FROM users WHERE id = ?`, [req.userId]);
+  emitToUsers([target.id], 'social:friend-request', {
+    request: {
+      id,
+      state: 'incoming',
+      user: publicUser(requester)
+    }
+  });
   return res.status(201).json({ request: { id, user: publicUser(target), state: 'outgoing' } });
 }
 
