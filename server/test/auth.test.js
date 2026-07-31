@@ -1007,9 +1007,14 @@ test('Freunde, Direktnachrichten, Anhänge und Moderation funktionieren vollstä
   assert.equal(requestResponse.status, 201);
   const friendshipId = (await requestResponse.json()).request.id;
   const outgoing = await request('/api/social/friends', { cookie: authCookie });
-  assert.equal((await outgoing.json()).friends[0].state, 'outgoing');
+  const outgoingFriend = (await outgoing.json()).friends[0];
+  assert.equal(outgoingFriend.state, 'outgoing');
+  assert.equal(outgoingFriend.user.username, 'social.friend');
+  assert.equal(outgoingFriend.user.display_name, 'Social Friend');
   const incoming = await request('/api/social/friends', { cookie: friendCookie });
-  assert.equal((await incoming.json()).friends[0].state, 'incoming');
+  const incomingFriend = (await incoming.json()).friends[0];
+  assert.equal(incomingFriend.state, 'incoming');
+  assert.equal(incomingFriend.user.username, 'mira.test');
   assert.equal((await request(`/api/social/friends/${friendshipId}`, {
     method: 'PATCH',
     cookie: friendCookie,

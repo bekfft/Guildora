@@ -6,7 +6,7 @@ import { socket } from '../lib/socket.js';
 const TABS = ['Online', 'Alle', 'Ausstehend', 'Blockiert'];
 
 function nameOf(user) {
-  return user.display_name || user.username;
+  return user?.display_name || user?.username || 'Unbekannt';
 }
 
 export default function FriendsView({ onOpenDm, onOpenProfile, onToast, onConversationsChanged }) {

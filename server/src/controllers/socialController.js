@@ -100,12 +100,18 @@ export async function listFriends(req, res) {
     .filter((row) => !(row.status === 'blocked' && row.requester_id !== req.userId))
     .map((row) => {
       const requesterIsCurrent = row.requester_id === req.userId;
-      const prefix = requesterIsCurrent ? 'addressee_user_' : 'requester_user_';
+      const userPrefix = requesterIsCurrent ? 'addressee' : 'requester';
       return {
         id: row.id,
         state: relationshipState(row, req.userId),
         created_at: row.created_at,
-        user: publicUser(row, prefix)
+        user: {
+          id: row[`${userPrefix}_user_id`],
+          username: row[`${userPrefix}_username`],
+          display_name: row[`${userPrefix}_display_name`],
+          avatar_url: row[`${userPrefix}_avatar_url`],
+          status: isUserOnline(row[`${userPrefix}_user_id`]) ? 'online' : 'offline'
+        }
       };
     });
   return res.json({ friends });
