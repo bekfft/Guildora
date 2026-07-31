@@ -112,6 +112,7 @@ export default function VoicePanel({ voice, onToast }) {
               disabled={!voice.inputs.length}
             >
               {!voice.inputs.length && <option value="">Kein Mikrofon gefunden</option>}
+              {voice.inputs.length > 0 && <option value="">Systemstandard</option>}
               {voice.inputs.map((device) => <option value={device.id} key={device.id}>{device.label}</option>)}
             </select>
           </label>
@@ -123,6 +124,7 @@ export default function VoicePanel({ voice, onToast }) {
               disabled={!voice.outputs.length}
             >
               {!voice.outputs.length && <option value="">Systemstandard</option>}
+              {voice.outputs.length > 0 && <option value="">Systemstandard</option>}
               {voice.outputs.map((device) => <option value={device.id} key={device.id}>{device.label}</option>)}
             </select>
           </label>

@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import Button from '../components/Button.jsx';
 import { api } from '../lib/api.js';
+import {
+  audioCaptureOptions,
+  resolveAudioDeviceId,
+  uniqueAudioDevices
+} from '../lib/mediaDevices.js';
 import { useGuildoraDialog } from '../context/GuildoraDialogContext.jsx';
 
 export function Switch({ label, description, checked, onChange }) {
@@ -195,20 +200,54 @@ export function VoiceSettingsSection({ settings, save, onToast }) {
   const [form, setForm] = useState(settings);
   const [devices, setDevices] = useState([]);
   const [testing, setTesting] = useState(false);
-  useEffect(() => { navigator.mediaDevices?.enumerateDevices().then(setDevices).catch(() => {}); }, []);
+  const rawInputs = devices.filter((device) => device.kind === 'audioinput');
+  const rawOutputs = devices.filter((device) => device.kind === 'audiooutput');
+  const inputs = uniqueAudioDevices(rawInputs, 'Mikrofon');
+  const outputs = uniqueAudioDevices(rawOutputs, 'Lautsprecher');
+  const cameras = devices.filter((device) => device.kind === 'videoinput');
+
+  useEffect(() => {
+    const refresh = () => navigator.mediaDevices?.enumerateDevices().then(setDevices).catch(() => {});
+    refresh();
+    navigator.mediaDevices?.addEventListener?.('devicechange', refresh);
+    return () => navigator.mediaDevices?.removeEventListener?.('devicechange', refresh);
+  }, []);
+
+  useEffect(() => {
+    if (!devices.length) return;
+    setForm((current) => ({
+      ...current,
+      voice_input_device: resolveAudioDeviceId(
+        current.voice_input_device,
+        rawInputs,
+        inputs
+      ) || null,
+      voice_output_device: resolveAudioDeviceId(
+        current.voice_output_device,
+        rawOutputs,
+        outputs
+      ) || null
+    }));
+  }, [devices]);
+
   const patch = (key, value) => setForm({ ...form, [key]: value });
   async function micTest() {
     setTesting(true);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      onToast('Mikrofon funktioniert. Sprich jetzt – der Test endet nach drei Sekunden.', 'success');
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: audioCaptureOptions(form, form.voice_input_device || '')
+      });
+      const microphone = stream.getAudioTracks()[0]?.label || 'Ausgewähltes Mikrofon';
+      const refreshed = await navigator.mediaDevices.enumerateDevices().catch(() => null);
+      if (refreshed) setDevices(refreshed);
+      onToast(`${microphone} ist aktiv. Sprich jetzt – der Test endet nach drei Sekunden.`, 'success');
       window.setTimeout(() => { stream.getTracks().forEach((track) => track.stop()); setTesting(false); }, 3000);
     } catch (error) { setTesting(false); onToast(error.message, 'error'); }
   }
   return <div className="user-settings-stack"><section className="user-settings-card"><h4>Voice & Video</h4><div className="user-settings-grid">
-    <Field label="Eingabegerät"><select value={form.voice_input_device || ''} onChange={(e) => patch('voice_input_device', e.target.value || null)}><option value="">Systemstandard</option>{devices.filter((d) => d.kind === 'audioinput').map((d, i) => <option key={d.deviceId} value={d.deviceId}>{d.label || `Mikrofon ${i + 1}`}</option>)}</select></Field>
-    <Field label="Ausgabegerät"><select value={form.voice_output_device || ''} onChange={(e) => patch('voice_output_device', e.target.value || null)}><option value="">Systemstandard</option>{devices.filter((d) => d.kind === 'audiooutput').map((d, i) => <option key={d.deviceId} value={d.deviceId}>{d.label || `Lautsprecher ${i + 1}`}</option>)}</select></Field>
-    <Field label="Kamera"><select value={form.voice_camera_device || ''} onChange={(e) => patch('voice_camera_device', e.target.value || null)}><option value="">Systemstandard</option>{devices.filter((d) => d.kind === 'videoinput').map((d, i) => <option key={d.deviceId} value={d.deviceId}>{d.label || `Kamera ${i + 1}`}</option>)}</select></Field>
+    <Field label="Eingabegerät"><select value={form.voice_input_device || ''} onChange={(e) => patch('voice_input_device', e.target.value || null)}><option value="">Systemstandard</option>{inputs.map((device) => <option key={device.id} value={device.id}>{device.label}</option>)}</select></Field>
+    <Field label="Ausgabegerät"><select value={form.voice_output_device || ''} onChange={(e) => patch('voice_output_device', e.target.value || null)}><option value="">Systemstandard</option>{outputs.map((device) => <option key={device.id} value={device.id}>{device.label}</option>)}</select></Field>
+    <Field label="Kamera"><select value={form.voice_camera_device || ''} onChange={(e) => patch('voice_camera_device', e.target.value || null)}><option value="">Systemstandard</option>{cameras.map((device, index) => <option key={device.deviceId} value={device.deviceId}>{device.label || `Kamera ${index + 1}`}</option>)}</select></Field>
     <Field label="Eingabemodus"><select value={form.voice_input_mode} onChange={(e) => patch('voice_input_mode', e.target.value)}><option value="voice_activity">Sprachaktivität</option><option value="push_to_talk">Push-to-Talk</option></select></Field>
     <Field label={`Empfindlichkeit: ${form.voice_sensitivity}`}><input type="range" min="0" max="100" value={form.voice_sensitivity} onChange={(e) => patch('voice_sensitivity', Number(e.target.value))} /></Field>
     {form.voice_input_mode === 'push_to_talk' && <Field label="Push-to-Talk-Taste"><input value={form.push_to_talk_key} onChange={(e) => patch('push_to_talk_key', e.target.value)} /></Field>}

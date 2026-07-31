@@ -14,6 +14,11 @@ import {
   primeVoiceFeedback,
   voiceActivityThreshold
 } from '../lib/voiceFeedback.js';
+import {
+  audioCaptureOptions,
+  resolveAudioDeviceId,
+  uniqueAudioDevices
+} from '../lib/mediaDevices.js';
 import { useAuth } from './AuthContext.jsx';
 
 const VoiceContext = createContext(null);
@@ -69,15 +74,8 @@ function roomParticipants(room) {
   ]);
 }
 
-function deviceView(device, index, type) {
-  return {
-    id: device.deviceId,
-    label: device.label || `${type} ${index + 1}`
-  };
-}
-
 export function VoiceProvider({ children }) {
-  const { settings } = useAuth();
+  const { settings, saveSettings } = useAuth();
   const roomRef = useRef(null);
   const participantListenerCleanupRef = useRef(() => {});
   const participantSyncTimerRef = useRef(null);
@@ -169,16 +167,12 @@ export function VoiceProvider({ children }) {
       Room.getLocalDevices('audioinput', requestPermissions).catch(() => []),
       Room.getLocalDevices('audiooutput', false).catch(() => [])
     ]);
-    const nextInputs = microphones.map((device, index) => deviceView(device, index, 'Mikrofon'));
-    const nextOutputs = speakers.map((device, index) => deviceView(device, index, 'Lautsprecher'));
+    const nextInputs = uniqueAudioDevices(microphones, 'Mikrofon');
+    const nextOutputs = uniqueAudioDevices(speakers, 'Lautsprecher');
     setInputs(nextInputs);
     setOutputs(nextOutputs);
-    setInputDeviceId((current) => (
-      current && nextInputs.some((device) => device.id === current) ? current : nextInputs[0]?.id || ''
-    ));
-    setOutputDeviceId((current) => (
-      current && nextOutputs.some((device) => device.id === current) ? current : nextOutputs[0]?.id || ''
-    ));
+    setInputDeviceId((current) => resolveAudioDeviceId(current, microphones, nextInputs));
+    setOutputDeviceId((current) => resolveAudioDeviceId(current, speakers, nextOutputs));
   }, []);
 
   const clearAudioElements = useCallback(() => {
@@ -273,6 +267,7 @@ export function VoiceProvider({ children }) {
     }
 
     const {
+      AudioPresets,
       DefaultReconnectPolicy,
       ParticipantEvent,
       Room,
@@ -283,11 +278,12 @@ export function VoiceProvider({ children }) {
       dynacast: true,
       reconnectPolicy: new DefaultReconnectPolicy([0, 500, 1000, 2000, 5000, 10_000, 15_000, 30_000]),
       disconnectOnPageLeave: true,
-      audioCaptureDefaults: {
-        autoGainControl: settings?.voice_auto_gain !== false,
-        echoCancellation: settings?.voice_echo_cancellation !== false,
-        noiseSuppression: settings?.voice_noise_suppression !== false,
-        deviceId: inputDeviceId || undefined
+      audioCaptureDefaults: audioCaptureOptions(settings, inputDeviceId),
+      publishDefaults: {
+        audioPreset: AudioPresets.musicHighQuality,
+        dtx: true,
+        red: true,
+        forceStereo: false
       },
       videoCaptureDefaults: {
         deviceId: settings?.voice_camera_device || undefined
@@ -591,19 +587,27 @@ export function VoiceProvider({ children }) {
   }, [refreshParticipants]);
 
   const selectInputDevice = useCallback(async (deviceId) => {
-    if (roomRef.current) await roomRef.current.switchActiveDevice('audioinput', deviceId, true);
-    localStorage.setItem('guildora:voice-input', deviceId);
-    setInputDeviceId(deviceId);
-  }, []);
+    const selected = deviceId || '';
+    if (roomRef.current) {
+      await roomRef.current.switchActiveDevice('audioinput', selected || 'default', true);
+    }
+    if (selected) localStorage.setItem('guildora:voice-input', selected);
+    else localStorage.removeItem('guildora:voice-input');
+    setInputDeviceId(selected);
+    await saveSettings({ voice_input_device: selected || null });
+  }, [saveSettings]);
 
   const selectOutputDevice = useCallback(async (deviceId) => {
+    const selected = deviceId || '';
     if (roomRef.current) {
-      const switched = await roomRef.current.switchActiveDevice('audiooutput', deviceId, true);
+      const switched = await roomRef.current.switchActiveDevice('audiooutput', selected || 'default', true);
       if (!switched) throw new Error('Dieser Browser unterstützt keine Lautsprecherauswahl.');
     }
-    localStorage.setItem('guildora:voice-output', deviceId);
-    setOutputDeviceId(deviceId);
-  }, []);
+    if (selected) localStorage.setItem('guildora:voice-output', selected);
+    else localStorage.removeItem('guildora:voice-output');
+    setOutputDeviceId(selected);
+    await saveSettings({ voice_output_device: selected || null });
+  }, [saveSettings]);
 
   const startAudio = useCallback(async () => {
     if (!roomRef.current) return;
