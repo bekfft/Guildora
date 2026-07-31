@@ -1929,7 +1929,14 @@
 .friends-view {
   display: grid;
   min-height: 0;
-  grid-template-rows: 48px 1fr;
+  grid-template-rows: 48px minmax(0, 1fr);
+}
+
+.friends-content {
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+  flex-direction: column;
 }
 
 .friends-tabs {
@@ -1958,6 +1965,7 @@
 
 .friends-empty {
   display: flex;
+  min-height: 100%;
   align-items: center;
   flex-direction: column;
   justify-content: center;
@@ -6068,6 +6076,8 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
 .friend-add{margin:20px 28px 8px;padding:11px 14px;border-radius:10px;background:var(--background-tertiary)}
 .friend-add input{flex:1;border:0;outline:0;color:var(--text-normal);background:transparent}
 .friend-search-results,.friends-list{margin:0 28px}
+.friend-search-results{flex:0 0 auto}
+.friends-list{min-height:0;overflow-y:auto;flex:1 1 auto}
 .friend-row{min-height:62px;padding:10px 6px;border-bottom:1px solid rgb(255 255 255 / 6%)}
 .friend-row>div:nth-child(2){display:flex;flex:1;flex-direction:column}.friend-row small{color:var(--text-muted)}
 .friend-avatar{display:grid;width:40px;height:40px;place-items:center;overflow:hidden;border-radius:50%;background:var(--brand);font-weight:700}
@@ -6289,6 +6299,12 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
     flex-direction: column;
   }
 
+  .friends-content {
+    min-height: auto;
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+
   .friends-tabs {
     position: sticky;
     z-index: 3;
@@ -6316,6 +6332,16 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
   .friend-add input {
     min-width: 0;
     font-size: 16px;
+  }
+
+  .friends-list {
+    min-height: auto;
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+
+  .friends-empty {
+    min-height: min(50dvh, 360px);
   }
 
   .friend-row {
