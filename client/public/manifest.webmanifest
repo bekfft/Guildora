@@ -9,6 +9,7 @@
   "scope": "/",
   "display": "standalone",
   "display_override": [
+    "fullscreen",
     "standalone"
   ],
   "orientation": "any",

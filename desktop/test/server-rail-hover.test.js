@@ -15,10 +15,18 @@ test('Server und Guildora-Logo behalten beim Hover ihre Farbe', () => {
   );
   assert.match(
     appCss,
-    /\.server-button:hover\s*\{[^}]*filter:\s*brightness\(1\.06\)[^}]*transform:\s*translateY\(-1px\)/s
+    /\.server-button:hover\s*\{[^}]*filter:\s*none[^}]*transform:\s*none/s
   );
   assert.match(
     appCss,
     /\.server-button--home\s*\{[^}]*background:\s*var\(--bg-sidebar\)/s
+  );
+  assert.match(
+    appCss,
+    /\.server-button--utility:hover,\s*\.server-button--utility\.is-active\s*\{[^}]*color:\s*inherit[^}]*background:\s*var\(--bg-sidebar\)/s
+  );
+  assert.doesNotMatch(
+    appCss,
+    /\.server-button:hover\s*\{[^}]*brightness|\.server-button--utility:hover,\s*\.server-button--utility\.is-active\s*\{[^}]*background:\s*var\(--online\)/s
   );
 });

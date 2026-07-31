@@ -84,7 +84,7 @@
   background: var(--bg-sidebar);
   cursor: pointer;
   place-items: center;
-  transition: border-radius 150ms ease-out, filter 150ms ease-out, transform 150ms ease-out;
+  transition: border-radius 150ms ease-out;
 }
 
 .server-button img,
@@ -116,8 +116,8 @@
 }
 
 .server-button:hover {
-  filter: brightness(1.06);
-  transform: translateY(-1px);
+  filter: none;
+  transform: none;
 }
 
 .server-button--home {
@@ -133,13 +133,13 @@
 }
 
 .server-button--utility {
-  color: var(--online);
+  color: var(--channel-hover);
 }
 
 .server-button--utility:hover,
 .server-button--utility.is-active {
-  color: #fff;
-  background: var(--online);
+  color: inherit;
+  background: var(--bg-sidebar);
 }
 
 .server-button__pill {
@@ -1984,12 +1984,7 @@
   background: var(--danger);
 }
 
-html[data-display-mode="standalone"] .app-main {
-  padding-bottom: var(--safe-area-bottom);
-}
-
 html[data-display-mode="standalone"] .app-navigation {
-  padding-bottom: var(--safe-area-bottom);
   background:
     linear-gradient(
       to right,
@@ -1998,7 +1993,16 @@ html[data-display-mode="standalone"] .app-navigation {
     );
 }
 
-html[data-display-mode="standalone"] .member-list {
+html[data-display-mode="standalone"] .server-rail {
+  padding-bottom: calc(12px + var(--safe-area-bottom));
+}
+
+html[data-display-mode="standalone"] .user-panel-wrap {
+  flex-basis: calc(52px + var(--safe-area-bottom));
+}
+
+html[data-display-mode="standalone"] .user-panel {
+  height: calc(52px + var(--safe-area-bottom));
   padding-bottom: var(--safe-area-bottom);
 }
 
@@ -6280,6 +6284,16 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
 
   .channel-view {
     padding: 0 10px max(10px, env(safe-area-inset-bottom));
+  }
+
+  html[data-display-mode="standalone"] .channel-view {
+    padding-bottom: 0;
+  }
+
+  html[data-display-mode="standalone"] .composer-area {
+    padding-bottom: var(--safe-area-bottom);
+    background: #383a40;
+    border-radius: 8px 8px 0 0;
   }
 
   .messages-scroller {
