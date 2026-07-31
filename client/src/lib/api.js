@@ -1,4 +1,5 @@
 const API_BASE = import.meta.env.VITE_API_URL || '';
+let refreshRequest = null;
 
 export class ApiError extends Error {
   constructor(error, status) {
@@ -7,6 +8,16 @@ export class ApiError extends Error {
     this.field = error?.field;
     this.status = status;
   }
+}
+
+function refreshSession() {
+  if (!refreshRequest) {
+    refreshRequest = request('/api/auth/refresh', { method: 'POST' }, false)
+      .finally(() => {
+        refreshRequest = null;
+      });
+  }
+  return refreshRequest;
 }
 
 async function request(path, options = {}, allowRefresh = true) {
@@ -22,7 +33,7 @@ async function request(path, options = {}, allowRefresh = true) {
 
   if (response.status === 401 && allowRefresh && !path.includes('/auth/refresh')) {
     try {
-      await request('/api/auth/refresh', { method: 'POST' }, false);
+      await refreshSession();
       return request(path, options, false);
     } catch {
       // Die ursprüngliche Antwort liefert anschließend den passenden Fehler.
@@ -40,7 +51,7 @@ export const api = {
   register: (data) => request('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   login: (data) => request('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   logout: () => request('/api/auth/logout', { method: 'POST' }),
-  refresh: () => request('/api/auth/refresh', { method: 'POST' }, false),
+  refresh: refreshSession,
   me: () => request('/api/auth/me'),
   accountSettings: () => request('/api/account/settings'),
   updateAccountSettings: (data) => request('/api/account/settings', { method: 'PATCH', body: JSON.stringify(data) }),

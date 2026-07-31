@@ -129,7 +129,9 @@ export async function logout(req, res) {
 export async function refresh(req, res) {
   const userId = await consumeRefreshToken(req.cookies.refresh_token);
   if (!userId) {
-    clearAuthCookies(res);
+    // Ein verspäteter paralleler Refresh darf kein bereits neu gesetztes
+    // Cookie im Browser wieder löschen. Der ungültige Token bleibt serverseitig
+    // wirkungslos und wird bei einer echten Anmeldung sicher überschrieben.
     throw new ApiError(401, 'UNAUTHORIZED', 'Deine Sitzung ist abgelaufen.');
   }
 

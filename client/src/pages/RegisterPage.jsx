@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Button from '../components/Button.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
+import SessionRecovery from '../components/SessionRecovery.jsx';
 import TextField from '../components/TextField.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -32,7 +33,13 @@ function passwordStrength(password) {
 }
 
 export default function RegisterPage() {
-  const { user, loading: authLoading, register } = useAuth();
+  const {
+    user,
+    loading: authLoading,
+    sessionUnavailable,
+    restoreSession,
+    register
+  } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [form, setForm] = useState({
@@ -46,6 +53,9 @@ export default function RegisterPage() {
 
   const destination = location.state?.from?.pathname || '/app';
 
+  if (authLoading || sessionUnavailable) {
+    return <SessionRecovery loading={authLoading} onRetry={restoreSession} />;
+  }
   if (!authLoading && user) return <Navigate to={destination} replace />;
 
   function update(name, value) {

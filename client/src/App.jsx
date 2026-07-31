@@ -11,27 +11,32 @@ import RegisterPage from './pages/RegisterPage.jsx';
 import DownloadPage from './pages/DownloadPage.jsx';
 import DesktopTitlebar from './components/DesktopTitlebar.jsx';
 import DesktopToasts from './components/DesktopToasts.jsx';
+import SessionRecovery from './components/SessionRecovery.jsx';
 import { DesktopProvider, useDesktop } from './context/DesktopContext.jsx';
 import { VoiceProvider } from './context/VoiceContext.jsx';
 import { GuildoraDialogProvider } from './context/GuildoraDialogContext.jsx';
 
 function HomeRoute() {
   const desktop = useDesktop();
-  const { user, loading } = useAuth();
+  const { user, loading, sessionUnavailable, restoreSession } = useAuth();
   const isStandalone = document.documentElement.dataset.displayMode === 'standalone';
 
   if (!desktop?.isDesktop && !isStandalone) return <LandingPage />;
-  if (loading) return <div className="route-loader"><span className="spinner spinner--large" /></div>;
+  if (loading || sessionUnavailable) {
+    return <SessionRecovery loading={loading} onRetry={restoreSession} />;
+  }
   return <Navigate to={user ? '/app' : '/login'} replace />;
 }
 
 function WebDownloadRoute() {
   const desktop = useDesktop();
-  const { user, loading } = useAuth();
+  const { user, loading, sessionUnavailable, restoreSession } = useAuth();
   const isStandalone = document.documentElement.dataset.displayMode === 'standalone';
 
   if (!desktop?.isDesktop && !isStandalone) return <DownloadPage />;
-  if (loading) return <div className="route-loader"><span className="spinner spinner--large" /></div>;
+  if (loading || sessionUnavailable) {
+    return <SessionRecovery loading={loading} onRetry={restoreSession} />;
+  }
   return <Navigate to={user ? '/app' : '/login'} replace />;
 }
 

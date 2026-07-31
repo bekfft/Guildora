@@ -1265,8 +1265,43 @@ p {
 .route-loader {
   display: grid;
   min-height: var(--content-viewport-height);
+  padding: 24px;
   background: var(--bg-darkest);
   place-items: center;
+}
+
+.session-recovery {
+  display: flex;
+  width: min(100%, 520px);
+  align-items: center;
+  flex-direction: column;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.session-recovery h1 {
+  margin: 24px 0 8px;
+  color: var(--text-primary);
+  font-size: clamp(22px, 4vw, 30px);
+}
+
+.session-recovery p {
+  max-width: 440px;
+  margin: 0;
+  line-height: 1.55;
+}
+
+.session-recovery button {
+  min-height: 42px;
+  margin-top: 22px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  background: var(--brand);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .app-placeholder {

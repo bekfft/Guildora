@@ -736,6 +736,11 @@ test('Refresh rotiert den Token und Logout beendet die Cookie-Sitzung', async ()
 
   const reused = await request('/api/auth/refresh', { method: 'POST', cookie: oldCookie });
   assert.equal(reused.status, 401);
+  assert.equal(
+    reused.headers.getSetCookie().length,
+    0,
+    'Ein verspäteter Refresh darf ein inzwischen erneuertes Cookie nicht löschen.'
+  );
 
   const logout = await request('/api/auth/logout', { method: 'POST', cookie: authCookie });
   assert.equal(logout.status, 204);

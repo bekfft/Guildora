@@ -1,6 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { BrowserWindow, app, screen, shell } = require('electron');
+const { BrowserWindow, app, screen, session, shell } = require('electron');
 const { IPC } = require('./ipc');
 const { readSettings, writeSettings } = require('./settings');
 
@@ -51,6 +51,9 @@ function createMainWindow({ appUrl, onQuitRequested, requestQuit }) {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Die persistente Standardsitzung bewahrt sichere HTTP-only-Cookies
+      // über vollständiges Beenden und Electron-Updates hinweg.
+      session: session.defaultSession,
       preload,
       additionalArguments: [`--guildora-version=${app.getVersion()}`]
     }

@@ -44,6 +44,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState(null);
+  const [sessionUnavailable, setSessionUnavailable] = useState(false);
 
   const loadSettings = useCallback(async () => {
     try {
@@ -60,21 +61,22 @@ export function AuthProvider({ children }) {
   }, []);
 
   const restoreSession = useCallback(async () => {
+    setLoading(true);
+    setSessionUnavailable(false);
     try {
       const result = await api.me();
       setUser(result.user);
+      setSessionUnavailable(false);
       await loadSettings();
     } catch (error) {
       if (error.status === 401) {
-        try {
-          const result = await api.refresh();
-          setUser(result.user);
-          await loadSettings();
-        } catch {
-          setUser(null);
-        }
-      } else {
         setUser(null);
+        setSettings(null);
+        setSessionUnavailable(false);
+      } else {
+        // Ein kurzer API- oder Netzwerkausfall ist keine Abmeldung. Besonders
+        // beim Desktop-Start nach einem Update bleibt die Sitzung erhalten.
+        setSessionUnavailable(true);
       }
     } finally {
       setLoading(false);
@@ -85,9 +87,21 @@ export function AuthProvider({ children }) {
     restoreSession();
   }, [restoreSession]);
 
+  useEffect(() => {
+    if (!sessionUnavailable) return undefined;
+    const retry = () => restoreSession();
+    const timer = window.setTimeout(retry, 5_000);
+    window.addEventListener('online', retry, { once: true });
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('online', retry);
+    };
+  }, [restoreSession, sessionUnavailable]);
+
   const login = useCallback(async (credentials) => {
     const result = await api.login(credentials);
     setUser(result.user);
+    setSessionUnavailable(false);
     await loadSettings();
     return result.user;
   }, [loadSettings]);
@@ -95,6 +109,7 @@ export function AuthProvider({ children }) {
   const register = useCallback(async (data) => {
     const result = await api.register(data);
     setUser(result.user);
+    setSessionUnavailable(false);
     await loadSettings();
     return result.user;
   }, [loadSettings]);
@@ -105,6 +120,7 @@ export function AuthProvider({ children }) {
     } finally {
       setUser(null);
       setSettings(null);
+      setSessionUnavailable(false);
     }
   }, []);
 
@@ -137,10 +153,31 @@ export function AuthProvider({ children }) {
     root.classList.toggle('high-contrast', settings.high_contrast);
   }, [settings]);
 
-  const value = useMemo(
-    () => ({ user, loading, settings, login, register, logout, refreshUser, saveSettings, loadSettings }),
-    [user, loading, settings, login, register, logout, refreshUser, saveSettings, loadSettings]
-  );
+  const value = useMemo(() => ({
+    user,
+    loading,
+    sessionUnavailable,
+    settings,
+    login,
+    register,
+    logout,
+    restoreSession,
+    refreshUser,
+    saveSettings,
+    loadSettings
+  }), [
+    user,
+    loading,
+    sessionUnavailable,
+    settings,
+    login,
+    register,
+    logout,
+    restoreSession,
+    refreshUser,
+    saveSettings,
+    loadSettings
+  ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
