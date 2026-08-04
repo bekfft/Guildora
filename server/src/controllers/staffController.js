@@ -16,6 +16,17 @@ async function userOrThrow(id) {
   return user;
 }
 
+async function userByIdentifierOrThrow(identifier) {
+  const normalized = clean(identifier, 254).toLowerCase();
+  const user = await db.get(
+    `SELECT id, username, display_name, avatar_url, email, created_at FROM users
+     WHERE id = ? OR LOWER(username) = ? OR LOWER(email) = ?`,
+    [identifier, normalized, normalized]
+  );
+  if (!user) throw new ApiError(404, 'USER_NOT_FOUND', 'Dieser Nutzer wurde nicht gefunden.');
+  return user;
+}
+
 export async function staffMe(req, res) {
   return res.json({ staff: await getStaff(req.userId) });
 }
@@ -182,6 +193,19 @@ export async function restrictGuild(req, res) {
   return res.status(201).json({ restriction: await db.get('SELECT * FROM guild_platform_restrictions WHERE id = ?', [id]) });
 }
 
+export async function revokeGuildRestriction(req, res) {
+  const restriction = await db.get('SELECT * FROM guild_platform_restrictions WHERE id = ?', [req.params.id]);
+  if (!restriction) throw new ApiError(404, 'GUILD_RESTRICTION_NOT_FOUND', 'Diese Servermaßnahme wurde nicht gefunden.');
+  const guild = await db.get('SELECT owner_id FROM guilds WHERE id = ?', [restriction.guild_id]);
+  if (guild) await assertNotProtectedOwner(guild.owner_id);
+  await db.run(
+    'UPDATE guild_platform_restrictions SET revoked_at = ?, revoked_by = ? WHERE id = ?',
+    [new Date().toISOString(), req.userId, restriction.id]
+  );
+  await auditStaff(req.userId, 'guild.restriction.revoke', 'guild', restriction.guild_id, { restrictionId: restriction.id }, restriction.case_id);
+  return res.status(204).end();
+}
+
 export async function listAppeals(req, res) {
   const appeals = await db.all(`SELECT a.*, u.username AS appellant_username, reviewer.username AS reviewer_username, s.type AS sanction_type
     FROM platform_appeals a JOIN users u ON u.id = a.appellant_id LEFT JOIN users reviewer ON reviewer.id = a.reviewer_id
@@ -242,13 +266,13 @@ export async function decideApproval(req, res) {
 
 export async function upsertTeamMember(req, res) {
   if (!STAFF_ROLES.includes(req.body.role)) throw new ApiError(400, 'INVALID_ROLE', 'Diese Staff-Rolle ist ungültig.');
-  await userOrThrow(req.params.userId);
-  const existing = await getStaff(req.params.userId);
+  const target = await userByIdentifierOrThrow(req.params.userId);
+  const existing = await getStaff(target.id);
   if (existing?.is_owner) throw new ApiError(403, 'OWNER_PROTECTED', 'Die Rolle des Inhabers kann nicht verändert werden.');
   await db.run(`INSERT INTO platform_staff (user_id, role, assigned_by) VALUES (?, ?, ?)
-    ON CONFLICT(user_id) DO UPDATE SET role = ?, assigned_by = ?, updated_at = ?`, [req.params.userId, req.body.role, req.userId, req.body.role, req.userId, new Date().toISOString()]);
-  await auditStaff(req.userId, 'staff.upsert', 'user', req.params.userId, { role: req.body.role });
-  return res.json({ staff: await getStaff(req.params.userId) });
+    ON CONFLICT(user_id) DO UPDATE SET role = ?, assigned_by = ?, updated_at = ?`, [target.id, req.body.role, req.userId, req.body.role, req.userId, new Date().toISOString()]);
+  await auditStaff(req.userId, 'staff.upsert', 'user', target.id, { role: req.body.role });
+  return res.json({ staff: await getStaff(target.id) });
 }
 
 export async function removeTeamMember(req, res) {

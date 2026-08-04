@@ -9,6 +9,7 @@ import { io as connectSocket } from 'socket.io-client';
 
 const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'guildora-test-'));
 process.env.NODE_ENV = 'test';
+delete process.env.DATABASE_URL;
 process.env.SQLITE_PATH = path.join(temporaryDirectory, 'auth.sqlite');
 process.env.UPLOAD_DIR = path.join(temporaryDirectory, 'uploads');
 process.env.JWT_ACCESS_SECRET = 'test-access-secret-with-sufficient-length';
@@ -1174,11 +1175,21 @@ test('Plattform-Staff hat Rollenrechte, Audit und unveränderlichen Inhaberschut
   const dashboard = await request('/api/staff/dashboard', { cookie: ownerCookie });
   assert.equal(dashboard.status, 200);
 
-  const addModerator = await request(`/api/staff/team/${targetId}`, {
+  const addModerator = await request('/api/staff/team/staff.target', {
     method: 'PUT', cookie: ownerCookie, body: { role: 'moderation' }
   });
   assert.equal(addModerator.status, 200);
   assert.equal((await addModerator.json()).staff.role, 'moderation');
+  const team = await request('/api/staff/team', { cookie: ownerCookie });
+  assert.equal(team.status, 200);
+  assert.ok((await team.json()).team.some((member) => member.user_id === targetId));
+
+  const users = await request('/api/staff/users?q=staff.target', { cookie: ownerCookie });
+  assert.equal(users.status, 200);
+  assert.deepEqual((await users.json()).users.map((user) => user.id), [targetId]);
+  const userDetail = await request(`/api/staff/users/${targetId}`, { cookie: ownerCookie });
+  assert.equal(userDetail.status, 200);
+  assert.equal((await userDetail.json()).user.username, 'staff.target');
 
   const protectedAction = await request(`/api/staff/users/${ownerId}/sanctions`, {
     cookie: ownerCookie, body: { type: 'warning', reason: 'Darf technisch niemals möglich sein' }
@@ -1190,9 +1201,28 @@ test('Plattform-Staff hat Rollenrechte, Audit und unveränderlichen Inhaberschut
     cookie: ownerCookie, body: { type: 'restrict_communication', reason: 'Automatisierter Moderationstest' }
   });
   assert.equal(sanction.status, 201);
+  const sanctionId = (await sanction.json()).sanction.id;
   const blockedMessage = await request(`/api/channels/${createdChannelId}/messages`, {
     cookie: `access_token=${signAccessToken(targetId)}`, body: { content: 'blockiert', attachmentIds: [] }
   });
   assert.equal(blockedMessage.status, 403);
-  assert.ok(Number((await db.get('SELECT COUNT(*) AS count FROM staff_audit_logs')).count) >= 2);
+  assert.equal((await request(`/api/staff/sanctions/${sanctionId}`, { method: 'DELETE', cookie: ownerCookie })).status, 204);
+
+  const restriction = await request(`/api/staff/guilds/${createdGuildId}/restrictions`, {
+    cookie: ownerCookie, body: { type: 'discovery_hidden', reason: 'Automatisierter Servertest' }
+  });
+  assert.equal(restriction.status, 201);
+  const restrictionId = (await restriction.json()).restriction.id;
+  const guildDetail = await request(`/api/staff/guilds/${createdGuildId}`, { cookie: ownerCookie });
+  assert.equal(guildDetail.status, 200);
+  assert.ok((await guildDetail.json()).restrictions.some((item) => item.id === restrictionId));
+  assert.equal((await request(`/api/staff/guild-restrictions/${restrictionId}`, { method: 'DELETE', cookie: ownerCookie })).status, 204);
+
+  const cases = await request('/api/staff/cases', { cookie: ownerCookie });
+  assert.equal(cases.status, 200);
+  assert.ok(Array.isArray((await cases.json()).cases));
+  const audit = await request('/api/staff/audit', { cookie: ownerCookie });
+  assert.equal(audit.status, 200);
+  assert.ok((await audit.json()).logs.some((entry) => entry.action === 'guild.restriction.revoke'));
+  assert.ok(Number((await db.get('SELECT COUNT(*) AS count FROM staff_audit_logs')).count) >= 5);
 });

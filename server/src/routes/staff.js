@@ -5,7 +5,7 @@ import { requireStaff } from '../services/platformModeration.js';
 import {
   addCaseNote, dashboard, decideApproval, getCase, getGuild, getUser, listAppeals, listApprovals, listAudit, listCases, listTeam,
   removePlatformMessage, removeTeamMember, reviewAppeal, revokeSanction, sanctionUser, searchGuilds, searchUsers, staffMe,
-  restrictGuild, updateCase, upsertTeamMember
+  restrictGuild, revokeGuildRestriction, updateCase, upsertTeamMember
 } from '../controllers/staffController.js';
 
 const router = Router();
@@ -24,6 +24,7 @@ router.delete('/messages/:id', requireStaff('content.remove'), asyncHandler(remo
 router.get('/guilds', requireStaff('users.view'), asyncHandler(searchGuilds));
 router.get('/guilds/:id', requireStaff('users.view'), asyncHandler(getGuild));
 router.post('/guilds/:id/restrictions', requireStaff('guilds.manage'), asyncHandler(restrictGuild));
+router.delete('/guild-restrictions/:id', requireStaff('guilds.manage'), asyncHandler(revokeGuildRestriction));
 router.get('/appeals', requireStaff('appeals.view'), asyncHandler(listAppeals));
 router.patch('/appeals/:id', requireStaff('appeals.manage'), asyncHandler(reviewAppeal));
 router.get('/audit', requireStaff('audit.view'), asyncHandler(listAudit));

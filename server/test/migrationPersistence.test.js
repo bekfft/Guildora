@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'guildora-migrations-'));
 const databasePath = path.join(temporaryDirectory, 'persistence.sqlite');
 process.env.NODE_ENV = 'test';
+delete process.env.DATABASE_URL;
 process.env.SQLITE_PATH = databasePath;
 
 const { db, runMigrations } = await import('../src/db/index.js');

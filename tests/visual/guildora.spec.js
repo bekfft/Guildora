@@ -89,14 +89,52 @@ test('Staff-Konsole passt visuell zu Guildora auf Desktop und Mobile', async ({ 
     email: 'bekfft@visual.guildora.test', username: 'bekfft', password: 'Guildora2026!', birthdate: '1995-04-12', newsletter: false
   }});
   expect(registration.ok()).toBeTruthy();
+  const targetRegistration = await page.request.post('/api/auth/register', { data: {
+    email: 'target@visual.guildora.test', username: 'mobile.target', password: 'Guildora2026!', birthdate: '1995-04-12', newsletter: false
+  }});
+  expect(targetRegistration.ok()).toBeTruthy();
+  const target = (await targetRegistration.json()).user;
+  expect((await page.request.post('/api/guilds', { data: { name: 'Mobile Preview Community' } })).ok()).toBeTruthy();
+  expect((await page.request.post('/api/auth/register', { data: {
+    email: 'reporter@visual.guildora.test', username: 'mobile.reporter', password: 'Guildora2026!', birthdate: '1995-04-12', newsletter: false
+  }})).ok()).toBeTruthy();
+  expect((await page.request.post(`/api/social/users/${target.id}/report`, { data: {
+    reason: 'Wiederholte Belästigung und unerwünschte Nachrichten im mobilen Test.'
+  }})).ok()).toBeTruthy();
+  expect((await page.request.post('/api/auth/login', { data: {
+    identifier: 'bekfft', password: 'Guildora2026!'
+  }})).ok()).toBeTruthy();
   await page.goto('/staff');
   await expect(page.locator('.staff-stats')).toBeVisible();
   await expect(page.locator('.staff-shell')).toHaveScreenshot('staff-desktop.png', { caret: 'hide' });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/staff?standalone-preview=1');
   await expect(page.locator('.staff-shell')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Staff-Menü öffnen' })).toBeVisible();
+
+  for (const section of ['Fälle', 'Benutzer', 'Server', 'Einsprüche', 'Freigaben', 'Auditlog', 'Team']) {
+    await page.getByRole('button', { name: 'Staff-Menü öffnen' }).click();
+    await expect(page.locator('.staff-shell')).toHaveClass(/staff-menu-open/);
+    await page.getByRole('button', { name: section, exact: true }).click();
+    await expect(page.locator('.staff-mobile-header strong')).toHaveText(section);
+    await expect(page.locator('.staff-empty[role="status"]')).toHaveCount(0);
+    await expect(page.locator('.staff-workspace')).toBeVisible();
+  }
+
+  await page.getByRole('button', { name: 'Staff-Menü öffnen' }).click();
+  await page.getByRole('button', { name: 'Benutzer', exact: true }).click();
+  await page.getByLabel('Benutzer suchen').fill('mobile.target');
+  await page.getByRole('button', { name: 'Suchen', exact: true }).click();
+  const targetButton = page.locator('.staff-list > button').filter({ hasText: '@mobile.target' });
+  await expect(targetButton).toHaveCount(1);
+  await targetButton.click();
+  await expect(page.getByRole('heading', { name: 'Benutzerdetails' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Staff-Menü öffnen' }).click();
+  await page.getByRole('button', { name: 'Übersicht', exact: true }).click();
   const geometry = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
+    body: document.body.scrollWidth,
     shell: document.querySelector('.staff-shell').getBoundingClientRect().width,
     workspace: document.querySelector('.staff-workspace').getBoundingClientRect().width,
     workspaceScroll: document.querySelector('.staff-workspace').scrollWidth,
@@ -105,12 +143,31 @@ test('Staff-Konsole passt visuell zu Guildora auf Desktop und Mobile', async ({ 
     cardLefts: [...document.querySelectorAll('.staff-stats article')].map((card) => Math.round(card.getBoundingClientRect().left))
   }));
   expect(geometry.shell).toBeLessThanOrEqual(geometry.viewport);
+  expect(geometry.body).toBeLessThanOrEqual(geometry.viewport);
   expect(geometry.workspace).toBeLessThanOrEqual(geometry.viewport);
   expect(geometry.workspaceScroll).toBeLessThanOrEqual(geometry.workspace);
   expect(geometry.stats).toBeLessThanOrEqual(geometry.workspace);
-  expect(geometry.statsColumns.split(' ')).toHaveLength(1);
-  expect(new Set(geometry.cardLefts).size).toBe(1);
+  expect(geometry.statsColumns.split(' ')).toHaveLength(2);
+  expect(new Set(geometry.cardLefts).size).toBe(2);
   await expect(page.locator('.staff-shell')).toHaveScreenshot('staff-mobile.png', { caret: 'hide' });
+
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.reload();
+  await expect(page.locator('.staff-stats')).toBeVisible();
+  const narrowGeometry = await page.evaluate(() => ({
+    viewport: document.documentElement.clientWidth,
+    body: document.body.scrollWidth,
+    workspace: document.querySelector('.staff-workspace').clientWidth,
+    workspaceScroll: document.querySelector('.staff-workspace').scrollWidth,
+    controlsOutsideViewport: [...document.querySelectorAll('.staff-workspace button, .staff-workspace input, .staff-workspace select, .staff-workspace textarea')]
+      .filter((control) => {
+        const rect = control.getBoundingClientRect();
+        return rect.left < 0 || rect.right > document.documentElement.clientWidth;
+      }).length
+  }));
+  expect(narrowGeometry.body).toBeLessThanOrEqual(narrowGeometry.viewport);
+  expect(narrowGeometry.workspaceScroll).toBeLessThanOrEqual(narrowGeometry.workspace);
+  expect(narrowGeometry.controlsOutsideViewport).toBe(0);
 });
 
 test('helles Hochkontrast-Design und reduzierte Bewegung bleiben nutzbar', async ({ page }, testInfo) => {

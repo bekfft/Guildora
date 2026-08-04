@@ -6,6 +6,9 @@ import path from 'node:path';
 const visualDataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'guildora-visual-'));
 process.env.NODE_ENV = 'test';
 process.env.PORT = '3199';
+// Visual tests must never inherit a production Postgres connection from the
+// parent process. The temporary SQLite database below is the only valid target.
+delete process.env.DATABASE_URL;
 process.env.SQLITE_PATH = path.join(visualDataDirectory, 'guildora.sqlite');
 process.env.UPLOAD_DIR = path.join(visualDataDirectory, 'uploads');
 process.env.CLIENT_ORIGIN = 'http://127.0.0.1:5189';
