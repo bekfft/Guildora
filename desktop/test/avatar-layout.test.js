@@ -28,6 +28,13 @@ test('Avatarbilder bleiben unabhängig vom Seitenverhältnis in ihrem festen Rah
   assert.match(imageRule[1], /object-fit:\s*cover/);
 });
 
+test('Presence-Punkte verwenden für jeden Nutzerstatus die richtige Farbe', () => {
+  assert.match(appCss, /\.status-dot--online\s*\{\s*background:\s*var\(--online\);\s*\}/);
+  assert.match(appCss, /\.status-dot--idle\s*\{\s*background:\s*var\(--idle\);\s*\}/);
+  assert.match(appCss, /\.status-dot--dnd\s*\{\s*background:\s*var\(--dnd\);\s*\}/);
+  assert.match(appCss, /\.status-dot--offline\s*\{\s*background:\s*var\(--offline\);\s*\}/);
+});
+
 test('Voice-Avatare verwenden denselben neutralen Bildrahmen wie die Mitgliederliste', () => {
   assert.match(
     appCss,

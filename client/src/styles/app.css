@@ -1079,6 +1079,11 @@ html:is([data-display-mode="standalone"], [data-mobile-app]) .guild-sidebar-head
   background: var(--online);
 }
 
+.status-dot--online { background: var(--online); }
+.status-dot--idle { background: var(--idle); }
+.status-dot--dnd { background: var(--dnd); }
+.status-dot--offline { background: var(--offline); }
+
 .user-panel__identity {
   display: flex;
   min-width: 0;
