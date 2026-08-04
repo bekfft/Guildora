@@ -21,7 +21,7 @@ async function prepareAccount(page, testInfo, variant = 'app') {
     localStorage.setItem(`guildora:onboarding:${userId}:v1`, 'done');
     localStorage.setItem('guildora:install-prompt-dismissed', '1');
   }, { userId: user.id });
-  return created;
+  return { ...created, user };
 }
 
 async function screenshot(page, name) {
@@ -127,8 +127,18 @@ test('Staff-Konsole passt visuell zu Guildora auf Desktop und Mobile', async ({ 
   await page.getByRole('button', { name: 'Suchen', exact: true }).click();
   const targetButton = page.locator('.staff-list > button').filter({ hasText: '@mobile.target' });
   await expect(targetButton).toHaveCount(1);
+  const targetAvatar = targetButton.locator('.staff-avatar img');
+  await expect(targetAvatar).toHaveAttribute('src', /\/icons\/guildora-192\.png$/);
+  const avatarGeometry = await targetAvatar.evaluate((avatar) => ({
+    width: avatar.getBoundingClientRect().width,
+    height: avatar.getBoundingClientRect().height,
+    objectFit: getComputedStyle(avatar).objectFit
+  }));
+  expect(avatarGeometry.width).toBe(avatarGeometry.height);
+  expect(avatarGeometry.objectFit).toBe('cover');
   await targetButton.click();
   await expect(page.getByRole('heading', { name: 'Benutzerdetails' })).toBeVisible();
+  await expect(page.locator('.staff-detail-identity .staff-avatar img')).toHaveAttribute('src', /\/icons\/guildora-192\.png$/);
 
   await page.getByRole('button', { name: 'Staff-Menü öffnen' }).click();
   await page.getByRole('button', { name: 'Übersicht', exact: true }).click();
@@ -168,6 +178,99 @@ test('Staff-Konsole passt visuell zu Guildora auf Desktop und Mobile', async ({ 
   expect(narrowGeometry.body).toBeLessThanOrEqual(narrowGeometry.viewport);
   expect(narrowGeometry.workspaceScroll).toBeLessThanOrEqual(narrowGeometry.workspace);
   expect(narrowGeometry.controlsOutsideViewport).toBe(0);
+});
+
+test('iPhone 17 Pro Max Standalone füllt den Bildschirm und bedient Nachrichten per Langdruck', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-1440', 'Der iPhone-Viewport wird einmal gezielt geprüft.');
+  test.setTimeout(90_000);
+  const { guild, channel } = await prepareAccount(page, testInfo, 'iphone17');
+  const messageResponse = await page.request.post(`/api/channels/${channel.id}/messages`, {
+    data: { content: 'Diese Nachricht prüft Langdruck, Profil und mobile Abstände.', replyToId: null, attachmentIds: [] }
+  });
+  expect(messageResponse.ok()).toBeTruthy();
+
+  await page.setViewportSize({ width: 440, height: 956 });
+  await page.goto(`/app/channels/${guild.id}/${channel.id}?standalone-preview=1`);
+  await expect(page.locator('.message-row')).toHaveCount(1);
+  await expect(page.locator('html')).toHaveAttribute('data-display-mode', 'standalone');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-app', '');
+  await expect(page.locator('.skip-link')).toBeHidden();
+  await expect(page.locator('.message-avatar img')).toHaveAttribute('src', /\/icons\/guildora-192\.png$/);
+
+  const shellGeometry = await page.evaluate(() => {
+    const app = document.querySelector('.guildora-app').getBoundingClientRect();
+    const composer = document.querySelector('.composer-area').getBoundingClientRect();
+    return {
+      viewportWidth: document.documentElement.clientWidth,
+      viewportHeight: document.documentElement.clientHeight,
+      bodyWidth: document.body.scrollWidth,
+      bodyHeight: document.body.getBoundingClientRect().height,
+      appTop: Math.round(app.top),
+      appBottom: Math.round(app.bottom),
+      appWidth: Math.round(app.width),
+      composerBottom: Math.round(composer.bottom),
+      appHeightInline: document.documentElement.style.getPropertyValue('--app-height')
+    };
+  });
+  expect(shellGeometry.viewportWidth).toBe(440);
+  expect(shellGeometry.viewportHeight).toBe(956);
+  expect(shellGeometry.bodyWidth).toBeLessThanOrEqual(440);
+  expect(shellGeometry.bodyHeight).toBe(956);
+  expect(shellGeometry.appTop).toBe(0);
+  expect(shellGeometry.appBottom).toBe(956);
+  expect(shellGeometry.appWidth).toBe(440);
+  expect(shellGeometry.composerBottom).toBe(956);
+  expect(shellGeometry.appHeightInline).toBe('');
+
+  const message = page.locator('.message-row').first();
+  const actions = message.locator('.message-actions');
+  await expect(actions).toBeHidden();
+  const messageBox = await message.boundingBox();
+  await message.dispatchEvent('pointerdown', {
+    pointerType: 'touch', pointerId: 1, isPrimary: true,
+    clientX: messageBox.x + 50, clientY: messageBox.y + 20
+  });
+  await page.waitForTimeout(520);
+  await expect(actions).toBeVisible();
+  await expect(actions.getByRole('button', { name: 'Antworten' })).toBeVisible();
+  await expect(actions.getByRole('button', { name: 'Reaktion hinzufügen' })).toBeVisible();
+  await expect(page.locator('.guildora-app')).toHaveScreenshot('iphone-17-pro-max-longpress.png', { caret: 'hide' });
+  await message.dispatchEvent('pointerup', { pointerType: 'touch', pointerId: 1, isPrimary: true });
+
+  await page.getByRole('button', { name: /Profil von .* öffnen/ }).first().click();
+  const profileDialog = page.getByRole('dialog', { name: 'Profil' });
+  await expect(profileDialog).toBeVisible();
+  await page.waitForTimeout(220);
+  const profileGeometry = await profileDialog.evaluate((dialog) => {
+    const rect = dialog.getBoundingClientRect();
+    const close = dialog.querySelector('.app-modal__close').getBoundingClientRect();
+    return {
+      top: Math.round(rect.top), bottom: Math.round(rect.bottom), width: Math.round(rect.width),
+      scrollWidth: dialog.scrollWidth, clientWidth: dialog.clientWidth,
+      closeTop: Math.round(close.top), closeRight: Math.round(close.right)
+    };
+  });
+  expect(profileGeometry.top).toBe(0);
+  expect(profileGeometry.bottom).toBe(956);
+  expect(profileGeometry.width).toBe(440);
+  expect(profileGeometry.scrollWidth).toBeLessThanOrEqual(profileGeometry.clientWidth);
+  expect(profileGeometry.closeTop).toBeGreaterThanOrEqual(10);
+  expect(profileGeometry.closeRight).toBeLessThanOrEqual(440);
+  await expect(profileDialog).toHaveScreenshot('iphone-17-pro-max-profile.png', { caret: 'hide' });
+  await profileDialog.getByRole('button', { name: 'Dialog schließen' }).click();
+
+  await page.getByRole('button', { name: 'Mitgliederliste umschalten' }).click();
+  const memberList = page.getByRole('complementary', { name: 'Mitglieder' });
+  await expect(memberList).toBeVisible();
+  const memberGeometry = await memberList.locator('.member-row').first().evaluate((row) => {
+    const avatar = row.querySelector('.member-avatar').getBoundingClientRect();
+    const rect = row.getBoundingClientRect();
+    return { rowHeight: rect.height, avatarWidth: avatar.width, avatarHeight: avatar.height };
+  });
+  expect(memberGeometry.rowHeight).toBeGreaterThanOrEqual(54);
+  expect(memberGeometry.avatarWidth).toBe(36);
+  expect(memberGeometry.avatarHeight).toBe(36);
+  await expect(page.locator('.guildora-app')).toHaveScreenshot('iphone-17-pro-max-members.png', { caret: 'hide' });
 });
 
 test('helles Hochkontrast-Design und reduzierte Bewegung bleiben nutzbar', async ({ page }, testInfo) => {

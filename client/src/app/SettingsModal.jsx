@@ -33,6 +33,8 @@ import {
   VoiceSettingsSection
 } from './AccountSettingsSections.jsx';
 
+const DEFAULT_USER_AVATAR = '/icons/guildora-192.png';
+
 const TABS = [
   { id: 'Mein Konto', label: 'Mein Konto', icon: UserRound },
   { id: 'Profil', label: 'Profile', icon: UserPen },
@@ -125,7 +127,7 @@ function ProfileSettings({ user, refreshUser, onToast }) {
 
   if (!profile) return <div className="profile-settings-loading"><LoaderCircle className="spin" size={20} /> Profil wird geladen …</div>;
 
-  const avatarPreview = avatarObjectUrl || (!removeAvatar ? profile.avatar_url : null);
+  const avatarPreview = avatarObjectUrl || (!removeAvatar ? profile.avatar_url : DEFAULT_USER_AVATAR) || DEFAULT_USER_AVATAR;
   const bannerPreview = bannerObjectUrl || (!removeBanner ? profile.banner_url : null);
 
   return (
@@ -140,7 +142,7 @@ function ProfileSettings({ user, refreshUser, onToast }) {
             {avatarPreview ? <img src={avatarPreview} alt="" /> : (form.displayName || user.username)[0].toUpperCase()}
           </span>
           <label aria-label="Avatar auswählen"><ImagePlus size={15} /><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => { setAvatarFile(event.target.files[0] || null); setRemoveAvatar(false); }} /></label>
-          {(profile.avatar_url || avatarFile) && <button type="button" onClick={() => { setAvatarFile(null); setRemoveAvatar(true); }} aria-label="Avatar entfernen"><Trash2 size={13} /></button>}
+          {((profile.avatar_url && profile.avatar_url !== DEFAULT_USER_AVATAR) || avatarFile) && <button type="button" onClick={() => { setAvatarFile(null); setRemoveAvatar(true); }} aria-label="Avatar entfernen"><Trash2 size={13} /></button>}
         </div>
       </div>
 

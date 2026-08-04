@@ -46,7 +46,9 @@ test('Standalone-Modus und iPhone-Safe-Areas werden im App-Layout berücksichtig
   assert.match(mainSource, /toggleAttribute\('data-mobile-app', isMobileApp\)/);
   assert.match(mainSource, /Math\.max\(window\.innerHeight, document\.documentElement\.clientHeight\)/);
   assert.match(mainSource, /keyboardTarget && layoutHeight - visualHeight > 120/);
-  assert.match(mainSource, /keyboardOpen \? visualHeight : Math\.max\(layoutHeight, visualHeight\)/);
+  assert.match(mainSource, /if \(keyboardOpen\)/);
+  assert.match(mainSource, /setProperty\('--app-height', `\$\{Math\.round\(visualHeight\)\}px`\)/);
+  assert.match(mainSource, /removeProperty\('--app-height'\)/);
   assert.match(mainSource, /--app-height/);
   assert.match(mainSource, /orientationchange/);
   assert.match(mainSource, /pageshow/);
@@ -67,11 +69,14 @@ test('Standalone-Modus und iPhone-Safe-Areas werden im App-Layout berücksichtig
   assert.match(cssRule(appCss, `${appViewportSelector} .member-list__header`), /padding-top:\s*var\(--safe-area-top\)/);
   assert.match(appCss, /:is\(\.modal-overlay, \.server-settings-overlay, \.engagement-overlay\)\s*\{\s*inset:\s*0;/);
   assert.match(cssRule(appCss, `${appViewportSelector} .modal-overlay`), /padding:\s*0/);
-  assert.match(appCss, new RegExp(`${appViewportSelector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\.app-modal:not\\(\\.app-modal--settings\\)[\\s\\S]*padding-bottom:\\s*max\\(30px, var\\(--safe-area-bottom\\)\\)`));
+  assert.match(appCss, new RegExp(`${appViewportSelector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\.app-modal:not\\(\\.app-modal--settings\\):not\\(:has\\(\\.full-profile\\)\\)[\\s\\S]*padding-bottom:\\s*max\\(30px, var\\(--safe-area-bottom\\)\\)`));
   assert.match(cssRule(appCss, `${appViewportSelector} .server-settings-overlay`), /padding:\s*var\(--safe-area-top\)[^;]*var\(--safe-area-bottom\)/);
   assert.match(cssRule(appCss, `${appViewportSelector} .engagement-panel`), /padding-bottom:\s*var\(--safe-area-bottom\)/);
   assert.match(cssRule(globalCss, `${appViewportSelector} :is(.route-loader, .app-placeholder)`), /height:\s*var\(--app-height\)[\s\S]*min-height:\s*var\(--app-height\)/);
   assert.match(appCss, /\.app-navigation\s*\{[\s\S]*?height:\s*auto;/);
+  assert.match(globalCss, /html\[data-mobile-app\] \.skip-link\s*\{\s*display:\s*none;/);
+  assert.match(appCss, /\.app-modal:has\(\.full-profile\)\s*\{[\s\S]*height:\s*var\(--app-height\);[\s\S]*overflow-y:\s*auto;/);
+  assert.match(appCss, /\.full-profile__banner\s*\{\s*height:\s*calc\(128px \+ var\(--safe-area-top\)\);/);
 });
 
 test('Mobile Vollbildansichten, Formulare und Composer bleiben in den sicheren Bedienflächen', () => {
@@ -88,4 +93,18 @@ test('Mobile Vollbildansichten, Formulare und Composer bleiben in den sicheren B
   assert.match(appCss, /@media \(max-width: 900px\) \{\s*\.guildora-app,/);
   assert.match(channelView, /fitComposer\(composerRef\.current\)/);
   assert.match(directMessageView, /fitComposer\(composer\.current\)/);
+});
+
+test('Mobile Nachrichtenaktionen erscheinen erst nach einem Langdruck', () => {
+  assert.match(channelView, /const \[mobileActionsId, setMobileActionsId\] = useState\(null\)/);
+  assert.match(channelView, /window\.setTimeout\(\(\) => \{[\s\S]*setMobileActionsId\(messageId\);[\s\S]*\}, 460\)/);
+  assert.match(channelView, /mobileActionsId === message\.id \? 'is-actions-open' : ''/);
+  assert.match(channelView, /onPointerDown=\{\(event\) => startMessageLongPress\(event, message\.id\)\}/);
+  assert.match(appCss, /@media \(max-width: 520px\) \{[\s\S]*\.message-actions\s*\{[\s\S]*display:\s*none;[\s\S]*opacity:\s*0;/);
+  assert.match(appCss, /\.message-row\.is-actions-open \.message-actions,[\s\S]*display:\s*flex;[\s\S]*opacity:\s*1;/);
+});
+
+test('Desktop-Shell scrollt nur im Inhalt und erzeugt keine zweite EXE-Scrollleiste', () => {
+  assert.match(globalCss, /html\.is-desktop,[\s\S]*html\.is-desktop body,[\s\S]*html\.is-desktop #root\s*\{[\s\S]*height:\s*100%;[\s\S]*overflow:\s*hidden;/);
+  assert.match(cssRule(globalCss, 'html.is-desktop :is(.landing, .download-page, .auth-shell, .invite-shell, .placeholder-page, .route-loader, .app-placeholder)'), /height:\s*var\(--content-viewport-height\)[\s\S]*overflow-y:\s*auto/);
 });

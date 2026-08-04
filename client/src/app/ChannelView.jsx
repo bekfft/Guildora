@@ -105,11 +105,13 @@ export default function ChannelView({
   const [editContent, setEditContent] = useState('');
   const [replyingTo, setReplyingTo] = useState(null);
   const [reactionPickerId, setReactionPickerId] = useState(null);
+  const [mobileActionsId, setMobileActionsId] = useState(null);
   const [pendingFiles, setPendingFiles] = useState([]);
   const [composerEmojiOpen, setComposerEmojiOpen] = useState(false);
   const [typingUsers, setTypingUsers] = useState(new Set());
   const scrollerRef = useRef(null);
   const composerRef = useRef(null);
+  const longPressRef = useRef(null);
 
   useEffect(() => {
     fitComposer(composerRef.current);
@@ -135,6 +137,7 @@ export default function ChannelView({
     setMessages([]);
     setReplyingTo(null);
     setReactionPickerId(null);
+    setMobileActionsId(null);
     setDraft(localStorage.getItem(draftKey) || '');
     if (!canReadHistory) {
       setMessages([]);
@@ -158,6 +161,33 @@ export default function ChannelView({
       .finally(() => active && setLoading(false));
     return () => { active = false; };
   }, [channel?.id, draftKey, focusMessageId, onToast, canReadHistory]);
+
+  function clearLongPress() {
+    if (longPressRef.current?.timer) window.clearTimeout(longPressRef.current.timer);
+    longPressRef.current = null;
+  }
+
+  function startMessageLongPress(event, messageId) {
+    if (!window.matchMedia('(max-width: 520px)').matches || event.button !== 0) return;
+    if (event.target.closest('button, a, input, textarea, [role="menu"]')) return;
+    clearLongPress();
+    const origin = { x: event.clientX, y: event.clientY };
+    const timer = window.setTimeout(() => {
+      setReactionPickerId(null);
+      setMobileActionsId(messageId);
+      navigator.vibrate?.(12);
+      longPressRef.current = null;
+    }, 460);
+    longPressRef.current = { timer, ...origin };
+  }
+
+  function moveMessageLongPress(event) {
+    const press = longPressRef.current;
+    if (!press) return;
+    if (Math.hypot(event.clientX - press.x, event.clientY - press.y) > 12) clearLongPress();
+  }
+
+  useEffect(() => () => clearLongPress(), []);
 
   useEffect(() => {
     if (!channel) return undefined;
@@ -379,7 +409,7 @@ export default function ChannelView({
 
   return (
     <section className="channel-view">
-      <div className="messages-scroller" ref={scrollerRef}>
+      <div className="messages-scroller" ref={scrollerRef} onScroll={() => { clearLongPress(); setMobileActionsId(null); }}>
         {hasMore && (
           <button className="load-more" type="button" onClick={loadOlder} disabled={loadingMore}>
             {loadingMore ? <LoaderCircle className="spin" size={16} /> : null}
@@ -402,8 +432,19 @@ export default function ChannelView({
               <div key={message.id}>
                 {showDay && <div className="message-day"><span>{messageDay(message.created_at)}</span></div>}
                 <article
-                  className={`message-row ${grouped ? 'is-grouped' : ''}`}
+                  className={`message-row ${grouped ? 'is-grouped' : ''} ${mobileActionsId === message.id ? 'is-actions-open' : ''}`}
                   data-message-id={message.id}
+                  onPointerDown={(event) => startMessageLongPress(event, message.id)}
+                  onPointerMove={moveMessageLongPress}
+                  onPointerUp={clearLongPress}
+                  onPointerCancel={clearLongPress}
+                  onContextMenu={(event) => {
+                    if (!window.matchMedia('(max-width: 520px)').matches) return;
+                    event.preventDefault();
+                    clearLongPress();
+                    setReactionPickerId(null);
+                    setMobileActionsId(message.id);
+                  }}
                 >
                   {!grouped && (
                     <button
@@ -485,13 +526,13 @@ export default function ChannelView({
                     <div className="message-actions">
                       {canSendMessages && (
                         <>
-                          <button type="button" aria-label="Antworten" onClick={() => startReply(message)}>
+                          <button type="button" aria-label="Antworten" onClick={() => { setMobileActionsId(null); startReply(message); }}>
                             <CornerUpLeft size={15} />
                           </button>
                           <button
                             type="button"
                             aria-label="Reaktion hinzufügen"
-                            onClick={() => setReactionPickerId((current) => current === message.id ? null : message.id)}
+                            onClick={() => { setMobileActionsId(null); setReactionPickerId((current) => current === message.id ? null : message.id); }}
                           >
                             <SmilePlus size={15} />
                           </button>
@@ -501,16 +542,16 @@ export default function ChannelView({
                         <button
                           type="button"
                           aria-label="Nachricht bearbeiten"
-                          onClick={() => { setEditingId(message.id); setEditContent(message.content); }}
+                          onClick={() => { setMobileActionsId(null); setEditingId(message.id); setEditContent(message.content); }}
                         ><Pencil size={15} /></button>
                       )}
                       {(message.author.id === currentUserId || canManageMessages) && (
-                        <button type="button" className="danger" aria-label="Nachricht löschen" onClick={() => removeMessage(message.id)}>
+                        <button type="button" className="danger" aria-label="Nachricht löschen" onClick={() => { setMobileActionsId(null); removeMessage(message.id); }}>
                           <Trash2 size={15} />
                         </button>
                       )}
                       {message.author.id !== currentUserId && (
-                        <button type="button" aria-label="Nachricht melden" onClick={() => reportMessage(message)}><Flag size={15} /></button>
+                        <button type="button" aria-label="Nachricht melden" onClick={() => { setMobileActionsId(null); reportMessage(message); }}><Flag size={15} /></button>
                       )}
                     </div>
                   )}

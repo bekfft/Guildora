@@ -20,8 +20,13 @@ function updateAppViewport() {
     'input, textarea, select, [contenteditable="true"]'
   );
   const keyboardOpen = keyboardTarget && layoutHeight - visualHeight > 120;
-  const viewportHeight = keyboardOpen ? visualHeight : Math.max(layoutHeight, visualHeight);
-  document.documentElement.style.setProperty('--app-height', `${Math.round(viewportHeight)}px`);
+  if (keyboardOpen) {
+    document.documentElement.style.setProperty('--app-height', `${Math.round(visualHeight)}px`);
+  } else {
+    // 100dvh folgt dem echten iOS-Standalone-Viewport zuverlässiger als ein
+    // beim Start gemessener Pixelwert, der die Home-Indicator-Zone enthalten kann.
+    document.documentElement.style.removeProperty('--app-height');
+  }
 }
 
 function updateDisplayMode() {

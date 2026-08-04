@@ -80,15 +80,15 @@
 .staff-empty { padding: 32px; color: var(--text-muted); text-align: center; }
 
 .staff-list { min-width: 0; display: grid; }
-.staff-list > button { min-width: 0; min-height: 62px; border: 0; border-bottom: 1px solid var(--divider); padding: 13px 16px; display: flex; align-items: center; gap: 12px; color: inherit; background: transparent; text-align: left; cursor: pointer; }
+.staff-list > button { min-width: 0; min-height: 70px; border: 0; border-bottom: 1px solid var(--divider); padding: 13px 16px; display: flex; align-items: center; gap: 13px; color: inherit; background: transparent; text-align: left; cursor: pointer; }
 .staff-list > button:last-child { border-bottom: 0; }
 .staff-list > button:hover { background: var(--bg-hover); }
 .staff-list > button > span:not(.staff-avatar, .staff-priority) { min-width: 0; flex: 1; display: grid; }
 .staff-list strong { min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
 .staff-list small { min-width: 0; overflow: hidden; color: var(--text-muted); white-space: nowrap; text-overflow: ellipsis; }
 .staff-list em { flex: none; color: var(--text-muted); font-size: 11px; font-style: normal; }
-.staff-avatar { width: 36px; height: 36px; flex: none; overflow: hidden; border-radius: 50%; display: grid; place-items: center; background: var(--brand); font-weight: 700; }
-.staff-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.staff-avatar { width: 42px; height: 42px; min-width: 42px; min-height: 42px; aspect-ratio: 1; flex: none; overflow: hidden; border: 2px solid color-mix(in srgb, var(--brand) 42%, var(--divider)); border-radius: 50%; display: grid; place-items: center; background: var(--bg-darkest); font-weight: 700; }
+.staff-avatar img { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: cover; }
 .staff-priority { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--channel-idle); }
 .staff-priority.high { background: var(--warning); }
 .staff-priority.critical { background: var(--danger); }
@@ -101,6 +101,11 @@
 .staff-status.dismissed { color: var(--danger); }
 
 .staff-detail { min-width: 0; padding: 20px; }
+.staff-detail-identity { display: grid; min-width: 0; grid-template-columns: 56px minmax(0, 1fr); align-items: center; gap: 13px; margin-bottom: 16px; }
+.staff-detail-identity .staff-avatar { width: 56px; height: 56px; min-width: 56px; min-height: 56px; }
+.staff-detail-identity > div { min-width: 0; }
+.staff-detail-identity h3 { margin: 0 0 2px; }
+.staff-detail-identity small { display: block; min-width: 0; color: var(--text-muted); overflow-wrap: anywhere; }
 .staff-detail h3 { overflow-wrap: anywhere; margin: 14px 0 6px; font-size: 21px; }
 .staff-detail h4 { margin: 24px 0 10px; color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
 .staff-detail p { min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }

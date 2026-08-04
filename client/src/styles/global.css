@@ -206,8 +206,18 @@ html[data-display-mode="standalone"] .auth-brand {
 }
 
 html.is-desktop :is(.landing, .download-page, .auth-shell, .invite-shell, .placeholder-page, .route-loader, .app-placeholder) {
+  height: var(--content-viewport-height);
   min-height: var(--content-viewport-height);
   margin-top: var(--titlebar-height);
+  overflow-y: auto;
+}
+
+html.is-desktop,
+html.is-desktop body,
+html.is-desktop #root {
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden;
 }
 
 .release-download {
@@ -388,6 +398,10 @@ p {
 
 .skip-link:focus {
   transform: translateY(0);
+}
+
+html[data-mobile-app] .skip-link {
+  display: none;
 }
 
 .button {

@@ -11,6 +11,7 @@ import {
 
 const PROFILE_USER_FIELDS = `u.id, u.username, u.display_name, u.avatar_url, u.created_at,
   p.banner_url, COALESCE(p.bio, '') AS bio, COALESCE(p.custom_status, '') AS custom_status`;
+const DEFAULT_USER_AVATAR = '/icons/guildora-192.png';
 
 function relationshipState(row, userId) {
   if (!row) return null;
@@ -105,7 +106,7 @@ async function serverProfile(guildId, viewerId, targetId) {
 
 async function profileAssetUrl(userId, attachmentId, fieldName) {
   if (attachmentId === undefined) return undefined;
-  if (attachmentId === null) return null;
+  if (attachmentId === null) return DEFAULT_USER_AVATAR;
   const attachment = await db.get(
     `SELECT id, mime_type FROM attachments
      WHERE id = ? AND owner_id = ? AND message_id IS NULL AND dm_message_id IS NULL`,

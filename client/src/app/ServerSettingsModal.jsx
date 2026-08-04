@@ -673,7 +673,7 @@ export default function ServerSettingsModal({
                 <div className="member-management__list">
                   {filteredMembers.map((member) => (
                     <button className={selectedMemberId === member.id ? 'is-active' : ''} type="button" onClick={() => setSelectedMemberId(member.id)} key={member.id}>
-                      <span className="member-avatar">{memberName(member)[0].toUpperCase()}</span>
+                      <span className="member-avatar">{member.avatar_url ? <img src={member.avatar_url} alt="" /> : memberName(member)[0].toUpperCase()}</span>
                       <span><strong>{memberName(member)}</strong><small>@{member.username}</small></span>
                       <div>{member.roles.filter((role) => !role.is_default).slice(0, 3).map((role) => <i title={role.name} style={{ background: role.color || '#949ba4' }} key={role.id} />)}</div>
                       <Settings2 size={17} />
@@ -929,7 +929,7 @@ function MemberEditor({ member, roles, ownerId, capabilities, busy, onSaveNickna
   return (
     <aside className="member-editor">
       <div className="member-editor__profile">
-        <span className="member-avatar">{memberName(member)[0].toUpperCase()}</span>
+        <span className="member-avatar">{member.avatar_url ? <img src={member.avatar_url} alt="" /> : memberName(member)[0].toUpperCase()}</span>
         <div><strong>{memberName(member)}</strong><small>@{member.username}</small></div>
         {member.user_id === ownerId && <span className="owner-badge">Besitzer</span>}
       </div>

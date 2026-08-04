@@ -12,6 +12,8 @@ import {
 import { decryptSecret, verifyTotp } from '../utils/totp.js';
 import { assertAccountActive, getStaff } from '../services/platformModeration.js';
 
+const DEFAULT_USER_AVATAR = '/icons/guildora-192.png';
+
 const PUBLIC_USER_FIELDS = `u.id, u.email, u.username, u.display_name, u.avatar_url, u.created_at,
   p.banner_url, COALESCE(p.bio, '') AS bio, COALESCE(p.custom_status, '') AS custom_status`;
 
@@ -85,7 +87,7 @@ export async function register(req, res) {
       `INSERT INTO users
         (id, email, username, display_name, password_hash, birthdate, avatar_url, email_verified)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, data.email, data.username, data.username, passwordHash, data.birthdate, null, false]
+      [id, data.email, data.username, data.username, passwordHash, data.birthdate, DEFAULT_USER_AVATAR, false]
     );
   } catch (error) {
     throw duplicateError(error) || error;

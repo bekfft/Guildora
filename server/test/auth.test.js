@@ -94,6 +94,7 @@ test('Registrierung speichert nur den Hash und setzt sichere Cookies', async () 
   ]);
   assert.equal(body.user.email, 'mira@example.de');
   assert.equal(body.user.display_name, 'mira.test');
+  assert.equal(body.user.avatar_url, '/icons/guildora-192.png');
   registeredUserId = body.user.id;
 
   const cookies = response.headers.getSetCookie();
@@ -1086,6 +1087,14 @@ test('Freunde, Direktnachrichten, Anhänge und Moderation funktionieren vollstä
     body: { reason: 'Profil-Meldetest' }
   });
   assert.equal(profileReport.status, 201);
+
+  const resetAvatar = await request('/api/social/profile', {
+    method: 'PATCH',
+    cookie: authCookie,
+    body: { avatarAttachmentId: null }
+  });
+  assert.equal(resetAvatar.status, 200);
+  assert.equal((await resetAvatar.json()).profile.avatar_url, '/icons/guildora-192.png');
 
   const conversationResponse = await request(`/api/social/dm/users/${friendId}`, {
     method: 'POST',

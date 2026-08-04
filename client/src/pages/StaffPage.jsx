@@ -113,6 +113,51 @@ function Panel({ title, children }) { return <section className="staff-panel"><h
 function Avatar({ value }) { return <span className="staff-avatar">{value.avatar_url || value.icon_url ? <img src={value.avatar_url || value.icon_url} alt=""/> : (value.display_name || value.name || value.username)[0].toUpperCase()}</span>; }
 function CaseList({ items, open }) { return <div className="staff-list">{items?.length ? items.map((c) => <button key={c.id} onClick={() => open('case', c.id)}><span className={`staff-priority ${c.priority}`}/><span><strong>{c.target_username ? `@${c.target_username}` : c.category}</strong><small>{c.reason} · {date(c.created_at)}</small></span><em className={`staff-status ${c.status}`}>{STATUS_NAMES[c.status] || c.status}</em></button>) : <Empty>Keine Fälle in dieser Ansicht.</Empty>}</div>; }
 function CaseDetail({ value, act, can }) { const c = value.case; const [note, setNote] = useState(''); return <Panel title={`Fall ${c.id.slice(0,8)}`}><div className="staff-detail"><span className={`staff-status ${c.status}`}>{STATUS_NAMES[c.status]}</span><h3>{c.target_username ? `@${c.target_username}` : c.category}</h3><p>{c.reason}</p><small>{c.guild_name || 'Plattformweit'} · {date(c.created_at)}</small>{value.evidence?.map((e) => <div className="staff-note" key={e.id}><strong>Gesicherter Inhalt</strong><p>{e.snapshot.content || e.snapshot.display_name || 'Metadaten wurden zum Meldezeitpunkt gesichert.'}</p>{can('content.remove') && e.snapshot.id && <button className="danger" onClick={() => act(() => api.removeStaffMessage(e.snapshot.id, { caseId: c.id, reason: c.reason }))}>Nachricht entfernen</button>}</div>)}{can('cases.manage') && <div className="staff-actions"><button onClick={() => act(() => api.updateStaffCase(c.id, { assignToMe: true, status: 'reviewing' }))}>Übernehmen</button><button onClick={() => act(() => api.updateStaffCase(c.id, { status: 'resolved', resolution: 'Bearbeitung abgeschlossen.' }))}>Lösen</button></div>}<h4>Interne Notizen</h4>{value.notes.map((n) => <p className="staff-note" key={n.id}><strong>@{n.author_username}</strong> {n.body}</p>)}<form className="staff-note-form" onSubmit={(e) => { e.preventDefault(); act(() => api.addStaffCaseNote(c.id, note)); setNote(''); }}><textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Interne Notiz …"/><button>Speichern</button></form></div></Panel>; }
-function UserDetail({ value, act, can }) { const u=value.user; const [type,setType]=useState('warning'); const [reason,setReason]=useState(''); return <Panel title="Benutzerdetails"><div className="staff-detail"><h3>{u.display_name || u.username}</h3><small>@{u.username} · {u.email}<br/>Registriert {date(u.created_at)}</small>{value.staff?.is_owner && <div className="staff-owner-lock"><ShieldCheck/> bekfft ist als Inhaber vollständig geschützt.</div>}<h4>Maßnahmen</h4>{value.sanctions.length ? value.sanctions.map((s) => <div className="staff-note staff-sanction" key={s.id}><p><strong>{s.type}</strong> {s.reason} {s.revoked_at && '· aufgehoben'}</p>{can('users.restrict') && !s.revoked_at && <button type="button" className="staff-inline-danger" onClick={() => act(() => api.revokeStaffSanction(s.id))}>Aufheben</button>}</div>) : <p className="staff-muted">Keine Maßnahmen.</p>}{can('users.warn') && !value.staff?.is_owner && <form className="staff-action-form" onSubmit={(e)=>{e.preventDefault();act(()=>api.sanctionStaffUser(u.id,{type,reason}));setReason('');}}><select value={type} onChange={(e)=>setType(e.target.value)}><option value="warning">Verwarnung</option><option value="restrict_social">Soziale Funktionen sperren</option><option value="restrict_communication">Kommunikation sperren</option><option value="restrict_dms">Direktnachrichten sperren</option><option value="restrict_guild_creation">Servererstellung sperren</option>{can('users.suspend') && <><option value="suspension">Suspendieren</option><option value="ban">Dauerhaft sperren</option></>}</select><textarea value={reason} onChange={(e)=>setReason(e.target.value)} placeholder="Begründung" required/><button>Maßnahme anwenden</button></form>}</div></Panel>; }
+function UserDetail({ value, act, can }) {
+  const u = value.user;
+  const [type, setType] = useState('warning');
+  const [reason, setReason] = useState('');
+  return (
+    <Panel title="Benutzerdetails">
+      <div className="staff-detail">
+        <div className="staff-detail-identity">
+          <Avatar value={u} />
+          <div>
+            <h3>{u.display_name || u.username}</h3>
+            <small>@{u.username} · {u.email}<br />Registriert {date(u.created_at)}</small>
+          </div>
+        </div>
+        {value.staff?.is_owner && <div className="staff-owner-lock"><ShieldCheck /> bekfft ist als Inhaber vollständig geschützt.</div>}
+        <h4>Maßnahmen</h4>
+        {value.sanctions.length ? value.sanctions.map((sanction) => (
+          <div className="staff-note staff-sanction" key={sanction.id}>
+            <p><strong>{sanction.type}</strong> {sanction.reason} {sanction.revoked_at && '· aufgehoben'}</p>
+            {can('users.restrict') && !sanction.revoked_at && (
+              <button type="button" className="staff-inline-danger" onClick={() => act(() => api.revokeStaffSanction(sanction.id))}>Aufheben</button>
+            )}
+          </div>
+        )) : <p className="staff-muted">Keine Maßnahmen.</p>}
+        {can('users.warn') && !value.staff?.is_owner && (
+          <form className="staff-action-form" onSubmit={(event) => {
+            event.preventDefault();
+            act(() => api.sanctionStaffUser(u.id, { type, reason }));
+            setReason('');
+          }}>
+            <select value={type} onChange={(event) => setType(event.target.value)}>
+              <option value="warning">Verwarnung</option>
+              <option value="restrict_social">Soziale Funktionen sperren</option>
+              <option value="restrict_communication">Kommunikation sperren</option>
+              <option value="restrict_dms">Direktnachrichten sperren</option>
+              <option value="restrict_guild_creation">Servererstellung sperren</option>
+              {can('users.suspend') && <><option value="suspension">Suspendieren</option><option value="ban">Dauerhaft sperren</option></>}
+            </select>
+            <textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Begründung" required />
+            <button>Maßnahme anwenden</button>
+          </form>
+        )}
+      </div>
+    </Panel>
+  );
+}
 function GuildDetail({ value, act, can }) { const g=value.guild; const [type,setType]=useState('discovery_hidden');const [reason,setReason]=useState('');return <Panel title="Serverdetails"><div className="staff-detail"><h3>{g.name}</h3><small>{value.members.length} Mitglieder · Inhaber @{g.owner_username}<br/>{value.channels.length} Channels · erstellt {date(g.created_at)}</small><h4>Aktive und frühere Maßnahmen</h4>{value.restrictions.length?value.restrictions.map((r)=><div className="staff-note staff-sanction" key={r.id}><p><strong>{r.type}</strong> {r.reason} {r.revoked_at && '· aufgehoben'}</p>{can('guilds.manage')&&!r.revoked_at&&<button type="button" className="staff-inline-danger" onClick={()=>act(()=>api.revokeStaffGuildRestriction(r.id))}>Aufheben</button>}</div>):<p className="staff-muted">Keine Servermaßnahmen.</p>}{can('guilds.manage')&&<form className="staff-action-form" onSubmit={(e)=>{e.preventDefault();act(()=>api.restrictStaffGuild(g.id,{type,reason}));setReason('');}}><select value={type} onChange={(e)=>setType(e.target.value)}><option value="discovery_hidden">Aus Discovery ausblenden</option><option value="restricted">Beitritt einschränken</option><option value="suspended">Server suspendieren</option></select><textarea value={reason} onChange={(e)=>setReason(e.target.value)} placeholder="Begründung" required/><button>Servermaßnahme anwenden</button></form>}</div></Panel>;}
 function TeamPanel({ team, act }) { const [userId,setUserId]=useState('');const [role,setRole]=useState('support');return <Panel title="Guildora-Team"><form className="staff-team-add" onSubmit={(e)=>{e.preventDefault();act(()=>api.updateStaffMember(userId.trim(),role));setUserId('');}}><input value={userId} onChange={(e)=>setUserId(e.target.value)} placeholder="Benutzername, E-Mail oder ID" aria-label="Teammitglied suchen" required/><select value={role} onChange={(e)=>setRole(e.target.value)}>{Object.entries(ROLE_NAMES).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select><button>Teammitglied hinzufügen</button></form><div className="staff-cards">{team.map((m)=><article key={m.user_id}><div><strong>{m.display_name||m.username}</strong>{m.is_owner&&<span className="staff-owner">Inhaber</span>}</div><small>@{m.username}<br/><span className="staff-id">{m.user_id}</span></small><div className="staff-actions"><select aria-label={`Rolle von ${m.username}`} disabled={m.is_owner} value={m.role} onChange={(e)=>act(()=>api.updateStaffMember(m.user_id,e.target.value))}>{Object.entries(ROLE_NAMES).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select>{!m.is_owner&&<button type="button" className="danger" onClick={()=>act(()=>api.removeStaffMember(m.user_id))}>Entfernen</button>}</div></article>)}</div></Panel>;}
