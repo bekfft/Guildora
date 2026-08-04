@@ -70,13 +70,26 @@ test('Standalone-Modus und iPhone-Safe-Areas werden im App-Layout berücksichtig
   assert.match(appCss, /:is\(\.modal-overlay, \.server-settings-overlay, \.engagement-overlay\)\s*\{\s*inset:\s*0;/);
   assert.match(cssRule(appCss, `${appViewportSelector} .modal-overlay`), /padding:\s*0/);
   assert.match(appCss, new RegExp(`${appViewportSelector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\.app-modal:not\\(\\.app-modal--settings\\):not\\(:has\\(\\.full-profile\\)\\)[\\s\\S]*padding-bottom:\\s*max\\(30px, var\\(--safe-area-bottom\\)\\)`));
-  assert.match(cssRule(appCss, `${appViewportSelector} .server-settings-overlay`), /padding:\s*var\(--safe-area-top\)[^;]*var\(--safe-area-bottom\)/);
+  assert.match(cssRule(appCss, `${appViewportSelector} .server-settings-overlay`), /padding:\s*0/);
+  assert.match(appCss, /\.server-settings__sidebar\s*\{[\s\S]*padding-top:\s*calc\(10px \+ var\(--safe-area-top\)\)/);
+  assert.match(appCss, /\.server-settings__content\s*\{[\s\S]*padding-bottom:\s*var\(--safe-area-bottom\)/);
   assert.match(cssRule(appCss, `${appViewportSelector} .engagement-panel`), /padding-bottom:\s*var\(--safe-area-bottom\)/);
   assert.match(cssRule(globalCss, `${appViewportSelector} :is(.route-loader, .app-placeholder)`), /height:\s*var\(--app-height\)[\s\S]*min-height:\s*var\(--app-height\)/);
   assert.match(appCss, /\.app-navigation\s*\{[\s\S]*?height:\s*auto;/);
   assert.match(globalCss, /html\[data-mobile-app\] \.skip-link\s*\{\s*display:\s*none;/);
   assert.match(appCss, /\.app-modal:has\(\.full-profile\)\s*\{[\s\S]*height:\s*var\(--app-height\);[\s\S]*overflow-y:\s*auto;/);
   assert.match(appCss, /\.full-profile__banner\s*\{\s*height:\s*calc\(128px \+ var\(--safe-area-top\)\);/);
+});
+
+test('Mobile Seitenleisten und Einstellungen liegen an den echten Viewport-Kanten', () => {
+  const mobileNavigationRule = cssRule(appCss, `${appViewportSelector} .app-navigation`);
+  assert.match(mobileNavigationRule, /background:[\s\S]*var\(--navigation-rail-width\)/);
+  assert.match(appCss, new RegExp(`${appViewportSelector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\.app-navigation[\\s\\S]*top:\\s*0;[\\s\\S]*bottom:\\s*0;[\\s\\S]*height:\\s*auto;`));
+  assert.match(appCss, /\.app-navigation\s*\{\s*--navigation-rail-width:\s*64px;[\s\S]*grid-template-columns:\s*64px/);
+  assert.match(appCss, /\.modal-overlay:has\(\.app-modal--settings\)\s*\{[\s\S]*background:\s*#1e1f22;/);
+  assert.match(appCss, /\.app-modal\.app-modal--settings\s*\{[\s\S]*position:\s*fixed;[\s\S]*inset:\s*0;[\s\S]*height:\s*auto;[\s\S]*max-height:\s*none;/);
+  assert.match(cssRule(appCss, `${appViewportSelector} .server-settings-overlay`), /padding:\s*0/);
+  assert.match(appCss, /\.server-settings__content\s*\{[\s\S]*padding-bottom:\s*var\(--safe-area-bottom\);[\s\S]*background:\s*#1e1f22;/);
 });
 
 test('Mobile Vollbildansichten, Formulare und Composer bleiben in den sicheren Bedienflächen', () => {

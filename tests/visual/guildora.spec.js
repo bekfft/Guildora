@@ -271,6 +271,87 @@ test('iPhone 17 Pro Max Standalone füllt den Bildschirm und bedient Nachrichten
   expect(memberGeometry.avatarWidth).toBe(36);
   expect(memberGeometry.avatarHeight).toBe(36);
   await expect(page.locator('.guildora-app')).toHaveScreenshot('iphone-17-pro-max-members.png', { caret: 'hide' });
+  await memberList.getByRole('button', { name: 'Mitgliederliste schließen' }).click();
+
+  await page.getByRole('button', { name: 'Navigation öffnen' }).click();
+  const navigation = page.locator('.app-navigation');
+  await expect(navigation).toBeVisible();
+  const navigationGeometry = await navigation.evaluate((panel) => {
+    const rect = panel.getBoundingClientRect();
+    const rail = panel.querySelector('.server-rail').getBoundingClientRect();
+    const sidebar = panel.querySelector('.channel-sidebar').getBoundingClientRect();
+    const userPanel = panel.querySelector('.user-panel').getBoundingClientRect();
+    return {
+      top: Math.round(rect.top), bottom: Math.round(rect.bottom), height: Math.round(rect.height),
+      railBottom: Math.round(rail.bottom), sidebarBottom: Math.round(sidebar.bottom),
+      userPanelBottom: Math.round(userPanel.bottom),
+      railColor: getComputedStyle(panel.querySelector('.server-rail')).backgroundColor,
+      navigationBackground: getComputedStyle(panel).backgroundImage
+    };
+  });
+  expect(navigationGeometry.top).toBe(0);
+  expect(navigationGeometry.bottom).toBe(956);
+  expect(navigationGeometry.height).toBe(956);
+  expect(navigationGeometry.railBottom).toBe(956);
+  expect(navigationGeometry.sidebarBottom).toBe(956);
+  expect(navigationGeometry.userPanelBottom).toBe(956);
+  expect(navigationGeometry.navigationBackground).toContain('72px');
+  await expect(page.locator('.guildora-app')).toHaveScreenshot('iphone-17-pro-max-navigation.png', { caret: 'hide' });
+
+  await navigation.getByRole('button', { name: 'Einstellungen' }).click();
+  const settingsDialog = page.getByRole('dialog', { name: 'Einstellungen' });
+  await expect(settingsDialog).toBeVisible();
+  await page.waitForTimeout(220);
+  const settingsGeometry = await settingsDialog.evaluate((dialog) => {
+    const overlay = dialog.closest('.modal-overlay').getBoundingClientRect();
+    const rect = dialog.getBoundingClientRect();
+    const layout = dialog.querySelector('.settings-layout').getBoundingClientRect();
+    const content = dialog.querySelector('.settings-content').getBoundingClientRect();
+    return {
+      overlayTop: Math.round(overlay.top), overlayBottom: Math.round(overlay.bottom),
+      top: Math.round(rect.top), bottom: Math.round(rect.bottom),
+      layoutBottom: Math.round(layout.bottom), contentBottom: Math.round(content.bottom),
+      background: getComputedStyle(dialog).backgroundColor,
+      overlayBackground: getComputedStyle(dialog.closest('.modal-overlay')).backgroundColor
+    };
+  });
+  expect(settingsGeometry.overlayTop).toBe(0);
+  expect(settingsGeometry.overlayBottom).toBe(956);
+  expect(settingsGeometry.top).toBe(0);
+  expect(settingsGeometry.bottom).toBe(956);
+  expect(settingsGeometry.layoutBottom).toBe(956);
+  expect(settingsGeometry.contentBottom).toBe(956);
+  expect(settingsGeometry.overlayBackground).toBe(settingsGeometry.background);
+  await expect(settingsDialog).toHaveScreenshot('iphone-17-pro-max-settings.png', { caret: 'hide' });
+  await settingsDialog.getByRole('button', { name: 'Dialog schließen' }).click();
+  await expect(settingsDialog).toBeHidden();
+
+  const textChannelRow = navigation.locator(`.channel-row:has(a[href="/app/channels/${guild.id}/${channel.id}"])`);
+  await expect(textChannelRow).toHaveCount(1);
+  const channelSettingsButton = textChannelRow.getByRole('button', { name: 'allgemein bearbeiten' });
+  await expect(channelSettingsButton).toHaveCount(1);
+  await channelSettingsButton.click();
+  const channelSettingsDialog = page.getByRole('dialog', { name: 'Kanaleinstellungen für allgemein' });
+  await expect(channelSettingsDialog).toBeVisible();
+  await page.waitForTimeout(220);
+  const channelSettingsGeometry = await channelSettingsDialog.evaluate((dialog) => {
+    const overlay = dialog.closest('.server-settings-overlay').getBoundingClientRect();
+    const rect = dialog.getBoundingClientRect();
+    const content = dialog.querySelector('.server-settings__content').getBoundingClientRect();
+    return {
+      overlayTop: Math.round(overlay.top), overlayBottom: Math.round(overlay.bottom),
+      top: Math.round(rect.top), bottom: Math.round(rect.bottom), contentBottom: Math.round(content.bottom),
+      overlayBackground: getComputedStyle(dialog.closest('.server-settings-overlay')).backgroundColor,
+      contentBackground: getComputedStyle(dialog.querySelector('.server-settings__content')).backgroundColor
+    };
+  });
+  expect(channelSettingsGeometry.overlayTop).toBe(0);
+  expect(channelSettingsGeometry.overlayBottom).toBe(956);
+  expect(channelSettingsGeometry.top).toBe(0);
+  expect(channelSettingsGeometry.bottom).toBe(956);
+  expect(channelSettingsGeometry.contentBottom).toBe(956);
+  expect(channelSettingsGeometry.contentBackground).toBe(channelSettingsGeometry.overlayBackground);
+  await expect(channelSettingsDialog).toHaveScreenshot('iphone-17-pro-max-channel-settings.png', { caret: 'hide' });
 });
 
 test('helles Hochkontrast-Design und reduzierte Bewegung bleiben nutzbar', async ({ page }, testInfo) => {

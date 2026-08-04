@@ -43,6 +43,7 @@ html:is([data-display-mode="standalone"], [data-mobile-app]) .guild-sidebar-head
 }
 
 .app-navigation {
+  --navigation-rail-width: 72px;
   position: relative;
   z-index: 30;
   display: grid;
@@ -2014,8 +2015,8 @@ html:is([data-display-mode="standalone"], [data-mobile-app]) .app-navigation {
   background:
     linear-gradient(
       to right,
-      var(--bg-rail) 0 72px,
-      var(--bg-sidebar) 72px 100%
+      var(--bg-rail) 0 var(--navigation-rail-width),
+      var(--bg-sidebar) var(--navigation-rail-width) 100%
     );
 }
 
@@ -3133,8 +3134,9 @@ html.is-desktop .modal-overlay {
 
   html:is([data-display-mode="standalone"], [data-mobile-app]) .app-navigation {
     top: 0;
-    bottom: auto;
-    height: var(--app-height);
+    bottom: 0;
+    height: auto;
+    min-height: 100%;
   }
 
   .is-discovery .app-navigation {
@@ -5824,6 +5826,11 @@ html.is-desktop .modal-overlay {
 }
 
 @media (max-width: 700px) {
+  html:is([data-display-mode="standalone"], [data-mobile-app]) .modal-overlay:has(.app-modal--settings) {
+    display: block;
+    background: #1e1f22;
+  }
+
   .app-modal.app-modal--settings {
     width: 100%;
     height: 100%;
@@ -5831,6 +5838,16 @@ html.is-desktop .modal-overlay {
     min-height: 100%;
     border: 0;
     border-radius: 0;
+  }
+
+  html:is([data-display-mode="standalone"], [data-mobile-app]) .app-modal.app-modal--settings {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: auto;
+    min-height: 100%;
+    max-height: none;
+    background: #1e1f22;
   }
 
   .app-modal--settings > .app-modal__close {
@@ -6777,6 +6794,7 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
 
 @media (max-width: 420px) {
   .app-navigation {
+    --navigation-rail-width: 64px;
     grid-template-columns: 64px minmax(0, 1fr);
   }
 
@@ -7873,7 +7891,25 @@ html:is([data-display-mode="standalone"], [data-mobile-app]) .modal-overlay {
 }
 
 html:is([data-display-mode="standalone"], [data-mobile-app]) .server-settings-overlay {
-  padding: var(--safe-area-top) var(--safe-area-right) var(--safe-area-bottom) var(--safe-area-left);
+  padding: 0;
+}
+
+@media (max-width: 640px) {
+  html:is([data-display-mode="standalone"], [data-mobile-app]) .server-settings__sidebar {
+    padding-top: calc(10px + var(--safe-area-top));
+    padding-right: max(10px, var(--safe-area-right));
+    padding-left: max(10px, var(--safe-area-left));
+  }
+
+  html:is([data-display-mode="standalone"], [data-mobile-app]) .server-settings__close {
+    top: calc(9px + var(--safe-area-top));
+    right: max(8px, var(--safe-area-right));
+  }
+
+  html:is([data-display-mode="standalone"], [data-mobile-app]) .server-settings__content {
+    padding-bottom: var(--safe-area-bottom);
+    background: #1e1f22;
+  }
 }
 
 html:is([data-display-mode="standalone"], [data-mobile-app]) .engagement-panel {
