@@ -23,6 +23,7 @@ import { useGuilds } from '../context/GuildContext.jsx';
 import { useVoice } from '../context/VoiceContext.jsx';
 import { useGuildoraDialog } from '../context/GuildoraDialogContext.jsx';
 import { api } from '../lib/api.js';
+import { resolveMobileSwipe } from '../lib/mobileSwipe.js';
 import { socket } from '../lib/socket.js';
 import '../styles/app.css';
 
@@ -68,10 +69,94 @@ export default function AppPage() {
   const toastTimers = useRef([]);
   const engagementRefreshTimer = useRef(null);
   const guildRealtimeRefreshTimer = useRef(null);
+  const appRef = useRef(null);
   const isDiscovery = location.pathname === '/app/discovery';
   const isHome = location.pathname === '/app/channels/@me';
   const isDirect = location.pathname.startsWith('/app/channels/@me/') && Boolean(channelId);
   const focusMessageId = new URLSearchParams(location.search).get('message');
+
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app) return undefined;
+
+    const gesture = {
+      startX: 0,
+      startY: 0,
+      startedAt: 0,
+      tracking: false,
+      horizontal: false
+    };
+    const ignoredTarget = (target) => target instanceof Element && Boolean(target.closest(
+      'input, textarea, select, button, a, [contenteditable="true"], [data-swipe-ignore], '
+      + '.modal-overlay, .server-settings-overlay, .engagement-overlay, .profile-popover'
+    ));
+    const resetGesture = () => {
+      gesture.tracking = false;
+      gesture.horizontal = false;
+    };
+    const onTouchStart = (event) => {
+      if (
+        event.touches.length !== 1
+        || !window.matchMedia('(max-width: 1024px)').matches
+        || ignoredTarget(event.target)
+      ) {
+        resetGesture();
+        return;
+      }
+      const [touch] = event.touches;
+      gesture.startX = touch.clientX;
+      gesture.startY = touch.clientY;
+      gesture.startedAt = performance.now();
+      gesture.tracking = true;
+      gesture.horizontal = false;
+    };
+    const onTouchMove = (event) => {
+      if (!gesture.tracking || event.touches.length !== 1) return;
+      const [touch] = event.touches;
+      const deltaX = touch.clientX - gesture.startX;
+      const deltaY = touch.clientY - gesture.startY;
+      if (!gesture.horizontal && Math.max(Math.abs(deltaX), Math.abs(deltaY)) >= 12) {
+        if (Math.abs(deltaY) >= Math.abs(deltaX)) {
+          resetGesture();
+          return;
+        }
+        gesture.horizontal = true;
+      }
+      if (gesture.horizontal) event.preventDefault();
+    };
+    const onTouchEnd = (event) => {
+      if (!gesture.tracking || !gesture.horizontal || event.changedTouches.length !== 1) {
+        resetGesture();
+        return;
+      }
+      const [touch] = event.changedTouches;
+      const direction = resolveMobileSwipe({
+        deltaX: touch.clientX - gesture.startX,
+        deltaY: touch.clientY - gesture.startY,
+        durationMs: performance.now() - gesture.startedAt
+      });
+      resetGesture();
+
+      if (direction === 'right') {
+        if (membersVisible) setMembersVisible(false);
+        else if (!drawerOpen) setDrawerOpen(true);
+      } else if (direction === 'left') {
+        if (drawerOpen) setDrawerOpen(false);
+        else if (!isDiscovery && !isHome && !isDirect) setMembersVisible(true);
+      }
+    };
+
+    app.addEventListener('touchstart', onTouchStart, { passive: true });
+    app.addEventListener('touchmove', onTouchMove, { passive: false });
+    app.addEventListener('touchend', onTouchEnd, { passive: true });
+    app.addEventListener('touchcancel', resetGesture, { passive: true });
+    return () => {
+      app.removeEventListener('touchstart', onTouchStart);
+      app.removeEventListener('touchmove', onTouchMove);
+      app.removeEventListener('touchend', onTouchEnd);
+      app.removeEventListener('touchcancel', resetGesture);
+    };
+  }, [drawerOpen, isDirect, isDiscovery, isHome, membersVisible]);
 
   const showToast = useCallback((message, type = 'info') => {
     toastTimers.current.forEach((timer) => window.clearTimeout(timer));
@@ -415,7 +500,7 @@ export default function AppPage() {
   }
 
   return (
-    <div className={`guildora-app ${isDiscovery ? 'is-discovery' : ''} ${membersVisible ? 'has-members' : 'members-hidden'} ${drawerOpen ? 'drawer-open' : ''}`}>
+    <div ref={appRef} className={`guildora-app ${isDiscovery ? 'is-discovery' : ''} ${membersVisible ? 'has-members' : 'members-hidden'} ${drawerOpen ? 'drawer-open' : ''}`}>
       <button className="drawer-backdrop" type="button" aria-label="Navigation schließen" onClick={() => setDrawerOpen(false)} />
       <div className="app-navigation">
         <ServerRail
