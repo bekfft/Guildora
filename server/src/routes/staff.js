@@ -10,7 +10,7 @@ import {
 
 const router = Router();
 router.use(requireAuth);
-router.get('/me', requireStaff('staff.access', { allowWithout2fa: true }), asyncHandler(staffMe));
+router.get('/me', requireStaff('staff.access'), asyncHandler(staffMe));
 router.get('/dashboard', requireStaff('staff.access'), asyncHandler(dashboard));
 router.get('/cases', requireStaff('cases.view'), asyncHandler(listCases));
 router.get('/cases/:id', requireStaff('cases.view'), asyncHandler(getCase));

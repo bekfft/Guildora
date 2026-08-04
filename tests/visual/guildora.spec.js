@@ -1,17 +1,4 @@
 import { expect, test } from '@playwright/test';
-import crypto from 'node:crypto';
-
-function totp(secret) {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  let bits = '';
-  for (const character of secret) bits += alphabet.indexOf(character).toString(2).padStart(5, '0');
-  const key = Buffer.from((bits.match(/.{8}/g) || []).map((byte) => Number.parseInt(byte, 2)));
-  const counter = Buffer.alloc(8);
-  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30_000)));
-  const digest = crypto.createHmac('sha1', key).update(counter).digest();
-  const offset = digest[digest.length - 1] & 15;
-  return String((digest.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, '0');
-}
 
 async function prepareAccount(page, testInfo, variant = 'app') {
   await page.goto('/');
@@ -102,10 +89,6 @@ test('Staff-Konsole passt visuell zu Guildora auf Desktop und Mobile', async ({ 
     email: 'bekfft@visual.guildora.test', username: 'bekfft', password: 'Guildora2026!', birthdate: '1995-04-12', newsletter: false
   }});
   expect(registration.ok()).toBeTruthy();
-  const setup = await page.request.post('/api/account/2fa/setup', { data: { currentPassword: 'Guildora2026!' } });
-  expect(setup.ok()).toBeTruthy();
-  const secret = (await setup.json()).secret;
-  expect((await page.request.post('/api/account/2fa/confirm', { data: { code: totp(secret) } })).ok()).toBeTruthy();
   await page.goto('/staff');
   await expect(page.locator('.staff-stats')).toBeVisible();
   await expect(page.locator('.staff-shell')).toHaveScreenshot('staff-desktop.png', { caret: 'hide' });

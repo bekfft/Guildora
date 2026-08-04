@@ -1159,7 +1159,7 @@ test('Freunde, Direktnachrichten, Anhänge und Moderation funktionieren vollstä
   friendDmSocket.disconnect();
 });
 
-test('Plattform-Staff hat Rollenrechte, 2FA-Pflicht, Audit und unveränderlichen Inhaberschutz', async () => {
+test('Plattform-Staff hat Rollenrechte, Audit und unveränderlichen Inhaberschutz', async () => {
   const ownerId = crypto.randomUUID();
   const targetId = crypto.randomUUID();
   await db.run(`INSERT INTO users (id, email, username, display_name, password_hash, birthdate) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -1168,12 +1168,9 @@ test('Plattform-Staff hat Rollenrechte, 2FA-Pflicht, Audit und unveränderlichen
     [targetId, 'staff-target@guildora.test', 'staff.target', 'Staff Target', 'not-used', '1990-01-01']);
   const ownerCookie = `access_token=${signAccessToken(ownerId)}`;
 
-  const meBefore2fa = await request('/api/staff/me', { cookie: ownerCookie });
-  assert.equal(meBefore2fa.status, 200);
-  assert.equal((await meBefore2fa.json()).staff.is_owner, true);
-  assert.equal((await request('/api/staff/dashboard', { cookie: ownerCookie })).status, 403);
-
-  await db.run('INSERT INTO user_security (user_id, two_factor_enabled) VALUES (?, ?)', [ownerId, true]);
+  const staffMe = await request('/api/staff/me', { cookie: ownerCookie });
+  assert.equal(staffMe.status, 200);
+  assert.equal((await staffMe.json()).staff.is_owner, true);
   const dashboard = await request('/api/staff/dashboard', { cookie: ownerCookie });
   assert.equal(dashboard.status, 200);
 

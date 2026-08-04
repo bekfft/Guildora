@@ -60,7 +60,6 @@ export default function StaffPage() {
       </aside>
       <section className="staff-workspace">
         <header><div><span className="staff-eyebrow">PLATTFORM-SICHERHEIT</span><h1>{sections.find(([id]) => id === section)?.[1]}</h1></div><span className="staff-role">{staff.is_owner ? 'bekfft · Inhaber' : ROLE_NAMES[staff.role]}</span></header>
-        {!staff.two_factor_enabled && <div className="staff-warning"><strong>2FA erforderlich</strong><span>Aktiviere in deinen Kontoeinstellungen die Zwei-Faktor-Authentifizierung, bevor du Staff-Aktionen ausführst.</span></div>}
         {error && <div className="staff-error">{error}</div>}
         {['users', 'guilds'].includes(section) && <form className="staff-search" onSubmit={(e) => { e.preventDefault(); load(); }}><Search size={18}/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={section === 'users' ? 'Benutzername, Anzeigename oder E-Mail' : 'Servername oder Slug'} /><button>Suchen</button></form>}
         {loading ? <div className="staff-empty">Staff-Bereich wird geladen …</div> : <StaffContent section={section} data={data} selected={selected} open={open} act={act} can={can} />}

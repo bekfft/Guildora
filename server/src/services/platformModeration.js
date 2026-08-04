@@ -41,14 +41,11 @@ export function hasStaffPermission(staff, permission) {
   return Boolean(staff && (staff.permissions.includes('*') || staff.permissions.includes(permission)));
 }
 
-export function requireStaff(permission, { allowWithout2fa = false } = {}) {
+export function requireStaff(permission) {
   return async (req, res, next) => {
     try {
       const staff = await getStaff(req.userId);
       if (!hasStaffPermission(staff, permission)) throw new ApiError(403, 'STAFF_FORBIDDEN', 'Du hast keinen Zugriff auf diesen Staff-Bereich.');
-      if (!allowWithout2fa && !staff.two_factor_enabled) {
-        throw new ApiError(403, 'STAFF_2FA_REQUIRED', 'Aktiviere zuerst die Zwei-Faktor-Authentifizierung für deinen Staff-Account.');
-      }
       req.staff = staff;
       next();
     } catch (error) { next(error); }
