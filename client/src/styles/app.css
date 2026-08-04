@@ -3116,7 +3116,8 @@ html.is-desktop .modal-overlay {
     width: 312px;
     height: auto;
     box-shadow: 12px 0 35px rgb(0 0 0 / 35%);
-    transform: translateX(calc(-105% - var(--safe-area-left)));
+    backface-visibility: hidden;
+    transform: translate3d(calc(-105% - var(--safe-area-left)), 0, 0);
     transition: transform 220ms cubic-bezier(.2, .8, .2, 1);
   }
 
@@ -3131,7 +3132,7 @@ html.is-desktop .modal-overlay {
   }
 
   .drawer-open .app-navigation {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
 
   .guildora-app.is-swiping-navigation .app-navigation {
@@ -3154,6 +3155,8 @@ html.is-desktop .modal-overlay {
     background: rgb(0 0 0 / 55%);
     pointer-events: none;
     transition: opacity 220ms ease-out;
+    backface-visibility: hidden;
+    will-change: opacity;
   }
 
   html:is([data-display-mode="standalone"], [data-mobile-app]) .drawer-backdrop {
@@ -6222,6 +6225,8 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
     backdrop-filter: blur(2px);
     opacity: 1;
     transition: opacity 220ms ease-out;
+    backface-visibility: hidden;
+    will-change: opacity;
   }
 
   html:is([data-display-mode="standalone"], [data-mobile-app]) .member-backdrop {
@@ -6240,6 +6245,8 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
     padding: 0 8px 18px;
     box-shadow: -16px 0 42px rgb(0 0 0 / 42%);
     animation: mobile-members-in 180ms ease-out both;
+    backface-visibility: hidden;
+    transform: translate3d(0, 0, 0);
     transition: transform 220ms cubic-bezier(.2, .8, .2, 1);
   }
 

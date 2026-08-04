@@ -22,6 +22,7 @@ test('mobile Wischrichtung wird nur bei einer klaren horizontalen Geste erkannt'
 });
 
 test('mobile App verdrahtet Discord-aehnliche Seitenpanel-Gesten', () => {
+  assert.match(appPage, /import \{ flushSync \} from 'react-dom'/);
   assert.match(appPage, /addEventListener\('touchmove', onTouchMove, \{ passive: false \}\)/);
   assert.match(appPage, /addEventListener\('touchend', onTouchEnd, \{ passive: false \}\)/);
   assert.match(appPage, /suppressSwipeClickUntilRef\.current = performance\.now\(\) \+ 450/);
@@ -31,6 +32,7 @@ test('mobile App verdrahtet Discord-aehnliche Seitenpanel-Gesten', () => {
   assert.match(appPage, /--swipe-panel-x/);
   assert.match(appPage, /--swipe-panel-transition/);
   assert.match(appPage, /cubic-bezier\(\.2, \.8, \.2, 1\)/);
+  assert.match(appPage, /flushSync\(\(\) => \{[\s\S]*?setSwipePreview\(null\);[\s\S]*?\}\);\s*gesture\.kind = null;\s*clearVisualState\(\)/);
   assert.match(appPage, /navigation-open/);
   assert.match(appPage, /members-open/);
   assert.match(appPage, /membersVisible \|\| swipePreview === 'members'/);

@@ -1,5 +1,6 @@
 import { Menu } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import ChannelSidebar from '../app/ChannelSidebar.jsx';
 import ChannelSettingsModal from '../app/ChannelSettingsModal.jsx';
@@ -240,13 +241,15 @@ export default function AppPage() {
       app.style.setProperty('--swipe-panel-x', `${targetOffset}px`);
       app.style.setProperty('--swipe-backdrop-opacity', settlesOpen ? '1' : '0');
       gesture.settleTimer = window.setTimeout(() => {
-        if (completed && kind === 'navigation-open') setDrawerOpen(true);
-        if (completed && kind === 'navigation-close') setDrawerOpen(false);
-        if (completed && kind === 'members-open') setMembersVisible(true);
-        if (completed && kind === 'members-close') setMembersVisible(false);
-        clearVisualState();
+        flushSync(() => {
+          if (completed && kind === 'navigation-open') setDrawerOpen(true);
+          if (completed && kind === 'navigation-close') setDrawerOpen(false);
+          if (completed && kind === 'members-open') setMembersVisible(true);
+          if (completed && kind === 'members-close') setMembersVisible(false);
+          setSwipePreview(null);
+        });
         gesture.kind = null;
-        setSwipePreview(null);
+        clearVisualState();
       }, MOBILE_SWIPE_SETTLE_MS + 5);
     };
     const onClickCapture = (event) => {
