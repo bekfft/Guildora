@@ -32,7 +32,9 @@ test('iOS startet Guildora vom Home-Bildschirm ohne Safari-Chrome', () => {
 test('Standalone-Modus und iPhone-Safe-Areas werden im App-Layout berücksichtigt', () => {
   assert.match(mainSource, /navigator\.standalone === true/);
   assert.match(mainSource, /display-mode: standalone/);
-  assert.match(mainSource, /visualViewport\?\.height \|\| window\.innerHeight/);
+  assert.match(mainSource, /Math\.max\(window\.innerHeight, document\.documentElement\.clientHeight\)/);
+  assert.match(mainSource, /layoutHeight - visualHeight > 120/);
+  assert.match(mainSource, /keyboardOpen \? visualHeight : Math\.max\(layoutHeight, visualHeight\)/);
   assert.match(mainSource, /--app-height/);
   assert.match(mainSource, /orientationchange/);
   assert.match(mainSource, /pageshow/);
@@ -40,6 +42,7 @@ test('Standalone-Modus und iPhone-Safe-Areas werden im App-Layout berücksichtig
   assert.match(tokensCss, /--safe-area-bottom:\s*env\(safe-area-inset-bottom/);
   assert.match(appCss, /calc\(var\(--titlebar-height\) \+ var\(--safe-area-top\)\)/);
   assert.match(globalCss, /height:\s*var\(--app-height\)/);
+  assert.match(globalCss, /html\[data-display-mode="standalone"\][\s\S]*?background:\s*var\(--bg-content\)/);
   assert.match(globalCss, /html\[data-display-mode="standalone"\] body\s*\{[^}]*position:\s*fixed[^}]*inset:\s*0/s);
   assert.match(appCss, /html\[data-display-mode="standalone"\] \.server-rail\s*\{[^}]*padding-top:\s*calc\(12px \+ var\(--safe-area-top\)\)[^}]*padding-bottom:\s*calc\(12px \+ var\(--safe-area-bottom\)\)/s);
   assert.match(appCss, /html\[data-display-mode="standalone"\] \.user-panel\s*\{[^}]*padding-bottom:\s*var\(--safe-area-bottom\)/s);

@@ -54,7 +54,7 @@ html[data-display-mode="standalone"] #root {
   height: var(--app-height);
   min-height: var(--app-height);
   overflow: hidden;
-  background: var(--bg-darkest);
+  background: var(--bg-content);
 }
 
 html[data-display-mode="standalone"] body {

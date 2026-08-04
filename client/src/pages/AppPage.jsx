@@ -71,6 +71,7 @@ export default function AppPage() {
   const engagementRefreshTimer = useRef(null);
   const guildRealtimeRefreshTimer = useRef(null);
   const appRef = useRef(null);
+  const suppressSwipeClickUntilRef = useRef(0);
   const isDiscovery = location.pathname === '/app/discovery';
   const isHome = location.pathname === '/app/channels/@me';
   const isDirect = location.pathname.startsWith('/app/channels/@me/') && Boolean(channelId);
@@ -205,6 +206,9 @@ export default function AppPage() {
         resetGesture();
         return;
       }
+      if (event.cancelable) event.preventDefault();
+      event.stopPropagation();
+      suppressSwipeClickUntilRef.current = performance.now() + 450;
       const [touch] = event.changedTouches;
       gesture.lastX = touch.clientX;
       gesture.lastY = touch.clientY;
@@ -245,16 +249,24 @@ export default function AppPage() {
         setSwipePreview(null);
       }, MOBILE_SWIPE_SETTLE_MS + 5);
     };
+    const onClickCapture = (event) => {
+      if (performance.now() >= suppressSwipeClickUntilRef.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+    };
 
     app.addEventListener('touchstart', onTouchStart, { passive: true });
     app.addEventListener('touchmove', onTouchMove, { passive: false });
-    app.addEventListener('touchend', onTouchEnd, { passive: true });
+    app.addEventListener('touchend', onTouchEnd, { passive: false });
+    app.addEventListener('click', onClickCapture, true);
     const onTouchCancel = () => resetGesture();
     app.addEventListener('touchcancel', onTouchCancel, { passive: true });
     return () => {
       app.removeEventListener('touchstart', onTouchStart);
       app.removeEventListener('touchmove', onTouchMove);
       app.removeEventListener('touchend', onTouchEnd);
+      app.removeEventListener('click', onClickCapture, true);
       app.removeEventListener('touchcancel', onTouchCancel);
       clearVisualState();
     };

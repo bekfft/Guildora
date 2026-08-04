@@ -23,6 +23,10 @@ test('mobile Wischrichtung wird nur bei einer klaren horizontalen Geste erkannt'
 
 test('mobile App verdrahtet Discord-aehnliche Seitenpanel-Gesten', () => {
   assert.match(appPage, /addEventListener\('touchmove', onTouchMove, \{ passive: false \}\)/);
+  assert.match(appPage, /addEventListener\('touchend', onTouchEnd, \{ passive: false \}\)/);
+  assert.match(appPage, /suppressSwipeClickUntilRef\.current = performance\.now\(\) \+ 450/);
+  assert.match(appPage, /addEventListener\('click', onClickCapture, true\)/);
+  assert.match(appPage, /stopImmediatePropagation\?\.\(\)/);
   assert.match(appPage, /requestAnimationFrame\(renderGesture\)/);
   assert.match(appPage, /--swipe-panel-x/);
   assert.match(appPage, /--swipe-panel-transition/);

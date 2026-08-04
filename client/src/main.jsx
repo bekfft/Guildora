@@ -13,7 +13,10 @@ const standalonePreview = import.meta.env.DEV
   && new URLSearchParams(window.location.search).get('standalone-preview') === '1';
 
 function updateAppViewport() {
-  const viewportHeight = window.visualViewport?.height || window.innerHeight;
+  const layoutHeight = Math.max(window.innerHeight, document.documentElement.clientHeight);
+  const visualHeight = window.visualViewport?.height || layoutHeight;
+  const keyboardOpen = layoutHeight - visualHeight > 120;
+  const viewportHeight = keyboardOpen ? visualHeight : Math.max(layoutHeight, visualHeight);
   document.documentElement.style.setProperty('--app-height', `${Math.round(viewportHeight)}px`);
 }
 
