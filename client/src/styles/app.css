@@ -12,6 +12,27 @@
   background: var(--bg-content);
 }
 
+html[data-display-mode="standalone"] .guildora-app {
+  top: 0;
+  bottom: auto;
+  height: var(--app-height);
+}
+
+html[data-display-mode="standalone"] .app-main {
+  grid-template-rows: calc(48px + var(--safe-area-top)) minmax(0, 1fr);
+}
+
+html[data-display-mode="standalone"] .main-header,
+html[data-display-mode="standalone"] .dm-search,
+html[data-display-mode="standalone"] .guild-sidebar-header {
+  padding-top: var(--safe-area-top);
+}
+
+html[data-display-mode="standalone"] .dm-search,
+html[data-display-mode="standalone"] .guild-sidebar-header {
+  flex-basis: calc(48px + var(--safe-area-top));
+}
+
 .guildora-app.members-hidden,
 .guildora-app:has(.friends-view) {
   grid-template-columns: 312px minmax(0, 1fr);
@@ -1994,6 +2015,7 @@ html[data-display-mode="standalone"] .app-navigation {
 }
 
 html[data-display-mode="standalone"] .server-rail {
+  padding-top: calc(12px + var(--safe-area-top));
   padding-bottom: calc(12px + var(--safe-area-bottom));
 }
 
@@ -3098,6 +3120,12 @@ html.is-desktop .modal-overlay {
     transition: transform 180ms ease-out;
   }
 
+  html[data-display-mode="standalone"] .app-navigation {
+    top: 0;
+    bottom: auto;
+    height: var(--app-height);
+  }
+
   .is-discovery .app-navigation {
     width: 72px;
   }
@@ -3120,6 +3148,10 @@ html.is-desktop .modal-overlay {
     background: rgb(0 0 0 / 55%);
     pointer-events: none;
     transition: opacity 180ms ease-out;
+  }
+
+  html[data-display-mode="standalone"] .drawer-backdrop {
+    inset: 0 var(--safe-area-right) 0 var(--safe-area-left);
   }
 
   .drawer-open .drawer-backdrop {
@@ -6178,6 +6210,10 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
     backdrop-filter: blur(2px);
   }
 
+  html[data-display-mode="standalone"] .member-backdrop {
+    inset: 0 var(--safe-area-right) 0 var(--safe-area-left);
+  }
+
   .member-list {
     position: fixed;
     z-index: 90;
@@ -6192,6 +6228,11 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
     animation: mobile-members-in 180ms ease-out both;
   }
 
+  html[data-display-mode="standalone"] .member-list {
+    top: 0;
+    bottom: 0;
+  }
+
   .member-list__header {
     position: sticky;
     z-index: 2;
@@ -6203,6 +6244,11 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
     padding: 0 4px 0 10px;
     border-bottom: 1px solid var(--divider);
     background: #2b2d31;
+  }
+
+  html[data-display-mode="standalone"] .member-list__header {
+    min-height: calc(54px + var(--safe-area-top));
+    padding-top: var(--safe-area-top);
   }
 
   .member-list__header > span {

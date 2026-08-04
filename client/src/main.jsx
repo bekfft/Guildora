@@ -12,16 +12,26 @@ const displayModeQuery = window.matchMedia('(display-mode: standalone)');
 const standalonePreview = import.meta.env.DEV
   && new URLSearchParams(window.location.search).get('standalone-preview') === '1';
 
+function updateAppViewport() {
+  const viewportHeight = window.visualViewport?.height || window.innerHeight;
+  document.documentElement.style.setProperty('--app-height', `${Math.round(viewportHeight)}px`);
+}
+
 function updateDisplayMode() {
   const isStandalone = displayModeQuery.matches
     || window.navigator.standalone === true
     || standalonePreview;
   document.documentElement.dataset.displayMode = isStandalone ? 'standalone' : 'browser';
   document.documentElement.toggleAttribute('data-standalone-preview', standalonePreview);
+  updateAppViewport();
 }
 
 updateDisplayMode();
 displayModeQuery.addEventListener?.('change', updateDisplayMode);
+window.addEventListener('resize', updateAppViewport);
+window.addEventListener('orientationchange', updateAppViewport);
+window.addEventListener('pageshow', updateAppViewport);
+window.visualViewport?.addEventListener('resize', updateAppViewport);
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

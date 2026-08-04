@@ -19,26 +19,35 @@ const appCss = fs.readFileSync(path.join(clientRoot, 'src', 'styles', 'app.css')
 test('iOS startet Guildora vom Home-Bildschirm ohne Safari-Chrome', () => {
   assert.match(indexHtml, /viewport-fit=cover/);
   assert.match(indexHtml, /apple-mobile-web-app-capable" content="yes"/);
+  assert.match(indexHtml, /apple-touch-fullscreen" content="yes"/);
   assert.match(indexHtml, /apple-mobile-web-app-status-bar-style" content="black-translucent"/);
   assert.match(indexHtml, /rel="apple-touch-icon"/);
   assert.match(indexHtml, /rel="manifest"/);
   assert.equal(manifest.start_url, '/app');
   assert.equal(manifest.scope, '/');
-  assert.equal(manifest.display, 'standalone');
+  assert.equal(manifest.display, 'fullscreen');
   assert.deepEqual(manifest.display_override, ['fullscreen', 'standalone']);
 });
 
 test('Standalone-Modus und iPhone-Safe-Areas werden im App-Layout berücksichtigt', () => {
   assert.match(mainSource, /navigator\.standalone === true/);
   assert.match(mainSource, /display-mode: standalone/);
+  assert.match(mainSource, /visualViewport\?\.height \|\| window\.innerHeight/);
+  assert.match(mainSource, /--app-height/);
+  assert.match(mainSource, /orientationchange/);
+  assert.match(mainSource, /pageshow/);
   assert.match(tokensCss, /--safe-area-top:\s*env\(safe-area-inset-top/);
   assert.match(tokensCss, /--safe-area-bottom:\s*env\(safe-area-inset-bottom/);
   assert.match(appCss, /calc\(var\(--titlebar-height\) \+ var\(--safe-area-top\)\)/);
-  assert.match(globalCss, /height:\s*100dvh/);
+  assert.match(globalCss, /height:\s*var\(--app-height\)/);
   assert.match(globalCss, /html\[data-display-mode="standalone"\] body\s*\{[^}]*position:\s*fixed[^}]*inset:\s*0/s);
-  assert.match(appCss, /html\[data-display-mode="standalone"\] \.server-rail\s*\{[^}]*padding-bottom:\s*calc\(12px \+ var\(--safe-area-bottom\)\)/s);
+  assert.match(appCss, /html\[data-display-mode="standalone"\] \.server-rail\s*\{[^}]*padding-top:\s*calc\(12px \+ var\(--safe-area-top\)\)[^}]*padding-bottom:\s*calc\(12px \+ var\(--safe-area-bottom\)\)/s);
   assert.match(appCss, /html\[data-display-mode="standalone"\] \.user-panel\s*\{[^}]*padding-bottom:\s*var\(--safe-area-bottom\)/s);
   assert.match(appCss, /html\[data-display-mode="standalone"\] \.composer-area\s*\{[^}]*padding-bottom:\s*var\(--safe-area-bottom\)[^}]*background:\s*#383a40/s);
+  assert.match(appCss, /html\[data-display-mode="standalone"\] \.guildora-app\s*\{[^}]*top:\s*0[^}]*height:\s*var\(--app-height\)/s);
+  assert.match(appCss, /html\[data-display-mode="standalone"\] \.app-main\s*\{[^}]*grid-template-rows:\s*calc\(48px \+ var\(--safe-area-top\)\)/s);
+  assert.match(appCss, /html\[data-display-mode="standalone"\] \.main-header,/);
+  assert.match(appCss, /html\[data-display-mode="standalone"\] \.member-list__header\s*\{[^}]*padding-top:\s*var\(--safe-area-top\)/s);
   assert.match(appCss, /\.app-navigation\s*\{[\s\S]*?height:\s*auto;/);
 });
 
