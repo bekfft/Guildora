@@ -23,7 +23,7 @@ import { useGuilds } from '../context/GuildContext.jsx';
 import { useVoice } from '../context/VoiceContext.jsx';
 import { useGuildoraDialog } from '../context/GuildoraDialogContext.jsx';
 import { api } from '../lib/api.js';
-import { resolveMobileSwipe } from '../lib/mobileSwipe.js';
+import { clampSwipe, MOBILE_SWIPE_SETTLE_MS, resolveMobileSwipe } from '../lib/mobileSwipe.js';
 import { socket } from '../lib/socket.js';
 import '../styles/app.css';
 
@@ -54,6 +54,7 @@ export default function AppPage() {
     () => !window.matchMedia('(max-width: 1024px)').matches
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [swipePreview, setSwipePreview] = useState(null);
   const [guildModalOpen, setGuildModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState('Mein Konto');
@@ -82,17 +83,78 @@ export default function AppPage() {
     const gesture = {
       startX: 0,
       startY: 0,
+      lastX: 0,
+      lastY: 0,
       startedAt: 0,
       tracking: false,
-      horizontal: false
+      horizontal: false,
+      kind: null,
+      frame: null,
+      settleTimer: null
     };
     const ignoredTarget = (target) => target instanceof Element && Boolean(target.closest(
-      'input, textarea, select, button, a, [contenteditable="true"], [data-swipe-ignore], '
+      'input, textarea, select, [contenteditable="true"], [data-swipe-ignore], '
+      + '.friends-tabs, .settings-tabs, .emoji-picker, .message-attachment, '
       + '.modal-overlay, .server-settings-overlay, .engagement-overlay, .profile-popover'
     ));
-    const resetGesture = () => {
+    const clearVisualState = () => {
+      if (gesture.frame) cancelAnimationFrame(gesture.frame);
+      gesture.frame = null;
+      app.style.removeProperty('--swipe-panel-x');
+      app.style.removeProperty('--swipe-backdrop-opacity');
+      app.style.removeProperty('--swipe-panel-transition');
+      if (gesture.settleTimer) window.clearTimeout(gesture.settleTimer);
+      gesture.settleTimer = null;
+    };
+    const resetGesture = (clearPreview = true) => {
+      clearVisualState();
       gesture.tracking = false;
       gesture.horizontal = false;
+      gesture.kind = null;
+      if (clearPreview) setSwipePreview(null);
+    };
+    const panelWidth = () => {
+      const selector = gesture.kind?.startsWith('members') ? '.member-list' : '.app-navigation';
+      return app.querySelector(selector)?.getBoundingClientRect().width || 312;
+    };
+    const renderGesture = () => {
+      gesture.frame = null;
+      if (!gesture.tracking || !gesture.kind) return;
+      const width = panelWidth();
+      const deltaX = gesture.lastX - gesture.startX;
+      let offset = 0;
+      let progress = 0;
+
+      if (gesture.kind === 'navigation-open') {
+        const travelled = clampSwipe(deltaX, 0, width);
+        offset = -width + travelled;
+        progress = travelled / width;
+      } else if (gesture.kind === 'navigation-close') {
+        offset = clampSwipe(deltaX, -width, 0);
+        progress = 1 - Math.abs(offset) / width;
+      } else if (gesture.kind === 'members-open') {
+        const travelled = clampSwipe(-deltaX, 0, width);
+        offset = width - travelled;
+        progress = travelled / width;
+      } else {
+        offset = clampSwipe(deltaX, 0, width);
+        progress = 1 - offset / width;
+      }
+
+      app.style.setProperty('--swipe-panel-x', `${offset}px`);
+      app.style.setProperty('--swipe-backdrop-opacity', String(clampSwipe(progress, 0, 1)));
+    };
+    const requestGestureFrame = () => {
+      if (!gesture.frame) gesture.frame = requestAnimationFrame(renderGesture);
+    };
+    const chooseGesture = (deltaX) => {
+      if (membersVisible && deltaX > 0) return 'members-close';
+      if (drawerOpen && deltaX < 0) return 'navigation-close';
+      if (!membersVisible && !drawerOpen && deltaX > 0) return 'navigation-open';
+      if (!membersVisible && !drawerOpen && deltaX < 0 && !isDiscovery && !isHome && !isDirect) {
+        return 'members-open';
+      }
+      return null;
     };
     const onTouchStart = (event) => {
       if (
@@ -106,23 +168,37 @@ export default function AppPage() {
       const [touch] = event.touches;
       gesture.startX = touch.clientX;
       gesture.startY = touch.clientY;
+      gesture.lastX = touch.clientX;
+      gesture.lastY = touch.clientY;
       gesture.startedAt = performance.now();
       gesture.tracking = true;
       gesture.horizontal = false;
+      gesture.kind = null;
     };
     const onTouchMove = (event) => {
       if (!gesture.tracking || event.touches.length !== 1) return;
       const [touch] = event.touches;
       const deltaX = touch.clientX - gesture.startX;
       const deltaY = touch.clientY - gesture.startY;
-      if (!gesture.horizontal && Math.max(Math.abs(deltaX), Math.abs(deltaY)) >= 12) {
-        if (Math.abs(deltaY) >= Math.abs(deltaX)) {
+      gesture.lastX = touch.clientX;
+      gesture.lastY = touch.clientY;
+      if (!gesture.horizontal && Math.max(Math.abs(deltaX), Math.abs(deltaY)) >= 8) {
+        if (Math.abs(deltaY) > Math.abs(deltaX) * 1.08) {
           resetGesture();
           return;
         }
         gesture.horizontal = true;
+        gesture.kind = chooseGesture(deltaX);
+        if (!gesture.kind) {
+          resetGesture();
+          return;
+        }
+        setSwipePreview(gesture.kind.startsWith('members') ? 'members' : 'navigation');
       }
-      if (gesture.horizontal) event.preventDefault();
+      if (gesture.horizontal) {
+        event.preventDefault();
+        requestGestureFrame();
+      }
     };
     const onTouchEnd = (event) => {
       if (!gesture.tracking || !gesture.horizontal || event.changedTouches.length !== 1) {
@@ -130,31 +206,57 @@ export default function AppPage() {
         return;
       }
       const [touch] = event.changedTouches;
+      gesture.lastX = touch.clientX;
+      gesture.lastY = touch.clientY;
+      if (gesture.frame) {
+        cancelAnimationFrame(gesture.frame);
+        gesture.frame = null;
+      }
+      renderGesture();
+      const width = panelWidth();
       const direction = resolveMobileSwipe({
         deltaX: touch.clientX - gesture.startX,
         deltaY: touch.clientY - gesture.startY,
-        durationMs: performance.now() - gesture.startedAt
+        durationMs: performance.now() - gesture.startedAt,
+        panelWidth: width
       });
-      resetGesture();
-
-      if (direction === 'right') {
-        if (membersVisible) setMembersVisible(false);
-        else if (!drawerOpen) setDrawerOpen(true);
-      } else if (direction === 'left') {
-        if (drawerOpen) setDrawerOpen(false);
-        else if (!isDiscovery && !isHome && !isDirect) setMembersVisible(true);
-      }
+      const kind = gesture.kind;
+      const completed = (direction === 'right' && ['navigation-open', 'members-close'].includes(kind))
+        || (direction === 'left' && ['navigation-close', 'members-open'].includes(kind));
+      gesture.tracking = false;
+      gesture.horizontal = false;
+      const settlesOpen = completed === kind.endsWith('-open');
+      const targetOffset = settlesOpen
+        ? 0
+        : (kind.startsWith('members') ? width : -width);
+      app.style.setProperty(
+        '--swipe-panel-transition',
+        `transform ${MOBILE_SWIPE_SETTLE_MS}ms cubic-bezier(.2, .8, .2, 1), opacity ${MOBILE_SWIPE_SETTLE_MS}ms ease-out`
+      );
+      app.style.setProperty('--swipe-panel-x', `${targetOffset}px`);
+      app.style.setProperty('--swipe-backdrop-opacity', settlesOpen ? '1' : '0');
+      gesture.settleTimer = window.setTimeout(() => {
+        if (completed && kind === 'navigation-open') setDrawerOpen(true);
+        if (completed && kind === 'navigation-close') setDrawerOpen(false);
+        if (completed && kind === 'members-open') setMembersVisible(true);
+        if (completed && kind === 'members-close') setMembersVisible(false);
+        clearVisualState();
+        gesture.kind = null;
+        setSwipePreview(null);
+      }, MOBILE_SWIPE_SETTLE_MS + 5);
     };
 
     app.addEventListener('touchstart', onTouchStart, { passive: true });
     app.addEventListener('touchmove', onTouchMove, { passive: false });
     app.addEventListener('touchend', onTouchEnd, { passive: true });
-    app.addEventListener('touchcancel', resetGesture, { passive: true });
+    const onTouchCancel = () => resetGesture();
+    app.addEventListener('touchcancel', onTouchCancel, { passive: true });
     return () => {
       app.removeEventListener('touchstart', onTouchStart);
       app.removeEventListener('touchmove', onTouchMove);
       app.removeEventListener('touchend', onTouchEnd);
-      app.removeEventListener('touchcancel', resetGesture);
+      app.removeEventListener('touchcancel', onTouchCancel);
+      clearVisualState();
     };
   }, [drawerOpen, isDirect, isDiscovery, isHome, membersVisible]);
 
@@ -500,7 +602,7 @@ export default function AppPage() {
   }
 
   return (
-    <div ref={appRef} className={`guildora-app ${isDiscovery ? 'is-discovery' : ''} ${membersVisible ? 'has-members' : 'members-hidden'} ${drawerOpen ? 'drawer-open' : ''}`}>
+    <div ref={appRef} className={`guildora-app ${isDiscovery ? 'is-discovery' : ''} ${membersVisible ? 'has-members' : 'members-hidden'} ${drawerOpen ? 'drawer-open' : ''} ${swipePreview ? `is-swiping-${swipePreview}` : ''}`}>
       <button className="drawer-backdrop" type="button" aria-label="Navigation schließen" onClick={() => setDrawerOpen(false)} />
       <div className="app-navigation">
         <ServerRail
@@ -594,7 +696,7 @@ export default function AppPage() {
         </section>
       )}
 
-      {!isDiscovery && !isHome && !isDirect && membersVisible && (
+      {!isDiscovery && !isHome && !isDirect && (membersVisible || swipePreview === 'members') && (
         <>
           <button
             className="member-backdrop"

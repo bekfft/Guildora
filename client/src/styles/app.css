@@ -3117,7 +3117,7 @@ html.is-desktop .modal-overlay {
     height: auto;
     box-shadow: 12px 0 35px rgb(0 0 0 / 35%);
     transform: translateX(calc(-105% - var(--safe-area-left)));
-    transition: transform 180ms ease-out;
+    transition: transform 220ms cubic-bezier(.2, .8, .2, 1);
   }
 
   html[data-display-mode="standalone"] .app-navigation {
@@ -3134,6 +3134,12 @@ html.is-desktop .modal-overlay {
     transform: translateX(0);
   }
 
+  .guildora-app.is-swiping-navigation .app-navigation {
+    transform: translate3d(var(--swipe-panel-x), 0, 0);
+    transition: var(--swipe-panel-transition, none);
+    will-change: transform;
+  }
+
   .drawer-backdrop {
     position: fixed;
     z-index: 70;
@@ -3147,7 +3153,7 @@ html.is-desktop .modal-overlay {
     opacity: 0;
     background: rgb(0 0 0 / 55%);
     pointer-events: none;
-    transition: opacity 180ms ease-out;
+    transition: opacity 220ms ease-out;
   }
 
   html[data-display-mode="standalone"] .drawer-backdrop {
@@ -3157,6 +3163,12 @@ html.is-desktop .modal-overlay {
   .drawer-open .drawer-backdrop {
     opacity: 1;
     pointer-events: auto;
+  }
+
+  .guildora-app.is-swiping-navigation .drawer-backdrop {
+    opacity: var(--swipe-backdrop-opacity);
+    pointer-events: none;
+    transition: var(--swipe-panel-transition, none);
   }
 
   .app-main,
@@ -6208,6 +6220,8 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
     border: 0;
     background: rgb(0 0 0 / 58%);
     backdrop-filter: blur(2px);
+    opacity: 1;
+    transition: opacity 220ms ease-out;
   }
 
   html[data-display-mode="standalone"] .member-backdrop {
@@ -6226,11 +6240,25 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
     padding: 0 8px 18px;
     box-shadow: -16px 0 42px rgb(0 0 0 / 42%);
     animation: mobile-members-in 180ms ease-out both;
+    transition: transform 220ms cubic-bezier(.2, .8, .2, 1);
   }
 
   html[data-display-mode="standalone"] .member-list {
     top: 0;
     bottom: 0;
+  }
+
+  .guildora-app.is-swiping-members .member-list {
+    animation: none;
+    transform: translate3d(var(--swipe-panel-x, 100%), 0, 0);
+    transition: var(--swipe-panel-transition, none);
+    will-change: transform;
+  }
+
+  .guildora-app.is-swiping-members .member-backdrop {
+    opacity: var(--swipe-backdrop-opacity, 0);
+    pointer-events: none;
+    transition: var(--swipe-panel-transition, none);
   }
 
   .member-list__header {
