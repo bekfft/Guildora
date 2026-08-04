@@ -33,6 +33,7 @@ export default function MemberList({
   roles = [],
   capabilities = {},
   canMention = true,
+  skipEntranceAnimation = false,
   onClose,
   onOpenProfile,
   onOpenDm,
@@ -242,7 +243,7 @@ export default function MemberList({
   const customRoles = roles.filter((role) => !role.is_default);
 
   return (
-    <aside className="member-list" aria-label="Mitglieder">
+    <aside className={`member-list ${skipEntranceAnimation ? 'skip-entrance-animation' : ''}`} aria-label="Mitglieder">
       <div className="member-list__header">
         <span><Users size={18} /><strong>Mitglieder</strong></span>
         <button className="icon-button" type="button" onClick={onClose} aria-label="Mitgliederliste schließen"><X size={20} /></button>

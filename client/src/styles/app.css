@@ -3132,6 +3132,10 @@ html.is-desktop .modal-overlay {
     transition: transform 220ms cubic-bezier(.2, .8, .2, 1);
   }
 
+  .member-list.skip-entrance-animation {
+    animation: none;
+  }
+
   html:is([data-display-mode="standalone"], [data-mobile-app]) .app-navigation {
     top: 0;
     bottom: 0;

@@ -6,6 +6,8 @@ const { pathToFileURL } = require('node:url');
 
 const clientRoot = path.resolve(__dirname, '..', '..', 'client', 'src');
 const appPage = fs.readFileSync(path.join(clientRoot, 'pages', 'AppPage.jsx'), 'utf8');
+const memberList = fs.readFileSync(path.join(clientRoot, 'app', 'MemberList.jsx'), 'utf8');
+const appCss = fs.readFileSync(path.join(clientRoot, 'styles', 'app.css'), 'utf8');
 const swipeModuleUrl = pathToFileURL(path.join(clientRoot, 'lib', 'mobileSwipe.js')).href;
 
 test('mobile Wischrichtung wird nur bei einer klaren horizontalen Geste erkannt', async () => {
@@ -36,5 +38,9 @@ test('mobile App verdrahtet Discord-aehnliche Seitenpanel-Gesten', () => {
   assert.match(appPage, /navigation-open/);
   assert.match(appPage, /members-open/);
   assert.match(appPage, /membersVisible \|\| swipePreview === 'members'/);
+  assert.match(appPage, /setMembersOpenedBySwipe\(true\);\s*setMembersVisible\(true\)/);
+  assert.match(appPage, /skipEntranceAnimation=\{membersOpenedBySwipe\}/);
+  assert.match(memberList, /skipEntranceAnimation \? 'skip-entrance-animation' : ''/);
+  assert.match(appCss, /\.member-list\.skip-entrance-animation\s*\{\s*animation:\s*none;/);
   assert.doesNotMatch(appPage, /input, textarea, select, button, a/);
 });

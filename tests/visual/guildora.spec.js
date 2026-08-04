@@ -259,9 +259,27 @@ test('iPhone 17 Pro Max Standalone füllt den Bildschirm und bedient Nachrichten
   await expect(profileDialog).toHaveScreenshot('iphone-17-pro-max-profile.png', { caret: 'hide' });
   await profileDialog.getByRole('button', { name: 'Dialog schließen' }).click();
 
+  await page.evaluate(() => {
+    window.__memberOpenProbe = { mounts: 0, animations: 0 };
+    window.__memberOpenObserver = new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          if (node instanceof Element && (node.matches('.member-list') || node.querySelector('.member-list'))) {
+            window.__memberOpenProbe.mounts += 1;
+          }
+        }
+      }
+    });
+    window.__memberOpenObserver.observe(document.querySelector('.guildora-app'), { childList: true, subtree: true });
+    document.addEventListener('animationstart', (event) => {
+      if (event.animationName === 'mobile-members-in') window.__memberOpenProbe.animations += 1;
+    }, true);
+  });
   await page.getByRole('button', { name: 'Mitgliederliste umschalten' }).click();
   const memberList = page.getByRole('complementary', { name: 'Mitglieder' });
   await expect(memberList).toBeVisible();
+  await page.waitForTimeout(240);
+  expect(await page.evaluate(() => window.__memberOpenProbe)).toEqual({ mounts: 1, animations: 1 });
   const memberGeometry = await memberList.locator('.member-row').first().evaluate((row) => {
     const avatar = row.querySelector('.member-avatar').getBoundingClientRect();
     const rect = row.getBoundingClientRect();
@@ -272,6 +290,20 @@ test('iPhone 17 Pro Max Standalone füllt den Bildschirm und bedient Nachrichten
   expect(memberGeometry.avatarHeight).toBe(36);
   await expect(page.locator('.guildora-app')).toHaveScreenshot('iphone-17-pro-max-members.png', { caret: 'hide' });
   await memberList.getByRole('button', { name: 'Mitgliederliste schließen' }).click();
+
+  await page.evaluate(() => { window.__memberOpenProbe = { mounts: 0, animations: 0 }; });
+  const appShell = page.locator('.guildora-app');
+  const touch = (clientX, clientY) => ({ identifier: 1, clientX, clientY, pageX: clientX, pageY: clientY });
+  await appShell.dispatchEvent('touchstart', { touches: [touch(420, 430)], changedTouches: [touch(420, 430)] });
+  await appShell.dispatchEvent('touchmove', { touches: [touch(70, 434)], changedTouches: [touch(70, 434)] });
+  await page.waitForTimeout(30);
+  await appShell.dispatchEvent('touchend', { touches: [], changedTouches: [touch(70, 434)] });
+  await expect(memberList).toBeVisible();
+  await page.waitForTimeout(260);
+  expect(await page.evaluate(() => window.__memberOpenProbe)).toEqual({ mounts: 1, animations: 0 });
+  await page.waitForTimeout(220);
+  await memberList.getByRole('button', { name: 'Mitgliederliste schließen' }).click();
+  await expect(memberList).toBeHidden();
 
   await page.getByRole('button', { name: 'Navigation öffnen' }).click();
   const navigation = page.locator('.app-navigation');

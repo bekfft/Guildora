@@ -58,6 +58,7 @@ export default function AppPage() {
   const [membersVisible, setMembersVisible] = useState(
     () => !window.matchMedia('(max-width: 1024px)').matches
   );
+  const [membersOpenedBySwipe, setMembersOpenedBySwipe] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [swipePreview, setSwipePreview] = useState(null);
   const [guildModalOpen, setGuildModalOpen] = useState(false);
@@ -249,8 +250,14 @@ export default function AppPage() {
         flushSync(() => {
           if (completed && kind === 'navigation-open') setDrawerOpen(true);
           if (completed && kind === 'navigation-close') setDrawerOpen(false);
-          if (completed && kind === 'members-open') setMembersVisible(true);
-          if (completed && kind === 'members-close') setMembersVisible(false);
+          if (completed && kind === 'members-open') {
+            setMembersOpenedBySwipe(true);
+            setMembersVisible(true);
+          }
+          if (completed && kind === 'members-close') {
+            setMembersOpenedBySwipe(false);
+            setMembersVisible(false);
+          }
           setSwipePreview(null);
         });
         gesture.kind = null;
@@ -316,24 +323,36 @@ export default function AppPage() {
 
   useEffect(() => {
     const query = window.matchMedia('(max-width: 1024px)');
-    const updateLayout = (event) => setMembersVisible(!event.matches);
+    const updateLayout = (event) => {
+      setMembersOpenedBySwipe(false);
+      setMembersVisible(!event.matches);
+    };
     query.addEventListener('change', updateLayout);
     return () => query.removeEventListener('change', updateLayout);
   }, []);
 
   useEffect(() => {
-    if (drawerOpen) setMembersVisible(false);
+    if (drawerOpen) {
+      setMembersOpenedBySwipe(false);
+      setMembersVisible(false);
+    }
   }, [drawerOpen]);
 
   useEffect(() => {
-    if (window.matchMedia('(max-width: 1024px)').matches) setMembersVisible(false);
+    if (window.matchMedia('(max-width: 1024px)').matches) {
+      setMembersOpenedBySwipe(false);
+      setMembersVisible(false);
+    }
   }, [location.pathname]);
 
   useEffect(() => {
     const closeMobilePanels = (event) => {
       if (event.key !== 'Escape') return;
       setDrawerOpen(false);
-      if (window.matchMedia('(max-width: 1024px)').matches) setMembersVisible(false);
+      if (window.matchMedia('(max-width: 1024px)').matches) {
+        setMembersOpenedBySwipe(false);
+        setMembersVisible(false);
+      }
     };
     document.addEventListener('keydown', closeMobilePanels);
     return () => document.removeEventListener('keydown', closeMobilePanels);
@@ -525,7 +544,10 @@ export default function AppPage() {
   const openProfile = useCallback((userId) => {
     setProfileUserId(userId);
     setDrawerOpen(false);
-    if (window.matchMedia('(max-width: 1024px)').matches) setMembersVisible(false);
+    if (window.matchMedia('(max-width: 1024px)').matches) {
+      setMembersOpenedBySwipe(false);
+      setMembersVisible(false);
+    }
   }, []);
 
   const closeProfile = useCallback(() => {
@@ -680,6 +702,7 @@ export default function AppPage() {
             notificationCount={notificationCount}
             onToggleMembers={() => {
               setDrawerOpen(false);
+              setMembersOpenedBySwipe(false);
               setMembersVisible((value) => !value);
             }}
             onToast={showToast}
@@ -725,9 +748,13 @@ export default function AppPage() {
             className="member-backdrop"
             type="button"
             aria-label="Mitgliederliste schließen"
-            onClick={() => setMembersVisible(false)}
+            onClick={() => {
+              setMembersOpenedBySwipe(false);
+              setMembersVisible(false);
+            }}
           />
           <MemberList
+            skipEntranceAnimation={membersOpenedBySwipe}
             members={members}
             loading={loadingDetails}
             currentUserId={user.id}
@@ -736,7 +763,10 @@ export default function AppPage() {
             roles={guildData?.roles || []}
             capabilities={capabilities}
             canMention={activeChannel?.permissions?.sendMessages !== false}
-            onClose={() => setMembersVisible(false)}
+            onClose={() => {
+              setMembersOpenedBySwipe(false);
+              setMembersVisible(false);
+            }}
             onOpenProfile={openProfile}
             onOpenDm={(id) => navigate(`/app/channels/@me/${id}`)}
             onMention={(member) => setMentionRequest({
