@@ -53,6 +53,7 @@ after(async () => {
 test('liefert normalisierte Release-Metadaten öffentlich aus', async () => {
   const response = await originalFetch(`${baseUrl}/api/releases/latest`);
   assert.equal(response.status, 200);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
   const body = await response.json();
   assert.equal(body.version, '1.2.3');
   assert.equal(body.windows.sizeBytes, 78_123_456);

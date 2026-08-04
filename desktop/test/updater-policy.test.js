@@ -17,7 +17,7 @@ test('Desktop-Updater lädt stabile Updates automatisch und installiert sie beim
   assert.doesNotMatch(source, /autoUpdater\.quitAndInstall\(false,/);
   assert.match(source, /autoUpdater\.allowDowngrade = false/);
   assert.match(source, /autoUpdater\.allowPrerelease = false/);
-  assert.match(source, /UPDATE_CHECK_INTERVAL_MS = 30 \* 60 \* 1000/);
+  assert.match(source, /UPDATE_CHECK_INTERVAL_MS = 5 \* 60 \* 1000/);
 });
 
 test('Renderer kann den letzten Updater-Status nach dem Laden abrufen', () => {
@@ -27,6 +27,23 @@ test('Renderer kann den letzten Updater-Status nach dem Laden abrufen', () => {
   assert.match(ipc, /UPDATE_GET_STATE: 'desktop:update-get-state'/);
   assert.match(preload, /getUpdateState: \(\) => ipcRenderer\.invoke\(IPC\.UPDATE_GET_STATE\)/);
   assert.match(updater, /function getUpdateState\(\)/);
+});
+
+test('Browser und Desktop zeigen neue Versionen mit einer direkten Aktualisierungsaktion', () => {
+  const toasts = fs.readFileSync(path.join(desktopRoot, '..', 'client', 'src', 'components', 'DesktopToasts.jsx'), 'utf8');
+  assert.match(toasts, /BROWSER_UPDATE_INTERVAL_MS = 60 \* 1000/);
+  assert.match(toasts, /Neue Guildora-Version verfügbar/);
+  assert.match(toasts, /Jetzt neu laden/);
+  assert.match(toasts, /Neu starten &amp; aktualisieren/);
+  assert.match(toasts, /\['available', 'progress'\]/);
+});
+
+test('Release-Build bettet die bereits erhöhte Desktop-Version in den Web-Client ein', () => {
+  const release = read('scripts/release.js');
+  const versionIndex = release.indexOf("npm', ['version'");
+  const buildIndex = release.indexOf("npm', ['run', 'build'");
+  assert.ok(versionIndex >= 0);
+  assert.ok(buildIndex > versionIndex);
 });
 
 test('Desktop-Releases verwenden den vorgeschriebenen Guildora-Tag', () => {

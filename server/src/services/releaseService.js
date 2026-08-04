@@ -1,6 +1,6 @@
 import { ApiError } from '../middleware/errorHandler.js';
 
-const CACHE_TTL_MS = 15 * 60 * 1000;
+const CACHE_TTL_MS = 60 * 1000;
 const GITHUB_OWNER = process.env.GITHUB_OWNER || 'bekfft';
 const GITHUB_REPO = process.env.GITHUB_REPO || 'Guildora';
 

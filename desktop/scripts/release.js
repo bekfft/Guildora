@@ -32,10 +32,10 @@ const nextVersion = semver.inc(currentPackage.version, bump);
 
 run('npm', ['test'], repositoryRoot);
 run('npm', ['run', 'test', '--workspace', 'guildora-desktop'], repositoryRoot);
-run('npm', ['run', 'build'], repositoryRoot);
 run('npm', ['version', nextVersion, '--workspace', 'guildora-desktop', '--no-git-tag-version'], repositoryRoot);
 
 const desktopPackage = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+run('npm', ['run', 'build'], repositoryRoot);
 console.log(`Desktop-Version auf ${desktopPackage.version} erhöht.`);
 run('npx', ['electron-builder', '--win', '--publish', 'always']);
 process.env.RELEASE_VERSION = desktopPackage.version;

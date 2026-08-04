@@ -5,7 +5,7 @@ const router = Router();
 
 router.get('/releases/latest', async (req, res, next) => {
   try {
-    res.set('Cache-Control', 'public, max-age=300');
+    res.set('Cache-Control', 'no-store');
     res.json(await getLatestRelease());
   } catch (error) {
     next(error);

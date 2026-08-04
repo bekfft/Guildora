@@ -178,7 +178,32 @@ html[data-display-mode="standalone"] .auth-brand {
 .desktop-toast span { color:var(--text-muted); font-size:13px; }
 .desktop-toast > div { display:flex; gap:8px; }
 .desktop-toast button { padding:7px 10px; border:0; border-radius:4px; color:#fff; background:var(--brand); cursor:pointer; }
-.desktop-toast button:last-child { background:#45474e; }
+.desktop-toast > div button:last-child:not(:first-child) { background:#45474e; }
+.desktop-toast button:disabled { opacity:.65; cursor:wait; }
+.app-update-toast { border-color:rgb(88 101 242 / 55%); }
+.app-update-toast__progress {
+  width:100%;
+  height:4px;
+  overflow:hidden;
+  border-radius:999px;
+  background:rgb(255 255 255 / 10%);
+}
+.app-update-toast__progress span {
+  display:block;
+  height:100%;
+  border-radius:inherit;
+  background:var(--brand);
+  transition:width 180ms ease;
+}
+
+@media (max-width: 600px) {
+  .desktop-toasts {
+    right:12px;
+    bottom:max(12px,env(safe-area-inset-bottom));
+    width:calc(100vw - 24px);
+  }
+  .desktop-toast > div:not(.app-update-toast__progress) { flex-wrap:wrap; }
+}
 
 html.is-desktop :is(.landing, .download-page, .auth-shell, .invite-shell, .placeholder-page, .route-loader, .app-placeholder) {
   min-height: var(--content-viewport-height);

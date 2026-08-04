@@ -184,3 +184,24 @@ test('helles Hochkontrast-Design und reduzierte Bewegung bleiben nutzbar', async
   await page.keyboard.press('Tab');
   await expect(page.locator('.guildora-app')).toHaveScreenshot('accessibility-light.png', { caret: 'hide' });
 });
+
+test('Browser meldet ein neues Release und kann die aktuelle Version neu laden', async ({ page }) => {
+  let documentRequests = 0;
+  page.on('request', (request) => {
+    if (request.resourceType() === 'document') documentRequests += 1;
+  });
+  await page.route('**/api/releases/latest', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ version: '99.0.0', publishedAt: new Date().toISOString(), windows: {} })
+  }));
+  await page.goto('/app/channels/@me');
+  const notice = page.getByRole('status', { name: 'Guildora-Update verfügbar' });
+  await expect(notice).toBeVisible();
+  await expect(notice).toContainText('Version 99.0.0');
+  await expect(notice.getByRole('button', { name: 'Jetzt neu laden' })).toBeVisible();
+
+  const requestsBeforeReload = documentRequests;
+  await notice.getByRole('button', { name: 'Jetzt neu laden' }).click();
+  await expect.poll(() => documentRequests).toBeGreaterThan(requestsBeforeReload);
+});

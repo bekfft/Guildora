@@ -10,7 +10,7 @@ let interval;
 let checkPromise;
 
 const INITIAL_CHECK_DELAY_MS = 3_000;
-const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
+const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 function emit(type, data = {}) {
   lastEvent = { type, ...data };
