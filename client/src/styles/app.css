@@ -12,24 +12,24 @@
   background: var(--bg-content);
 }
 
-html[data-display-mode="standalone"] .guildora-app {
+html:is([data-display-mode="standalone"], [data-mobile-app]) .guildora-app {
   top: 0;
   bottom: auto;
   height: var(--app-height);
 }
 
-html[data-display-mode="standalone"] .app-main {
+html:is([data-display-mode="standalone"], [data-mobile-app]) .app-main {
   grid-template-rows: calc(48px + var(--safe-area-top)) minmax(0, 1fr);
 }
 
-html[data-display-mode="standalone"] .main-header,
-html[data-display-mode="standalone"] .dm-search,
-html[data-display-mode="standalone"] .guild-sidebar-header {
+html:is([data-display-mode="standalone"], [data-mobile-app]) .main-header,
+html:is([data-display-mode="standalone"], [data-mobile-app]) .dm-search,
+html:is([data-display-mode="standalone"], [data-mobile-app]) .guild-sidebar-header {
   padding-top: var(--safe-area-top);
 }
 
-html[data-display-mode="standalone"] .dm-search,
-html[data-display-mode="standalone"] .guild-sidebar-header {
+html:is([data-display-mode="standalone"], [data-mobile-app]) .dm-search,
+html:is([data-display-mode="standalone"], [data-mobile-app]) .guild-sidebar-header {
   flex-basis: calc(48px + var(--safe-area-top));
 }
 
@@ -2005,7 +2005,7 @@ html[data-display-mode="standalone"] .guild-sidebar-header {
   background: var(--danger);
 }
 
-html[data-display-mode="standalone"] .app-navigation {
+html:is([data-display-mode="standalone"], [data-mobile-app]) .app-navigation {
   background:
     linear-gradient(
       to right,
@@ -2014,16 +2014,16 @@ html[data-display-mode="standalone"] .app-navigation {
     );
 }
 
-html[data-display-mode="standalone"] .server-rail {
+html:is([data-display-mode="standalone"], [data-mobile-app]) .server-rail {
   padding-top: calc(12px + var(--safe-area-top));
   padding-bottom: calc(12px + var(--safe-area-bottom));
 }
 
-html[data-display-mode="standalone"] .user-panel-wrap {
+html:is([data-display-mode="standalone"], [data-mobile-app]) .user-panel-wrap {
   flex-basis: calc(52px + var(--safe-area-bottom));
 }
 
-html[data-display-mode="standalone"] .user-panel {
+html:is([data-display-mode="standalone"], [data-mobile-app]) .user-panel {
   height: calc(52px + var(--safe-area-bottom));
   padding-bottom: var(--safe-area-bottom);
 }
@@ -3120,7 +3120,7 @@ html.is-desktop .modal-overlay {
     transition: transform 220ms cubic-bezier(.2, .8, .2, 1);
   }
 
-  html[data-display-mode="standalone"] .app-navigation {
+  html:is([data-display-mode="standalone"], [data-mobile-app]) .app-navigation {
     top: 0;
     bottom: auto;
     height: var(--app-height);
@@ -3156,7 +3156,7 @@ html.is-desktop .modal-overlay {
     transition: opacity 220ms ease-out;
   }
 
-  html[data-display-mode="standalone"] .drawer-backdrop {
+  html:is([data-display-mode="standalone"], [data-mobile-app]) .drawer-backdrop {
     inset: 0 var(--safe-area-right) 0 var(--safe-area-left);
   }
 
@@ -6224,7 +6224,7 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
     transition: opacity 220ms ease-out;
   }
 
-  html[data-display-mode="standalone"] .member-backdrop {
+  html:is([data-display-mode="standalone"], [data-mobile-app]) .member-backdrop {
     inset: 0 var(--safe-area-right) 0 var(--safe-area-left);
   }
 
@@ -6243,7 +6243,7 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
     transition: transform 220ms cubic-bezier(.2, .8, .2, 1);
   }
 
-  html[data-display-mode="standalone"] .member-list {
+  html:is([data-display-mode="standalone"], [data-mobile-app]) .member-list {
     top: 0;
     bottom: 0;
   }
@@ -6274,7 +6274,7 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
     background: #2b2d31;
   }
 
-  html[data-display-mode="standalone"] .member-list__header {
+  html:is([data-display-mode="standalone"], [data-mobile-app]) .member-list__header {
     min-height: calc(54px + var(--safe-area-top));
     padding-top: var(--safe-area-top);
   }
@@ -6360,11 +6360,11 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
     padding: 0 10px max(10px, env(safe-area-inset-bottom));
   }
 
-  html[data-display-mode="standalone"] .channel-view {
+  html:is([data-display-mode="standalone"], [data-mobile-app]) .channel-view {
     padding-bottom: 0;
   }
 
-  html[data-display-mode="standalone"] .composer-area {
+  html:is([data-display-mode="standalone"], [data-mobile-app]) .composer-area {
     padding-bottom: var(--safe-area-bottom);
     background: var(--bg-content);
   }

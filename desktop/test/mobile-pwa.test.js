@@ -15,6 +15,13 @@ const directMessageView = fs.readFileSync(path.join(clientRoot, 'src', 'app', 'D
 const globalCss = fs.readFileSync(path.join(clientRoot, 'src', 'styles', 'global.css'), 'utf8');
 const tokensCss = fs.readFileSync(path.join(clientRoot, 'src', 'styles', 'tokens.css'), 'utf8');
 const appCss = fs.readFileSync(path.join(clientRoot, 'src', 'styles', 'app.css'), 'utf8');
+const appViewportSelector = 'html:is([data-display-mode="standalone"], [data-mobile-app])';
+
+function cssRule(source, selector) {
+  const start = source.indexOf(`${selector} {`);
+  assert.notEqual(start, -1, `CSS-Regel fehlt: ${selector}`);
+  return source.slice(start, source.indexOf('}', start) + 1);
+}
 
 test('iOS startet Guildora vom Home-Bildschirm ohne Safari-Chrome', () => {
   assert.match(indexHtml, /viewport-fit=cover/);
@@ -27,13 +34,18 @@ test('iOS startet Guildora vom Home-Bildschirm ohne Safari-Chrome', () => {
   assert.equal(manifest.scope, '/');
   assert.equal(manifest.display, 'fullscreen');
   assert.deepEqual(manifest.display_override, ['fullscreen', 'standalone']);
+  assert.equal(manifest.background_color, '#313338');
+  assert.equal(manifest.theme_color, '#313338');
+  assert.match(indexHtml, /name="theme-color" content="#313338"/);
 });
 
 test('Standalone-Modus und iPhone-Safe-Areas werden im App-Layout berücksichtigt', () => {
   assert.match(mainSource, /navigator\.standalone === true/);
   assert.match(mainSource, /display-mode: standalone/);
+  assert.match(mainSource, /mobileAppQuery\.matches && window\.location\.pathname\.startsWith\('\/app'\)/);
+  assert.match(mainSource, /toggleAttribute\('data-mobile-app', isMobileApp\)/);
   assert.match(mainSource, /Math\.max\(window\.innerHeight, document\.documentElement\.clientHeight\)/);
-  assert.match(mainSource, /layoutHeight - visualHeight > 120/);
+  assert.match(mainSource, /keyboardTarget && layoutHeight - visualHeight > 120/);
   assert.match(mainSource, /keyboardOpen \? visualHeight : Math\.max\(layoutHeight, visualHeight\)/);
   assert.match(mainSource, /--app-height/);
   assert.match(mainSource, /orientationchange/);
@@ -42,16 +54,17 @@ test('Standalone-Modus und iPhone-Safe-Areas werden im App-Layout berücksichtig
   assert.match(tokensCss, /--safe-area-bottom:\s*env\(safe-area-inset-bottom/);
   assert.match(appCss, /calc\(var\(--titlebar-height\) \+ var\(--safe-area-top\)\)/);
   assert.match(globalCss, /height:\s*var\(--app-height\)/);
-  assert.match(globalCss, /html\[data-display-mode="standalone"\][\s\S]*?background:\s*var\(--bg-content\)/);
-  assert.match(globalCss, /html\[data-display-mode="standalone"\] body\s*\{[^}]*position:\s*fixed[^}]*inset:\s*0/s);
-  assert.match(appCss, /html\[data-display-mode="standalone"\] \.server-rail\s*\{[^}]*padding-top:\s*calc\(12px \+ var\(--safe-area-top\)\)[^}]*padding-bottom:\s*calc\(12px \+ var\(--safe-area-bottom\)\)/s);
-  assert.match(appCss, /html\[data-display-mode="standalone"\] \.user-panel\s*\{[^}]*padding-bottom:\s*var\(--safe-area-bottom\)/s);
-  assert.match(appCss, /html\[data-display-mode="standalone"\] \.composer-area\s*\{[^}]*padding-bottom:\s*var\(--safe-area-bottom\)[^}]*background:\s*var\(--bg-content\)/s);
-  assert.doesNotMatch(appCss, /html\[data-display-mode="standalone"\] \.composer-area\s*\{[^}]*border-radius:/s);
-  assert.match(appCss, /html\[data-display-mode="standalone"\] \.guildora-app\s*\{[^}]*top:\s*0[^}]*height:\s*var\(--app-height\)/s);
-  assert.match(appCss, /html\[data-display-mode="standalone"\] \.app-main\s*\{[^}]*grid-template-rows:\s*calc\(48px \+ var\(--safe-area-top\)\)/s);
-  assert.match(appCss, /html\[data-display-mode="standalone"\] \.main-header,/);
-  assert.match(appCss, /html\[data-display-mode="standalone"\] \.member-list__header\s*\{[^}]*padding-top:\s*var\(--safe-area-top\)/s);
+  assert.match(globalCss, /background:\s*var\(--bg-content\)/);
+  assert.match(cssRule(globalCss, `${appViewportSelector} body`), /position:\s*fixed[\s\S]*inset:\s*0/);
+  assert.match(cssRule(appCss, `${appViewportSelector} .server-rail`), /padding-top:\s*calc\(12px \+ var\(--safe-area-top\)\)[\s\S]*padding-bottom:\s*calc\(12px \+ var\(--safe-area-bottom\)\)/);
+  assert.match(cssRule(appCss, `${appViewportSelector} .user-panel`), /padding-bottom:\s*var\(--safe-area-bottom\)/);
+  const composerViewportRule = cssRule(appCss, `${appViewportSelector} .composer-area`);
+  assert.match(composerViewportRule, /padding-bottom:\s*var\(--safe-area-bottom\)[\s\S]*background:\s*var\(--bg-content\)/);
+  assert.doesNotMatch(composerViewportRule, /border-radius:/);
+  assert.match(cssRule(appCss, `${appViewportSelector} .guildora-app`), /top:\s*0[\s\S]*height:\s*var\(--app-height\)/);
+  assert.match(cssRule(appCss, `${appViewportSelector} .app-main`), /grid-template-rows:\s*calc\(48px \+ var\(--safe-area-top\)\)/);
+  assert.match(appCss, new RegExp(`${appViewportSelector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\.main-header,`));
+  assert.match(cssRule(appCss, `${appViewportSelector} .member-list__header`), /padding-top:\s*var\(--safe-area-top\)/);
   assert.match(appCss, /\.app-navigation\s*\{[\s\S]*?height:\s*auto;/);
 });
 

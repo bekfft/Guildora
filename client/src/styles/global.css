@@ -47,9 +47,9 @@ body {
   min-height: 100%;
 }
 
-html[data-display-mode="standalone"],
-html[data-display-mode="standalone"] body,
-html[data-display-mode="standalone"] #root {
+html:is([data-display-mode="standalone"], [data-mobile-app]),
+html:is([data-display-mode="standalone"], [data-mobile-app]) body,
+html:is([data-display-mode="standalone"], [data-mobile-app]) #root {
   width: 100%;
   height: var(--app-height);
   min-height: var(--app-height);
@@ -57,7 +57,7 @@ html[data-display-mode="standalone"] #root {
   background: var(--bg-content);
 }
 
-html[data-display-mode="standalone"] body {
+html:is([data-display-mode="standalone"], [data-mobile-app]) body {
   position: fixed;
   inset: 0;
   height: var(--app-height);
@@ -65,7 +65,7 @@ html[data-display-mode="standalone"] body {
   -webkit-touch-callout: none;
 }
 
-html[data-display-mode="standalone"] :is(input, textarea, [contenteditable="true"]) {
+html:is([data-display-mode="standalone"], [data-mobile-app]) :is(input, textarea, [contenteditable="true"]) {
   user-select: text;
   -webkit-touch-callout: default;
 }
