@@ -7597,3 +7597,32 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
     height: 34px;
   }
 }
+
+/* Jede mobile App-Ebene bedeckt auch die physischen Safe-Areas. */
+html:is([data-display-mode="standalone"], [data-mobile-app])
+  :is(.modal-overlay, .server-settings-overlay, .engagement-overlay) {
+  inset: 0;
+}
+
+html:is([data-display-mode="standalone"], [data-mobile-app]) .modal-overlay {
+  padding-top: max(20px, var(--safe-area-top));
+  padding-right: max(20px, var(--safe-area-right));
+  padding-bottom: max(20px, var(--safe-area-bottom));
+  padding-left: max(20px, var(--safe-area-left));
+}
+
+html:is([data-display-mode="standalone"], [data-mobile-app]) .server-settings-overlay {
+  padding: var(--safe-area-top) var(--safe-area-right) var(--safe-area-bottom) var(--safe-area-left);
+}
+
+html:is([data-display-mode="standalone"], [data-mobile-app]) .engagement-panel {
+  padding-top: var(--safe-area-top);
+  padding-right: var(--safe-area-right);
+  padding-bottom: var(--safe-area-bottom);
+}
+
+@media (max-width: 1024px) {
+  html:is([data-display-mode="standalone"], [data-mobile-app]) .member-list {
+    padding-bottom: calc(18px + var(--safe-area-bottom));
+  }
+}
