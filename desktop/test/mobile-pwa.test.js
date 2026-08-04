@@ -44,11 +44,14 @@ test('Standalone-Modus und iPhone-Safe-Areas werden im App-Layout berücksichtig
   assert.match(mainSource, /display-mode: standalone/);
   assert.match(mainSource, /mobileAppQuery\.matches && \['\/app', '\/staff'\]\.some/);
   assert.match(mainSource, /toggleAttribute\('data-mobile-app', isMobileApp\)/);
+  assert.match(appSource, /function MobileAppRouteSync\(\)/);
+  assert.match(appSource, /\['\/app', '\/staff'\]\.some\(\(prefix\) => pathname\.startsWith\(prefix\)\)/);
+  assert.match(appSource, /<MobileAppRouteSync \/>/);
   assert.match(mainSource, /Math\.max\(window\.innerHeight, document\.documentElement\.clientHeight\)/);
   assert.match(mainSource, /keyboardTarget && layoutHeight - visualHeight > 120/);
-  assert.match(mainSource, /if \(keyboardOpen\)/);
-  assert.match(mainSource, /setProperty\('--app-height', `\$\{Math\.round\(visualHeight\)\}px`\)/);
-  assert.match(mainSource, /removeProperty\('--app-height'\)/);
+  assert.match(mainSource, /const viewportHeight = keyboardOpen \? visualHeight : Math\.max\(layoutHeight, visualHeight\)/);
+  assert.match(mainSource, /setProperty\('--app-height', `\$\{Math\.round\(viewportHeight\)\}px`\)/);
+  assert.doesNotMatch(mainSource, /removeProperty\('--app-height'\)/);
   assert.match(mainSource, /--app-height/);
   assert.match(mainSource, /orientationchange/);
   assert.match(mainSource, /pageshow/);

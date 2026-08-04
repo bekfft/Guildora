@@ -20,13 +20,12 @@ function updateAppViewport() {
     'input, textarea, select, [contenteditable="true"]'
   );
   const keyboardOpen = keyboardTarget && layoutHeight - visualHeight > 120;
-  if (keyboardOpen) {
-    document.documentElement.style.setProperty('--app-height', `${Math.round(visualHeight)}px`);
-  } else {
-    // 100dvh folgt dem echten iOS-Standalone-Viewport zuverlässiger als ein
-    // beim Start gemessener Pixelwert, der die Home-Indicator-Zone enthalten kann.
-    document.documentElement.style.removeProperty('--app-height');
-  }
+  // iOS kann 100dvh im Home-Bildschirm-Modus oberhalb der Home-Indicator-Zone
+  // beenden. Die groessere Layout-/Visual-Viewport-Hoehe malt die App bis zur
+  // physischen Unterkante; die Safe-Area-Paddings halten Bedienelemente trotzdem
+  // oberhalb des Home Indicators. Nur bei offener Tastatur wird bewusst gekuerzt.
+  const viewportHeight = keyboardOpen ? visualHeight : Math.max(layoutHeight, visualHeight);
+  document.documentElement.style.setProperty('--app-height', `${Math.round(viewportHeight)}px`);
 }
 
 function updateDisplayMode() {

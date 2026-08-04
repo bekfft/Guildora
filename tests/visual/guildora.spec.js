@@ -220,7 +220,7 @@ test('iPhone 17 Pro Max Standalone füllt den Bildschirm und bedient Nachrichten
   expect(shellGeometry.appBottom).toBe(956);
   expect(shellGeometry.appWidth).toBe(440);
   expect(shellGeometry.composerBottom).toBe(956);
-  expect(shellGeometry.appHeightInline).toBe('');
+  expect(shellGeometry.appHeightInline).toBe('956px');
 
   const message = page.locator('.message-row').first();
   const actions = message.locator('.message-actions');

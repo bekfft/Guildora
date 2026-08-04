@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { lazy, Suspense, useEffect } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { GuildProvider } from './context/GuildContext.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
@@ -18,6 +18,24 @@ const LoginPage = lazy(() => import('./pages/LoginPage.jsx'));
 const PlaceholderPage = lazy(() => import('./pages/PlaceholderPage.jsx'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage.jsx'));
 const StaffPage = lazy(() => import('./pages/StaffPage.jsx'));
+
+function MobileAppRouteSync() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    const mobileAppQuery = window.matchMedia('(max-width: 1024px)');
+    const update = () => {
+      const isMobileApp = mobileAppQuery.matches
+        && ['/app', '/staff'].some((prefix) => pathname.startsWith(prefix));
+      document.documentElement.toggleAttribute('data-mobile-app', isMobileApp);
+    };
+    update();
+    mobileAppQuery.addEventListener?.('change', update);
+    return () => mobileAppQuery.removeEventListener?.('change', update);
+  }, [pathname]);
+
+  return null;
+}
 
 function StaffRoute() {
   const { user } = useAuth();
@@ -55,6 +73,7 @@ function WebDownloadRoute() {
 export default function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MobileAppRouteSync />
       <DesktopProvider>
         <DesktopTitlebar />
         <DesktopToasts />
