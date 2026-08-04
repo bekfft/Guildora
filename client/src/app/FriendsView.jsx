@@ -1,5 +1,5 @@
 import { Ban, Check, MessageCircle, Search, UserMinus, UserPlus, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { socket } from '../lib/socket.js';
 
@@ -15,6 +15,7 @@ export default function FriendsView({ onOpenDm, onOpenProfile, onToast, onConver
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
+  const searchRef = useRef(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -108,7 +109,7 @@ export default function FriendsView({ onOpenDm, onOpenProfile, onToast, onConver
       <div className="friends-content">
         <div className="friend-add">
           <Search size={18} />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nutzername suchen und Freund hinzufügen" aria-label="Nutzer suchen" />
+          <input ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nutzername suchen" aria-label="Nutzer suchen" />
         </div>
         {results.length > 0 && (
           <div className="friend-search-results">
@@ -130,6 +131,11 @@ export default function FriendsView({ onOpenDm, onOpenProfile, onToast, onConver
             <div className="friends-empty">
               <h2>{tab === 'Ausstehend' ? 'Keine offenen Anfragen' : 'Hier ist es noch ganz ruhig'}</h2>
               <p>{tab === 'Ausstehend' ? 'Gesendete und empfangene Freundschaftsanfragen erscheinen hier.' : `In „${tab}“ gibt es aktuell nichts zu sehen.`}</p>
+              {tab !== 'Ausstehend' && tab !== 'Blockiert' && (
+                <button className="button button--primary friends-empty__action" type="button" onClick={() => searchRef.current?.focus()}>
+                  <UserPlus size={17} /> Freunde finden
+                </button>
+              )}
             </div>
           )}
           {visible.map((friend) => (

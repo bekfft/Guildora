@@ -18,7 +18,7 @@ import {
   UserRound,
   Trash2
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/Button.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -175,12 +175,48 @@ function ProfileSettings({ user, refreshUser, onToast }) {
 
 export default function SettingsModal({ onClose, onToast, initialTab = 'Mein Konto' }) {
   const [tab, setTab] = useState(initialTab);
+  const [tabEdges, setTabEdges] = useState({ left: false, right: false });
+  const tabListRef = useRef(null);
+  const tabButtonRefs = useRef(new Map());
   const { user, logout, refreshUser, settings, saveSettings } = useAuth();
   const navigate = useNavigate();
   const desktop = useDesktop();
   const tabs = desktop?.isDesktop
     ? [...TABS, { id: 'Über', label: 'Über Guildora', icon: Info }]
     : TABS;
+
+  const updateTabEdges = useCallback(() => {
+    const list = tabListRef.current;
+    if (!list) return;
+    setTabEdges({
+      left: list.scrollLeft > 2,
+      right: list.scrollLeft + list.clientWidth < list.scrollWidth - 2
+    });
+  }, []);
+
+  useEffect(() => {
+    const list = tabListRef.current;
+    if (!list) return undefined;
+    updateTabEdges();
+    const observer = new ResizeObserver(updateTabEdges);
+    observer.observe(list);
+    window.addEventListener('resize', updateTabEdges);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateTabEdges);
+    };
+  }, [tabs.length, updateTabEdges]);
+
+  useEffect(() => {
+    const button = tabButtonRefs.current.get(tab);
+    if (!button || !window.matchMedia('(max-width: 700px)').matches) return;
+    button.scrollIntoView({
+      behavior: document.documentElement.classList.contains('reduce-motion') ? 'auto' : 'smooth',
+      block: 'nearest',
+      inline: 'center'
+    });
+    window.setTimeout(updateTabEdges, 220);
+  }, [tab, updateTabEdges]);
 
   function updateStatus() {
     const state = desktop.update;
@@ -220,16 +256,25 @@ export default function SettingsModal({ onClose, onToast, initialTab = 'Mein Kon
             <span><strong>{user.display_name || user.username}</strong><small>Profil bearbeiten</small></span>
           </button>
           <span className="settings-nav-label">Benutzereinstellungen</span>
-          <nav aria-label="Einstellungsbereiche">
-            {tabs.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button className={tab === item.id ? 'is-active' : ''} type="button" onClick={() => setTab(item.id)} key={item.id}>
-                  <Icon size={18} /><span>{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
+          <div className={`settings-tabs-shell${tabEdges.left ? ' can-scroll-left' : ''}${tabEdges.right ? ' can-scroll-right' : ''}`}>
+            <nav ref={tabListRef} onScroll={updateTabEdges} aria-label="Einstellungsbereiche">
+              {tabs.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    ref={(node) => node ? tabButtonRefs.current.set(item.id, node) : tabButtonRefs.current.delete(item.id)}
+                    className={tab === item.id ? 'is-active' : ''}
+                    type="button"
+                    aria-current={tab === item.id ? 'page' : undefined}
+                    onClick={() => setTab(item.id)}
+                    key={item.id}
+                  >
+                    <Icon size={18} /><span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
           <button className="settings-sidebar__logout" type="button" onClick={handleLogout}><LogOut size={18} /> Abmelden</button>
         </aside>
         <main className="settings-content">

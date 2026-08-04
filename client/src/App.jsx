@@ -1,20 +1,26 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { GuildProvider } from './context/GuildContext.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
-import AppPage from './pages/AppPage.jsx';
-import LandingPage from './pages/LandingPage.jsx';
-import InvitePage from './pages/InvitePage.jsx';
-import LoginPage from './pages/LoginPage.jsx';
-import PlaceholderPage from './pages/PlaceholderPage.jsx';
-import RegisterPage from './pages/RegisterPage.jsx';
-import DownloadPage from './pages/DownloadPage.jsx';
 import DesktopTitlebar from './components/DesktopTitlebar.jsx';
 import DesktopToasts from './components/DesktopToasts.jsx';
 import SessionRecovery from './components/SessionRecovery.jsx';
 import { DesktopProvider, useDesktop } from './context/DesktopContext.jsx';
 import { VoiceProvider } from './context/VoiceContext.jsx';
 import { GuildoraDialogProvider } from './context/GuildoraDialogContext.jsx';
+
+const AppPage = lazy(() => import('./pages/AppPage.jsx'));
+const DownloadPage = lazy(() => import('./pages/DownloadPage.jsx'));
+const InvitePage = lazy(() => import('./pages/InvitePage.jsx'));
+const LandingPage = lazy(() => import('./pages/LandingPage.jsx'));
+const LoginPage = lazy(() => import('./pages/LoginPage.jsx'));
+const PlaceholderPage = lazy(() => import('./pages/PlaceholderPage.jsx'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage.jsx'));
+
+function RouteFallback() {
+  return <main className="route-loader" role="status" aria-label="Guildora wird geladen"><span className="route-loader__spinner" /></main>;
+}
 
 function HomeRoute() {
   const desktop = useDesktop();
@@ -48,7 +54,8 @@ export default function App() {
         <DesktopToasts />
         <AuthProvider>
           <GuildoraDialogProvider>
-            <Routes>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
           <Route path="/" element={<HomeRoute />} />
           <Route path="/download" element={<WebDownloadRoute />} />
           <Route path="/login" element={<LoginPage />} />
@@ -68,7 +75,8 @@ export default function App() {
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+              </Routes>
+            </Suspense>
           </GuildoraDialogProvider>
         </AuthProvider>
       </DesktopProvider>

@@ -32,7 +32,7 @@ const loginLimiter = rateLimit({
 
 const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  limit: 3,
+  limit: process.env.NODE_ENV === 'test' ? 100 : 3,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   handler: rateLimitHandler

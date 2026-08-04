@@ -139,10 +139,13 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!settings) return;
     const root = document.documentElement;
-    const resolvedTheme = settings.theme === 'system'
-      ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
-      : settings.theme;
-    root.dataset.theme = resolvedTheme;
+    const systemTheme = window.matchMedia('(prefers-color-scheme: light)');
+    const applyTheme = () => {
+      root.dataset.theme = settings.theme === 'system'
+        ? (systemTheme.matches ? 'light' : 'dark')
+        : settings.theme;
+    };
+    applyTheme();
     root.dataset.density = settings.message_density;
     root.dataset.colorVision = settings.color_vision;
     root.lang = settings.language;
@@ -151,6 +154,8 @@ export function AuthProvider({ children }) {
     root.style.zoom = String(settings.app_zoom / 100);
     root.classList.toggle('reduce-motion', settings.reduce_motion);
     root.classList.toggle('high-contrast', settings.high_contrast);
+    if (settings.theme === 'system') systemTheme.addEventListener('change', applyTheme);
+    return () => systemTheme.removeEventListener('change', applyTheme);
   }, [settings]);
 
   const value = useMemo(() => ({

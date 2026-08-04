@@ -66,7 +66,8 @@ test('Standalone-Modus und iPhone-Safe-Areas werden im App-Layout berücksichtig
   assert.match(appCss, new RegExp(`${appViewportSelector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\.main-header,`));
   assert.match(cssRule(appCss, `${appViewportSelector} .member-list__header`), /padding-top:\s*var\(--safe-area-top\)/);
   assert.match(appCss, /:is\(\.modal-overlay, \.server-settings-overlay, \.engagement-overlay\)\s*\{\s*inset:\s*0;/);
-  assert.match(cssRule(appCss, `${appViewportSelector} .modal-overlay`), /padding-bottom:\s*max\(20px, var\(--safe-area-bottom\)\)/);
+  assert.match(cssRule(appCss, `${appViewportSelector} .modal-overlay`), /padding:\s*0/);
+  assert.match(appCss, new RegExp(`${appViewportSelector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\.app-modal:not\\(\\.app-modal--settings\\)[\\s\\S]*padding-bottom:\\s*max\\(30px, var\\(--safe-area-bottom\\)\\)`));
   assert.match(cssRule(appCss, `${appViewportSelector} .server-settings-overlay`), /padding:\s*var\(--safe-area-top\)[^;]*var\(--safe-area-bottom\)/);
   assert.match(cssRule(appCss, `${appViewportSelector} .engagement-panel`), /padding-bottom:\s*var\(--safe-area-bottom\)/);
   assert.match(cssRule(globalCss, `${appViewportSelector} :is(.route-loader, .app-placeholder)`), /height:\s*var\(--app-height\)[\s\S]*min-height:\s*var\(--app-height\)/);

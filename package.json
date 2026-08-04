@@ -13,11 +13,14 @@
     "migrate": "npm run migrate --workspace server",
     "seed": "npm run seed --workspace server",
     "test": "npm run test --workspace server",
+    "test:visual": "playwright test",
+    "test:visual:update": "playwright test --update-snapshots",
     "desktop:dev": "npm run dev --workspace guildora-desktop",
     "desktop:build": "npm run build --workspace guildora-desktop",
     "desktop:release": "npm run release --workspace guildora-desktop --"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "concurrently": "^9.2.0"
   }
 }

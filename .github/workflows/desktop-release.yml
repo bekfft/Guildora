@@ -28,6 +28,10 @@ jobs:
           npm run test --workspace guildora-desktop
       - name: Web-Client bauen
         run: npm run build
+      - name: Browser für visuelle Regression installieren
+        run: npx playwright install chromium
+      - name: Visuelle Desktop- und Mobile-Regression
+        run: npm run test:visual
       - name: Desktop-Version aus Tag übernehmen
         shell: pwsh
         run: |

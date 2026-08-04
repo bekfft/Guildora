@@ -25,7 +25,15 @@ html.reduce-motion *::after {
 }
 
 html.high-contrast {
-  filter: contrast(1.16);
+  --divider: rgb(255 255 255 / 18%);
+  --channel-idle: #c4c7cc;
+  --text-muted: #d5d7dc;
+}
+
+html.high-contrast[data-theme="light"] {
+  --divider: rgb(0 0 0 / 24%);
+  --channel-idle: #3e4148;
+  --text-muted: #34373d;
 }
 
 body {
@@ -335,8 +343,26 @@ p {
 }
 
 :focus-visible {
-  outline: 3px solid #fff;
+  outline: 3px solid color-mix(in srgb, var(--brand) 60%, #fff);
   outline-offset: 3px;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 20000;
+  top: calc(8px + var(--safe-area-top));
+  left: max(8px, var(--safe-area-left));
+  padding: 10px 14px;
+  border-radius: 7px;
+  color: #fff;
+  background: var(--brand);
+  font-weight: 700;
+  transform: translateY(-180%);
+  transition: transform 140ms ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
 }
 
 .button {
@@ -1277,6 +1303,36 @@ p {
   padding: 24px;
   background: var(--bg-darkest);
   place-items: center;
+}
+
+.route-loader__spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid rgb(255 255 255 / 14%);
+  border-top-color: var(--brand-light);
+  border-radius: 50%;
+  animation: route-loader-spin 700ms linear infinite;
+}
+
+@keyframes route-loader-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-contrast: more) {
+  :root {
+    --divider: rgb(255 255 255 / 20%);
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    border-color: currentColor;
+  }
+}
+
+@media (forced-colors: active) {
+  :focus-visible { outline-color: Highlight; }
+  .button,
+  button { forced-color-adjust: auto; }
 }
 
 .session-recovery {

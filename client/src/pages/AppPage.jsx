@@ -1,24 +1,19 @@
 import { Menu } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import ChannelSidebar from '../app/ChannelSidebar.jsx';
-import ChannelSettingsModal from '../app/ChannelSettingsModal.jsx';
 import ChannelView from '../app/ChannelView.jsx';
-import CategorySettingsModal from '../app/CategorySettingsModal.jsx';
 import DiscoveryPage from '../app/DiscoveryPage.jsx';
 import DirectMessageView from '../app/DirectMessageView.jsx';
 import FriendsView from '../app/FriendsView.jsx';
-import GuildModal from '../app/GuildModal.jsx';
+import ConnectionBanner from '../app/ConnectionBanner.jsx';
+import InstallAppPrompt from '../app/InstallAppPrompt.jsx';
 import MainHeader from '../app/MainHeader.jsx';
-import MessageSearch from '../app/MessageSearch.jsx';
 import MemberList from '../app/MemberList.jsx';
-import NotificationCenter from '../app/NotificationCenter.jsx';
-import ProfileModal from '../app/ProfileModal.jsx';
 import ServerRail from '../app/ServerRail.jsx';
-import ServerSettingsModal from '../app/ServerSettingsModal.jsx';
-import SettingsModal from '../app/SettingsModal.jsx';
 import Toast from '../app/Toast.jsx';
+import WelcomeOnboarding from '../app/WelcomeOnboarding.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useGuilds } from '../context/GuildContext.jsx';
 import { useVoice } from '../context/VoiceContext.jsx';
@@ -27,6 +22,15 @@ import { api } from '../lib/api.js';
 import { clampSwipe, MOBILE_SWIPE_SETTLE_MS, resolveMobileSwipe } from '../lib/mobileSwipe.js';
 import { socket } from '../lib/socket.js';
 import '../styles/app.css';
+
+const CategorySettingsModal = lazy(() => import('../app/CategorySettingsModal.jsx'));
+const ChannelSettingsModal = lazy(() => import('../app/ChannelSettingsModal.jsx'));
+const GuildModal = lazy(() => import('../app/GuildModal.jsx'));
+const MessageSearch = lazy(() => import('../app/MessageSearch.jsx'));
+const NotificationCenter = lazy(() => import('../app/NotificationCenter.jsx'));
+const ProfileModal = lazy(() => import('../app/ProfileModal.jsx'));
+const ServerSettingsModal = lazy(() => import('../app/ServerSettingsModal.jsx'));
+const SettingsModal = lazy(() => import('../app/SettingsModal.jsx'));
 
 function inQuietHours(settings) {
   if (!settings?.quiet_hours_start || !settings?.quiet_hours_end) return false;
@@ -97,7 +101,8 @@ export default function AppPage() {
     const ignoredTarget = (target) => target instanceof Element && Boolean(target.closest(
       'input, textarea, select, [contenteditable="true"], [data-swipe-ignore], '
       + '.friends-tabs, .settings-tabs, .emoji-picker, .message-attachment, '
-      + '.modal-overlay, .server-settings-overlay, .engagement-overlay, .profile-popover'
+      + '.modal-overlay, .server-settings-overlay, .engagement-overlay, .profile-popover, '
+      + '.welcome-onboarding, .install-app-prompt'
     ));
     const clearVisualState = () => {
       if (gesture.frame) cancelAnimationFrame(gesture.frame);
@@ -618,6 +623,8 @@ export default function AppPage() {
 
   return (
     <div ref={appRef} className={`guildora-app ${isDiscovery ? 'is-discovery' : ''} ${membersVisible ? 'has-members' : 'members-hidden'} ${drawerOpen ? 'drawer-open' : ''} ${swipePreview ? `is-swiping-${swipePreview}` : ''}`}>
+      <a className="skip-link" href="#guildora-main">Zum Hauptinhalt</a>
+      <ConnectionBanner />
       <button className="drawer-backdrop" type="button" aria-label="Navigation schließen" onClick={() => setDrawerOpen(false)} />
       <div className="app-navigation">
         <ServerRail
@@ -658,12 +665,12 @@ export default function AppPage() {
       </div>
 
       {isDiscovery ? (
-        <div className="discovery-area">
+        <div className="discovery-area" id="guildora-main" tabIndex="-1">
           <button className="icon-button discovery-menu" type="button" onClick={() => setDrawerOpen(true)} aria-label="Navigation öffnen"><Menu size={22} /></button>
           <DiscoveryPage onToast={showToast} />
         </div>
       ) : (
-        <section className="app-main">
+        <section className="app-main" id="guildora-main" tabIndex="-1">
           <MainHeader
             channel={activeChannel}
             isHome={isHome}
@@ -745,6 +752,9 @@ export default function AppPage() {
       )}
 
       {(guildsLoading || (loadingDetails && !guildData && !isDirect)) && !isDiscovery && <div className="sidebar-loading" aria-hidden="true"><span /><span /><span /></div>}
+      {isHome && <WelcomeOnboarding user={user} onFindFriends={() => navigate('/app/channels/@me')} onCreateServer={() => setGuildModalOpen(true)} />}
+      <InstallAppPrompt />
+      <Suspense fallback={null}>
       {guildModalOpen && <GuildModal onClose={() => setGuildModalOpen(false)} onToast={showToast} />}
       {settingsOpen && <SettingsModal initialTab={settingsInitialTab} onClose={() => setSettingsOpen(false)} onToast={showToast} />}
       {profileUserId && (
@@ -814,6 +824,7 @@ export default function AppPage() {
           onToast={showToast}
         />
       )}
+      </Suspense>
       <Toast toast={toast} />
     </div>
   );

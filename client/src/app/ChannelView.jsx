@@ -562,7 +562,7 @@ export default function ChannelView({
             value={draft}
             maxLength={2000}
             rows={1}
-            placeholder={canSendMessages ? `Nachricht an #${channel.name}` : 'Du darfst in diesem Channel nicht schreiben.'}
+            placeholder={canSendMessages ? 'Nachricht schreiben …' : 'Du darfst hier nicht schreiben.'}
             aria-label={`Nachricht an #${channel.name}`}
             disabled={!canSendMessages}
             onChange={(event) => updateDraft(event.target.value)}

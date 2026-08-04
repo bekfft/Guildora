@@ -154,7 +154,7 @@ export default function DirectMessageView({ conversation, currentUserId, onOpenP
         <div className="composer-shell">
           <label className="composer-tool" title="Datei anhängen"><Paperclip size={19} /><input type="file" multiple hidden onChange={(event) => setPendingFiles([...event.target.files].slice(0, 5))} /></label>
           <button className="composer-tool" type="button" title="Emoji" onClick={() => setEmojiOpen((current) => !current)}><SmilePlus size={19} /></button>
-          <textarea ref={composer} value={draft} maxLength={2000} rows={1} placeholder={`Nachricht an ${nameOf(conversation.user)}`} onChange={(event) => updateDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} />
+          <textarea ref={composer} value={draft} maxLength={2000} rows={1} placeholder="Nachricht schreiben …" onChange={(event) => updateDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} />
           <button type="button" onClick={send} disabled={sending || (!draft.trim() && !pendingFiles.length)}>{sending ? <LoaderCircle className="spin" size={19} /> : <Send size={19} />}</button>
         </div>
       </div>
