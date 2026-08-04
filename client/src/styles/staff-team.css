@@ -1,0 +1,11 @@
+.staff-team-add {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 180px auto;
+  gap: 9px;
+  padding: 16px;
+  border-bottom: 1px solid var(--divider);
+}
+
+@media (max-width: 800px) {
+  .staff-team-add { grid-template-columns: 1fr; }
+}

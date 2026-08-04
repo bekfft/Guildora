@@ -28,7 +28,7 @@ function updateDisplayMode() {
   const isStandalone = displayModeQuery.matches
     || window.navigator.standalone === true
     || standalonePreview;
-  const isMobileApp = mobileAppQuery.matches && window.location.pathname.startsWith('/app');
+  const isMobileApp = mobileAppQuery.matches && ['/app', '/staff'].some((prefix) => window.location.pathname.startsWith(prefix));
   document.documentElement.dataset.displayMode = isStandalone ? 'standalone' : 'browser';
   document.documentElement.toggleAttribute('data-mobile-app', isMobileApp);
   document.documentElement.toggleAttribute('data-standalone-preview', standalonePreview);

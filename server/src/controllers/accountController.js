@@ -194,7 +194,7 @@ export async function deleteConnection(req, res) {
 }
 
 export async function accountSafetyOverview(req, res) {
-  const [blocked, reports] = await Promise.all([
+  const [blocked, reports, sanctions, appeals] = await Promise.all([
     db.all(
       `SELECT u.id, u.username, u.display_name, u.avatar_url
        FROM friendships f JOIN users u ON u.id = f.addressee_id
@@ -209,9 +209,13 @@ export async function accountSafetyOverview(req, res) {
        FROM guild_reports WHERE reporter_id = ?
        ORDER BY created_at DESC LIMIT 50`,
       [req.userId, req.userId]
-    )
+    ),
+    db.all(`SELECT id, type, reason, expires_at, revoked_at, created_at FROM global_sanctions
+      WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`, [req.userId]),
+    db.all(`SELECT id, sanction_id, message, status, response, created_at, updated_at FROM platform_appeals
+      WHERE appellant_id = ? ORDER BY created_at DESC LIMIT 50`, [req.userId])
   ]);
-  return res.json({ blocked, reports });
+  return res.json({ blocked, reports, sanctions, appeals });
 }
 
 export async function deactivateAccount(req, res) {

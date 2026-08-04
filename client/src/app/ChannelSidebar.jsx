@@ -60,7 +60,7 @@ function VoiceParticipants({ voice, channelId }) {
 
 export default function ChannelSidebar({
   guildData, channelId, user, voice, canManageServer, canManageChannels, canManageInvites, onToast, onLeave,
-  onOpenSettings, onOpenServerSettings, onOpenChannelSettings, onOpenCategorySettings,
+  onOpenSettings, onOpenStaff, onOpenServerSettings, onOpenChannelSettings, onOpenCategorySettings,
   onDeleteChannel, onDeleteCategory, onMoveChannel, onNavigate, conversations = []
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -522,6 +522,7 @@ export default function ChannelSidebar({
             </span>
           </button>
           <div className="user-panel__actions">
+            {user.staff && <button type="button" onClick={onOpenStaff} aria-label="Guildora Staff öffnen"><ShieldCheck size={17} /></button>}
             <button className={voice.muted ? 'is-danger' : ''} type="button" onClick={() => toggleVoiceControl(voice.toggleMuted)} aria-label={voice.muted ? 'Mikrofon aktivieren' : 'Mikrofon stummschalten'}>
               {voice.muted ? <MicOff size={17} /> : <Mic size={17} />}
             </button>

@@ -88,6 +88,7 @@ test('Registrierung speichert nur den Hash und setzt sichere Cookies', async () 
     'display_name',
     'email',
     'id',
+    'staff',
     'username'
   ]);
   assert.equal(body.user.email, 'mira@example.de');
@@ -1156,4 +1157,45 @@ test('Freunde, Direktnachrichten, Anhänge und Moderation funktionieren vollstä
   assert.equal(auditBody.audit_logs[0].action, 'member.ban');
   ownerDmSocket.disconnect();
   friendDmSocket.disconnect();
+});
+
+test('Plattform-Staff hat Rollenrechte, 2FA-Pflicht, Audit und unveränderlichen Inhaberschutz', async () => {
+  const ownerId = crypto.randomUUID();
+  const targetId = crypto.randomUUID();
+  await db.run(`INSERT INTO users (id, email, username, display_name, password_hash, birthdate) VALUES (?, ?, ?, ?, ?, ?)`,
+    [ownerId, 'owner@guildora.test', 'bekfft', 'bekfft', 'not-used', '1990-01-01']);
+  await db.run(`INSERT INTO users (id, email, username, display_name, password_hash, birthdate) VALUES (?, ?, ?, ?, ?, ?)`,
+    [targetId, 'staff-target@guildora.test', 'staff.target', 'Staff Target', 'not-used', '1990-01-01']);
+  const ownerCookie = `access_token=${signAccessToken(ownerId)}`;
+
+  const meBefore2fa = await request('/api/staff/me', { cookie: ownerCookie });
+  assert.equal(meBefore2fa.status, 200);
+  assert.equal((await meBefore2fa.json()).staff.is_owner, true);
+  assert.equal((await request('/api/staff/dashboard', { cookie: ownerCookie })).status, 403);
+
+  await db.run('INSERT INTO user_security (user_id, two_factor_enabled) VALUES (?, ?)', [ownerId, true]);
+  const dashboard = await request('/api/staff/dashboard', { cookie: ownerCookie });
+  assert.equal(dashboard.status, 200);
+
+  const addModerator = await request(`/api/staff/team/${targetId}`, {
+    method: 'PUT', cookie: ownerCookie, body: { role: 'moderation' }
+  });
+  assert.equal(addModerator.status, 200);
+  assert.equal((await addModerator.json()).staff.role, 'moderation');
+
+  const protectedAction = await request(`/api/staff/users/${ownerId}/sanctions`, {
+    cookie: ownerCookie, body: { type: 'warning', reason: 'Darf technisch niemals möglich sein' }
+  });
+  assert.equal(protectedAction.status, 403);
+  assert.equal((await protectedAction.json()).error.code, 'OWNER_PROTECTED');
+
+  const sanction = await request(`/api/staff/users/${targetId}/sanctions`, {
+    cookie: ownerCookie, body: { type: 'restrict_communication', reason: 'Automatisierter Moderationstest' }
+  });
+  assert.equal(sanction.status, 201);
+  const blockedMessage = await request(`/api/channels/${createdChannelId}/messages`, {
+    cookie: `access_token=${signAccessToken(targetId)}`, body: { content: 'blockiert', attachmentIds: [] }
+  });
+  assert.equal(blockedMessage.status, 403);
+  assert.ok(Number((await db.get('SELECT COUNT(*) AS count FROM staff_audit_logs')).count) >= 2);
 });

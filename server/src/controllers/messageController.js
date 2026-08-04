@@ -5,6 +5,7 @@ import { emitToChannel, emitToUsers } from '../realtime.js';
 import { requireChannelPermission } from '../utils/channelPermissions.js';
 import { createNotification } from '../utils/notifications.js';
 import { requireNotTimedOut } from '../utils/moderation.js';
+import { assertCapability } from '../services/platformModeration.js';
 import {
   createMessageSchema,
   messageQuerySchema,
@@ -246,6 +247,7 @@ export async function getMessages(req, res) {
 }
 
 export async function createMessage(req, res) {
+  await assertCapability(req.userId, 'communicate');
   const permissions = await channelAccess(req.params.channelId, req.userId, 'sendMessages');
   await requireNotTimedOut(permissions.guildId, req.userId);
   const data = createMessageSchema.parse(req.body);

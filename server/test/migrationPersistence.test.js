@@ -148,7 +148,7 @@ test('Migrationen laufen nur einmal und erhalten Server-, Rollen- und Channel-Zu
     attach_files: 1,
     manage_messages: 1
   });
-  assert.equal(migrationCount.count, 14);
+  assert.equal(migrationCount.count, 15);
   assert.deepEqual(bekfftBadges.map((badge) => badge.slug), [
     'guildora-team',
     'founding-member',

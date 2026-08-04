@@ -3,6 +3,7 @@ import { db } from '../db/index.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { emitGuildRefresh, emitGuildRemoved, emitToUsers } from '../realtime.js';
 import { requirePermission } from './guildAdminController.js';
+import { assertNotProtectedOwner, createPlatformCase } from '../services/platformModeration.js';
 import {
   moderationSchema,
   reportActionSchema,
@@ -41,6 +42,7 @@ export async function listModeration(req, res) {
 export async function banMember(req, res) {
   const guild = await requirePermission(req.params.id, req.userId, 'kickMembers');
   const data = moderationSchema.parse(req.body);
+  await assertNotProtectedOwner(data.userId);
   if (data.userId === guild.owner_id) throw new ApiError(409, 'OWNER_CANNOT_BE_BANNED', 'Der Serverbesitzer kann nicht gesperrt werden.');
   await db.run(
     `INSERT INTO guild_bans (guild_id, user_id, moderator_id, reason) VALUES (?, ?, ?, ?)
@@ -65,6 +67,7 @@ export async function unbanMember(req, res) {
 export async function timeoutMember(req, res) {
   const guild = await requirePermission(req.params.id, req.userId, 'kickMembers');
   const data = timeoutSchema.parse(req.body);
+  await assertNotProtectedOwner(data.userId);
   if (data.userId === guild.owner_id) throw new ApiError(409, 'OWNER_CANNOT_BE_TIMED_OUT', 'Der Serverbesitzer kann keinen Timeout erhalten.');
   if (!(await membership(req.params.id, data.userId))) throw new ApiError(404, 'MEMBER_NOT_FOUND', 'Dieses Mitglied wurde nicht gefunden.');
   const expiresAt = new Date(Date.now() + data.durationMinutes * 60_000).toISOString();
@@ -89,17 +92,20 @@ export async function createReport(req, res) {
   const member = await membership(req.params.id, req.userId);
   if (!member) throw new ApiError(403, 'NOT_MEMBER', 'Du bist kein Mitglied dieses Servers.');
   const data = reportSchema.parse(req.body);
+  let message = null;
   if (data.messageId) {
-    const message = await db.get(`SELECT m.id, m.author_id FROM messages m JOIN channels c ON c.id = m.channel_id WHERE m.id = ? AND c.guild_id = ?`, [data.messageId, req.params.id]);
+    message = await db.get(`SELECT m.id, m.author_id, m.content, m.created_at, m.channel_id FROM messages m JOIN channels c ON c.id = m.channel_id WHERE m.id = ? AND c.guild_id = ?`, [data.messageId, req.params.id]);
     if (!message) throw new ApiError(404, 'MESSAGE_NOT_FOUND', 'Diese Nachricht wurde nicht gefunden.');
     data.reportedUserId ||= message.author_id;
   }
   const id = crypto.randomUUID();
+  if (data.reportedUserId) await assertNotProtectedOwner(data.reportedUserId);
   await db.run(
     `INSERT INTO guild_reports (id, guild_id, reporter_id, reported_user_id, message_id, reason)
      VALUES (?, ?, ?, ?, ?, ?)`,
     [id, req.params.id, req.userId, data.reportedUserId || null, data.messageId || null, data.reason]
   );
+  await createPlatformCase({ sourceType: 'guild_report', sourceId: id, reporterId: req.userId, targetUserId: data.reportedUserId, guildId: req.params.id, category: 'server_report', reason: data.reason, evidence: message });
   const moderators = await db.all('SELECT user_id FROM guild_members WHERE guild_id = ?', [req.params.id]);
   emitToUsers(moderators.map((item) => item.user_id), 'moderation:refresh', { guildId: req.params.id });
   return res.status(201).json({ report: { id, status: 'open' } });

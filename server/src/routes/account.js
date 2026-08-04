@@ -20,6 +20,7 @@ import {
   updatePassword,
   updateSettings
 } from '../controllers/accountController.js';
+import { createAppeal, myAppeals } from '../controllers/staffController.js';
 
 const router = Router();
 const securityLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 15, standardHeaders: 'draft-7', legacyHeaders: false });
@@ -38,6 +39,8 @@ router.delete('/2fa', securityLimiter, asyncHandler(disableTwoFactor));
 router.get('/connections', asyncHandler(listConnections));
 router.delete('/connections/:id', asyncHandler(deleteConnection));
 router.get('/safety', asyncHandler(accountSafetyOverview));
+router.get('/appeals', asyncHandler(myAppeals));
+router.post('/appeals', securityLimiter, asyncHandler(createAppeal));
 router.post('/deactivate', securityLimiter, asyncHandler(deactivateAccount));
 router.delete('/', securityLimiter, asyncHandler(deleteAccount));
 

@@ -42,7 +42,7 @@ test('iOS startet Guildora vom Home-Bildschirm ohne Safari-Chrome', () => {
 test('Standalone-Modus und iPhone-Safe-Areas werden im App-Layout berücksichtigt', () => {
   assert.match(mainSource, /navigator\.standalone === true/);
   assert.match(mainSource, /display-mode: standalone/);
-  assert.match(mainSource, /mobileAppQuery\.matches && window\.location\.pathname\.startsWith\('\/app'\)/);
+  assert.match(mainSource, /mobileAppQuery\.matches && \['\/app', '\/staff'\]\.some/);
   assert.match(mainSource, /toggleAttribute\('data-mobile-app', isMobileApp\)/);
   assert.match(mainSource, /Math\.max\(window\.innerHeight, document\.documentElement\.clientHeight\)/);
   assert.match(mainSource, /keyboardTarget && layoutHeight - visualHeight > 120/);

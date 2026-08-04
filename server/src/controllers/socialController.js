@@ -8,6 +8,7 @@ import {
   friendRequestSchema,
   userSearchSchema
 } from '../validation/socialSchemas.js';
+import { assertCapability } from '../services/platformModeration.js';
 
 const USER_FIELDS = 'id, username, display_name, avatar_url';
 
@@ -118,6 +119,7 @@ export async function listFriends(req, res) {
 }
 
 export async function createFriendRequest(req, res) {
+  await assertCapability(req.userId, 'social');
   const { username } = friendRequestSchema.parse(req.body);
   const target = await db.get(`SELECT ${USER_FIELDS} FROM users WHERE LOWER(username) = LOWER(?)`, [username]);
   if (!target) throw new ApiError(404, 'USER_NOT_FOUND', 'Dieser Nutzer wurde nicht gefunden.');
@@ -289,6 +291,7 @@ export async function listConversations(req, res) {
 }
 
 export async function createConversation(req, res) {
+  await assertCapability(req.userId, 'dm');
   const targetId = req.params.userId;
   const relationship = await relationshipBetween(req.userId, targetId);
   if (relationship?.status === 'blocked' || !(await canDirectMessage(req.userId, targetId))) {
@@ -330,6 +333,8 @@ export async function getDmMessages(req, res) {
 }
 
 export async function createDmMessage(req, res) {
+  await assertCapability(req.userId, 'dm');
+  await assertCapability(req.userId, 'communicate');
   await requireConversation(req.params.id, req.userId);
   const data = dmMessageSchema.parse(req.body);
   const participants = await dmParticipants(req.params.id);

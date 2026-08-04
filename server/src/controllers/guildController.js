@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { activeGuildRestriction, assertCapability } from '../services/platformModeration.js';
 import { db } from '../db/index.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { createGuildSchema, discoveryQuerySchema } from '../validation/guildSchemas.js';
@@ -101,7 +102,10 @@ export async function getMyGuilds(req, res) {
 export async function discoverGuilds(req, res) {
   const { q, category } = discoveryQuerySchema.parse(req.query);
   const params = [req.userId];
-  const conditions = ['g.is_public = ?', 'g.is_verified = ?'];
+  const conditions = ['g.is_public = ?', 'g.is_verified = ?', `NOT EXISTS (
+    SELECT 1 FROM guild_platform_restrictions pr WHERE pr.guild_id = g.id AND pr.revoked_at IS NULL
+    AND (pr.expires_at IS NULL OR pr.expires_at > CURRENT_TIMESTAMP)
+    AND pr.type IN ('discovery_hidden','restricted','suspended'))`];
   params.push(true);
   params.push(true);
 
@@ -237,6 +241,8 @@ export async function getGuildMembers(req, res) {
 
 export async function joinGuild(req, res) {
   const guild = await guildOrThrow(req.params.id);
+  const restriction = await activeGuildRestriction(guild.id);
+  if (restriction && ['restricted', 'suspended'].includes(restriction.type)) throw new ApiError(403, 'GUILD_PLATFORM_RESTRICTED', 'Dieser Server ist durch Guildora eingeschränkt.');
   await requireNotBanned(guild.id, req.userId);
   if (!bool(guild.is_public)) throw new ApiError(403, 'GUILD_NOT_PUBLIC', 'Dieser Server ist nicht öffentlich.');
   if (await membership(guild.id, req.userId)) {
@@ -271,6 +277,7 @@ function slugify(name) {
 }
 
 export async function createGuild(req, res) {
+  await assertCapability(req.userId, 'guild_create');
   const data = createGuildSchema.parse(req.body);
   const guildId = crypto.randomUUID();
   const slug = `${slugify(data.name)}-${guildId.slice(0, 6)}`;

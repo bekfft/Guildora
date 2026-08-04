@@ -10,6 +10,7 @@ import {
   setAuthCookies
 } from '../utils/tokens.js';
 import { decryptSecret, verifyTotp } from '../utils/totp.js';
+import { assertAccountActive, getStaff } from '../services/platformModeration.js';
 
 const PUBLIC_USER_FIELDS = `u.id, u.email, u.username, u.display_name, u.avatar_url, u.created_at,
   p.banner_url, COALESCE(p.bio, '') AS bio, COALESCE(p.custom_status, '') AS custom_status`;
@@ -23,7 +24,8 @@ function findPublicUserById(userId) {
   );
 }
 
-function publicUser(user) {
+async function publicUser(user) {
+  const staff = await getStaff(user.id);
   return {
     id: user.id,
     email: user.email,
@@ -33,7 +35,8 @@ function publicUser(user) {
     banner_url: user.banner_url,
     bio: user.bio,
     custom_status: user.custom_status,
-    created_at: user.created_at
+    created_at: user.created_at,
+    staff: staff ? { role: staff.role, is_owner: staff.is_owner, two_factor_enabled: staff.two_factor_enabled, permissions: staff.permissions } : null
   };
 }
 
@@ -91,7 +94,7 @@ export async function register(req, res) {
   console.info(`[E-Mail-Stub] Verifizierungslink für Nutzer ${id} würde jetzt versendet.`);
   const user = await findPublicUserById(id);
   await setAuthCookies(res, id);
-  return res.status(201).json({ user: publicUser(user) });
+  return res.status(201).json({ user: await publicUser(user) });
 }
 
 export async function login(req, res) {
@@ -102,6 +105,7 @@ export async function login(req, res) {
   if (!user || !(await bcrypt.compare(data.password, user.password_hash))) {
     throw new ApiError(401, 'INVALID_CREDENTIALS', 'E-Mail, Benutzername oder Passwort ist falsch.');
   }
+  await assertAccountActive(user.id);
 
   const security = await db.get('SELECT * FROM user_security WHERE user_id = ?', [user.id]);
   if (security?.deactivated_at) {
@@ -117,7 +121,7 @@ export async function login(req, res) {
   }
 
   await setAuthCookies(res, user.id);
-  return res.json({ user: publicUser(await findPublicUserById(user.id)) });
+  return res.json({ user: await publicUser(await findPublicUserById(user.id)) });
 }
 
 export async function logout(req, res) {
@@ -142,13 +146,15 @@ export async function refresh(req, res) {
   }
 
   await setAuthCookies(res, userId);
-  return res.json({ user: publicUser(user) });
+  await assertAccountActive(user.id);
+  return res.json({ user: await publicUser(user) });
 }
 
 export async function me(req, res) {
   const user = await findPublicUserById(req.userId);
   if (!user) throw new ApiError(401, 'UNAUTHORIZED', 'Dein Account wurde nicht gefunden.');
-  return res.json({ user: publicUser(user) });
+  await assertAccountActive(user.id);
+  return res.json({ user: await publicUser(user) });
 }
 
 export async function verifyEmailStub(req, res) {

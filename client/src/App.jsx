@@ -17,6 +17,12 @@ const LandingPage = lazy(() => import('./pages/LandingPage.jsx'));
 const LoginPage = lazy(() => import('./pages/LoginPage.jsx'));
 const PlaceholderPage = lazy(() => import('./pages/PlaceholderPage.jsx'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage.jsx'));
+const StaffPage = lazy(() => import('./pages/StaffPage.jsx'));
+
+function StaffRoute() {
+  const { user } = useAuth();
+  return user?.staff ? <StaffPage /> : <Navigate to="/app" replace />;
+}
 
 function RouteFallback() {
   return <main className="route-loader" role="status" aria-label="Guildora wird geladen"><span className="route-loader__spinner" /></main>;
@@ -65,6 +71,7 @@ export default function App() {
           <Route path="/nutzungsbedingungen" element={<PlaceholderPage title="Nutzungsbedingungen" />} />
           <Route path="/datenschutz" element={<PlaceholderPage title="Datenschutzerklärung" />} />
           <Route element={<ProtectedRoute />}>
+            <Route path="/staff" element={<StaffRoute />} />
             <Route element={<GuildProvider><VoiceProvider><AppPage /></VoiceProvider></GuildProvider>}>
               <Route path="/app" element={null} />
               <Route path="/app/channels/@me" element={null} />

@@ -182,7 +182,8 @@ export function AccountSection({ user, refreshUser, logout, onClose, onToast }) 
 
 export function PrivacySection({ settings, save, onToast }) {
   const [form, setForm] = useState(settings);
-  const [safety, setSafety] = useState({ blocked: [], reports: [] });
+  const [safety, setSafety] = useState({ blocked: [], reports: [], sanctions: [], appeals: [] });
+  const [appeal, setAppeal] = useState({ sanctionId: '', message: '' });
   useEffect(() => { api.accountSafety().then(setSafety).catch((e) => onToast(e.message, 'error')); }, []);
   const patch = (key, value) => setForm({ ...form, [key]: value });
   return <div className="user-settings-stack">
@@ -193,6 +194,7 @@ export function PrivacySection({ settings, save, onToast }) {
     </div><SaveBar onSave={() => save(form)} /></section>
     <section className="user-settings-card"><h4>Blockierte Nutzer</h4><div className="simple-list">{safety.blocked.length ? safety.blocked.map((u) => <div key={u.id}><span><strong>{u.display_name}</strong><small>@{u.username}</small></span><button onClick={async () => { await api.unblockUser(u.id); setSafety({ ...safety, blocked: safety.blocked.filter((x) => x.id !== u.id) }); }}>Entblocken</button></div>) : <p>Du hast niemanden blockiert.</p>}</div></section>
     <section className="user-settings-card"><h4>Meldeverlauf</h4><div className="simple-list">{safety.reports.length ? safety.reports.map((r) => <div key={`${r.source}-${r.id}`}><span><strong>{r.reason}</strong><small>{new Date(r.created_at).toLocaleString('de-DE')}</small></span><em>{r.status}</em></div>) : <p>Noch keine Meldungen.</p>}</div></section>
+    <section className="user-settings-card"><h4>Guildora-Maßnahmen & Einsprüche</h4><p>Aktive und vergangene Plattformmaßnahmen gegen deinen Account. Zu jeder Maßnahme kannst du einen nachvollziehbaren Einspruch einreichen.</p><div className="simple-list">{safety.sanctions.length ? safety.sanctions.map((s) => <div key={s.id}><span><strong>{s.type}</strong><small>{s.reason} · {new Date(s.created_at).toLocaleString('de-DE')}</small></span><em>{s.revoked_at ? 'aufgehoben' : 'aktiv'}</em></div>) : <p>Keine Plattformmaßnahmen.</p>}</div>{safety.sanctions.some((s) => !s.revoked_at) && <div className="user-settings-grid"><Field label="Maßnahme"><select value={appeal.sanctionId} onChange={(e) => setAppeal({ ...appeal, sanctionId: e.target.value })}><option value="">Auswählen …</option>{safety.sanctions.filter((s) => !s.revoked_at).map((s) => <option key={s.id} value={s.id}>{s.type} · {s.reason.slice(0, 45)}</option>)}</select></Field><Field label="Begründung"><textarea value={appeal.message} onChange={(e) => setAppeal({ ...appeal, message: e.target.value })} placeholder="Warum soll die Maßnahme erneut geprüft werden?" /></Field><Button onClick={async () => { try { await api.createAppeal(appeal.sanctionId, appeal.message); const next = await api.accountSafety(); setSafety(next); setAppeal({ sanctionId: '', message: '' }); onToast('Einspruch wurde eingereicht.', 'success'); } catch (e) { onToast(e.message, 'error'); } }}>Einspruch einreichen</Button></div>}<div className="simple-list">{safety.appeals.map((a) => <div key={a.id}><span><strong>Einspruch: {a.status}</strong><small>{a.message}{a.response ? ` · Antwort: ${a.response}` : ''}</small></span></div>)}</div></section>
   </div>;
 }
 

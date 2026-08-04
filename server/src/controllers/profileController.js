@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { assertNotProtectedOwner, createPlatformCase } from '../services/platformModeration.js';
 import { db } from '../db/index.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { emitGuildRefresh, emitToUsers, isUserOnline } from '../realtime.js';
@@ -256,10 +257,13 @@ export async function reportUserProfile(req, res) {
     throw new ApiError(404, 'USER_NOT_FOUND', 'Dieser Nutzer wurde nicht gefunden.');
   }
   const id = crypto.randomUUID();
+  await assertNotProtectedOwner(target.id);
   await db.run(
     `INSERT INTO user_profile_reports (id, reporter_id, reported_user_id, reason)
      VALUES (?, ?, ?, ?)`,
     [id, req.userId, target.id, reason]
   );
+  const profile = await db.get('SELECT display_name, avatar_url FROM users WHERE id = ?', [target.id]);
+  await createPlatformCase({ sourceType: 'profile_report', sourceId: id, reporterId: req.userId, targetUserId: target.id, category: 'profile_report', reason, evidence: profile });
   return res.status(201).json({ report: { id, status: 'open' } });
 }

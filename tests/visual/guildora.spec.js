@@ -1,4 +1,17 @@
 import { expect, test } from '@playwright/test';
+import crypto from 'node:crypto';
+
+function totp(secret) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '';
+  for (const character of secret) bits += alphabet.indexOf(character).toString(2).padStart(5, '0');
+  const key = Buffer.from((bits.match(/.{8}/g) || []).map((byte) => Number.parseInt(byte, 2)));
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30_000)));
+  const digest = crypto.createHmac('sha1', key).update(counter).digest();
+  const offset = digest[digest.length - 1] & 15;
+  return String((digest.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, '0');
+}
 
 async function prepareAccount(page, testInfo, variant = 'app') {
   await page.goto('/');
@@ -81,6 +94,40 @@ test('Landingpage bleibt an jeder Zielgröße stabil', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.landing')).toBeVisible();
   await expect(page.locator('.landing')).toHaveScreenshot('landing.png', { caret: 'hide', fullPage: true });
+});
+
+test('Staff-Konsole passt visuell zu Guildora auf Desktop und Mobile', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-1440', 'Desktop und Mobile werden in einer isolierten Inhaber-Sitzung geprüft.');
+  const registration = await page.request.post('/api/auth/register', { data: {
+    email: 'bekfft@visual.guildora.test', username: 'bekfft', password: 'Guildora2026!', birthdate: '1995-04-12', newsletter: false
+  }});
+  expect(registration.ok()).toBeTruthy();
+  const setup = await page.request.post('/api/account/2fa/setup', { data: { currentPassword: 'Guildora2026!' } });
+  expect(setup.ok()).toBeTruthy();
+  const secret = (await setup.json()).secret;
+  expect((await page.request.post('/api/account/2fa/confirm', { data: { code: totp(secret) } })).ok()).toBeTruthy();
+  await page.goto('/staff');
+  await expect(page.locator('.staff-stats')).toBeVisible();
+  await expect(page.locator('.staff-shell')).toHaveScreenshot('staff-desktop.png', { caret: 'hide' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/staff?standalone-preview=1');
+  await expect(page.locator('.staff-shell')).toBeVisible();
+  const geometry = await page.evaluate(() => ({
+    viewport: document.documentElement.clientWidth,
+    shell: document.querySelector('.staff-shell').getBoundingClientRect().width,
+    workspace: document.querySelector('.staff-workspace').getBoundingClientRect().width,
+    workspaceScroll: document.querySelector('.staff-workspace').scrollWidth,
+    stats: document.querySelector('.staff-stats').getBoundingClientRect().width,
+    statsColumns: getComputedStyle(document.querySelector('.staff-stats')).gridTemplateColumns,
+    cardLefts: [...document.querySelectorAll('.staff-stats article')].map((card) => Math.round(card.getBoundingClientRect().left))
+  }));
+  expect(geometry.shell).toBeLessThanOrEqual(geometry.viewport);
+  expect(geometry.workspace).toBeLessThanOrEqual(geometry.viewport);
+  expect(geometry.workspaceScroll).toBeLessThanOrEqual(geometry.workspace);
+  expect(geometry.stats).toBeLessThanOrEqual(geometry.workspace);
+  expect(geometry.statsColumns.split(' ')).toHaveLength(1);
+  expect(new Set(geometry.cardLefts).size).toBe(1);
+  await expect(page.locator('.staff-shell')).toHaveScreenshot('staff-mobile.png', { caret: 'hide' });
 });
 
 test('helles Hochkontrast-Design und reduzierte Bewegung bleiben nutzbar', async ({ page }, testInfo) => {

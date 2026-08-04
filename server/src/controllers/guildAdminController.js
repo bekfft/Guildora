@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { db } from '../db/index.js';
 import { ApiError } from '../middleware/errorHandler.js';
+import { assertNotProtectedOwner } from '../services/platformModeration.js';
 import {
   categorySchema,
   channelSchema,
@@ -348,6 +349,7 @@ export async function updateMemberNickname(req, res) {
 export async function kickMember(req, res) {
   const guild = await requirePermission(req.params.id, req.userId, 'kickMembers');
   const member = await memberInGuild(req.params.memberId, req.params.id);
+  await assertNotProtectedOwner(member.user_id);
   if (member.user_id === guild.owner_id) {
     throw new ApiError(409, 'OWNER_CANNOT_BE_KICKED', 'Der Serverbesitzer kann nicht entfernt werden.');
   }

@@ -646,6 +646,7 @@ export default function AppPage() {
             onToast={showToast}
             onLeave={handleLeave}
             onOpenSettings={(tab = 'Mein Konto') => { setSettingsInitialTab(tab); setSettingsOpen(true); }}
+            onOpenStaff={() => navigate('/staff')}
             onOpenServerSettings={(tab = 'overview') => setServerSettingsTab(tab)}
             onOpenChannelSettings={(channel) => {
               setDrawerOpen(false);
