@@ -142,6 +142,7 @@ test('Staff-Konsole passt visuell zu Guildora auf Desktop und Mobile', async ({ 
 
   await page.getByRole('button', { name: 'Staff-Menü öffnen' }).click();
   await page.getByRole('button', { name: 'Übersicht', exact: true }).click();
+  await expect(page.locator('.staff-stats')).toBeVisible();
   const geometry = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
     body: document.body.scrollWidth,
