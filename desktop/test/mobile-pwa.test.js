@@ -43,7 +43,8 @@ test('Standalone-Modus und iPhone-Safe-Areas werden im App-Layout berücksichtig
   assert.match(globalCss, /html\[data-display-mode="standalone"\] body\s*\{[^}]*position:\s*fixed[^}]*inset:\s*0/s);
   assert.match(appCss, /html\[data-display-mode="standalone"\] \.server-rail\s*\{[^}]*padding-top:\s*calc\(12px \+ var\(--safe-area-top\)\)[^}]*padding-bottom:\s*calc\(12px \+ var\(--safe-area-bottom\)\)/s);
   assert.match(appCss, /html\[data-display-mode="standalone"\] \.user-panel\s*\{[^}]*padding-bottom:\s*var\(--safe-area-bottom\)/s);
-  assert.match(appCss, /html\[data-display-mode="standalone"\] \.composer-area\s*\{[^}]*padding-bottom:\s*var\(--safe-area-bottom\)[^}]*background:\s*#383a40/s);
+  assert.match(appCss, /html\[data-display-mode="standalone"\] \.composer-area\s*\{[^}]*padding-bottom:\s*var\(--safe-area-bottom\)[^}]*background:\s*var\(--bg-content\)/s);
+  assert.doesNotMatch(appCss, /html\[data-display-mode="standalone"\] \.composer-area\s*\{[^}]*border-radius:/s);
   assert.match(appCss, /html\[data-display-mode="standalone"\] \.guildora-app\s*\{[^}]*top:\s*0[^}]*height:\s*var\(--app-height\)/s);
   assert.match(appCss, /html\[data-display-mode="standalone"\] \.app-main\s*\{[^}]*grid-template-rows:\s*calc\(48px \+ var\(--safe-area-top\)\)/s);
   assert.match(appCss, /html\[data-display-mode="standalone"\] \.main-header,/);

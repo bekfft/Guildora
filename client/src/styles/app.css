@@ -6366,8 +6366,7 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
 
   html[data-display-mode="standalone"] .composer-area {
     padding-bottom: var(--safe-area-bottom);
-    background: #383a40;
-    border-radius: 8px 8px 0 0;
+    background: var(--bg-content);
   }
 
   .messages-scroller {
