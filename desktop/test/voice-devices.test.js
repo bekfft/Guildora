@@ -56,18 +56,35 @@ test('Windows-Aliase werden zu einem echten Audiogerät zusammengeführt', async
 
 test('Voice-Aufnahme verwendet klare Mono-Sprache mit hoher Opus-Qualität', async () => {
   const { audioCaptureOptions } = await import(pathToFileURL(mediaDevicesPath));
-  const capture = audioCaptureOptions({
-    voice_auto_gain: true,
-    voice_echo_cancellation: true,
-    voice_noise_suppression: true
-  }, 'physical-headset');
+  const capture = audioCaptureOptions('physical-headset');
 
   assert.deepEqual(capture.sampleRate, { ideal: 48_000 });
   assert.deepEqual(capture.channelCount, { ideal: 1 });
-  assert.equal(capture.voiceIsolation, true);
+  assert.equal(capture.autoGainControl, false);
+  assert.equal(capture.echoCancellation, true);
+  assert.equal(capture.noiseSuppression, true);
+  assert.equal('voiceIsolation' in capture, false);
   assert.deepEqual(capture.deviceId, { ideal: 'physical-headset' });
   assert.match(voiceContext, /audioPreset:\s*AudioPresets\.musicHighQuality/);
+  assert.match(voiceContext, /dtx:\s*false/);
   assert.match(voiceContext, /saveSettings\(\{ voice_input_device: selected \|\| null \}\)/);
   assert.match(voiceContext, /saveSettings\(\{ voice_output_device: selected \|\| null \}\)/);
   assert.match(voicePanel, /<option value="">Systemstandard<\/option>/);
+});
+
+test('Kontoeinstellungen zeigen für Voice nur die drei Geräteauswahlen', () => {
+  const settingsSource = fs.readFileSync(
+    path.join(clientRoot, 'app', 'AccountSettingsSections.jsx'),
+    'utf8'
+  );
+  const voiceSection = settingsSource.slice(
+    settingsSource.indexOf('export function VoiceSettingsSection'),
+    settingsSource.indexOf('export function PreferencesSection')
+  );
+
+  assert.match(voiceSection, /Eingabegerät/);
+  assert.match(voiceSection, /Ausgabegerät/);
+  assert.match(voiceSection, /Kamera/);
+  assert.doesNotMatch(voiceSection, /Eingabemodus|Empfindlichkeit|Push-to-Talk|Rauschunterdrückung|Echounterdrückung|Automatische Verstärkung|Mikrofon testen/);
+  assert.match(voiceSection, /voice_camera_device: form\.voice_camera_device \|\| null/);
 });

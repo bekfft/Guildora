@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import Button from '../components/Button.jsx';
 import { api } from '../lib/api.js';
 import {
-  audioCaptureOptions,
   resolveAudioDeviceId,
   uniqueAudioDevices
 } from '../lib/mediaDevices.js';
@@ -201,7 +200,6 @@ export function PrivacySection({ settings, save, onToast }) {
 export function VoiceSettingsSection({ settings, save, onToast }) {
   const [form, setForm] = useState(settings);
   const [devices, setDevices] = useState([]);
-  const [testing, setTesting] = useState(false);
   const rawInputs = devices.filter((device) => device.kind === 'audioinput');
   const rawOutputs = devices.filter((device) => device.kind === 'audiooutput');
   const inputs = uniqueAudioDevices(rawInputs, 'Mikrofon');
@@ -233,31 +231,17 @@ export function VoiceSettingsSection({ settings, save, onToast }) {
   }, [devices]);
 
   const patch = (key, value) => setForm({ ...form, [key]: value });
-  async function micTest() {
-    setTesting(true);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: audioCaptureOptions(form, form.voice_input_device || '')
-      });
-      const microphone = stream.getAudioTracks()[0]?.label || 'Ausgewähltes Mikrofon';
-      const refreshed = await navigator.mediaDevices.enumerateDevices().catch(() => null);
-      if (refreshed) setDevices(refreshed);
-      onToast(`${microphone} ist aktiv. Sprich jetzt – der Test endet nach drei Sekunden.`, 'success');
-      window.setTimeout(() => { stream.getTracks().forEach((track) => track.stop()); setTesting(false); }, 3000);
-    } catch (error) { setTesting(false); onToast(error.message, 'error'); }
-  }
-  return <div className="user-settings-stack"><section className="user-settings-card"><h4>Voice & Video</h4><div className="user-settings-grid">
+  const saveDevices = () => save({
+    voice_input_device: form.voice_input_device || null,
+    voice_output_device: form.voice_output_device || null,
+    voice_camera_device: form.voice_camera_device || null
+  });
+  return <div className="user-settings-stack"><section className="user-settings-card"><h4>Voice & Video</h4><p>Wähle die Geräte aus, die Guildora für Voice und Video verwenden soll.</p><div className="user-settings-grid">
     <Field label="Eingabegerät"><select value={form.voice_input_device || ''} onChange={(e) => patch('voice_input_device', e.target.value || null)}><option value="">Systemstandard</option>{inputs.map((device) => <option key={device.id} value={device.id}>{device.label}</option>)}</select></Field>
     <Field label="Ausgabegerät"><select value={form.voice_output_device || ''} onChange={(e) => patch('voice_output_device', e.target.value || null)}><option value="">Systemstandard</option>{outputs.map((device) => <option key={device.id} value={device.id}>{device.label}</option>)}</select></Field>
     <Field label="Kamera"><select value={form.voice_camera_device || ''} onChange={(e) => patch('voice_camera_device', e.target.value || null)}><option value="">Systemstandard</option>{cameras.map((device, index) => <option key={device.deviceId} value={device.deviceId}>{device.label || `Kamera ${index + 1}`}</option>)}</select></Field>
-    <Field label="Eingabemodus"><select value={form.voice_input_mode} onChange={(e) => patch('voice_input_mode', e.target.value)}><option value="voice_activity">Sprachaktivität</option><option value="push_to_talk">Push-to-Talk</option></select></Field>
-    <Field label={`Empfindlichkeit: ${form.voice_sensitivity}`}><input type="range" min="0" max="100" value={form.voice_sensitivity} onChange={(e) => patch('voice_sensitivity', Number(e.target.value))} /></Field>
-    {form.voice_input_mode === 'push_to_talk' && <Field label="Push-to-Talk-Taste"><input value={form.push_to_talk_key} onChange={(e) => patch('push_to_talk_key', e.target.value)} /></Field>}
   </div>
-  <Switch label="Rauschunterdrückung" checked={form.voice_noise_suppression} onChange={(v) => patch('voice_noise_suppression', v)} />
-  <Switch label="Echounterdrückung" checked={form.voice_echo_cancellation} onChange={(v) => patch('voice_echo_cancellation', v)} />
-  <Switch label="Automatische Verstärkung" checked={form.voice_auto_gain} onChange={(v) => patch('voice_auto_gain', v)} />
-  <div className="user-settings-inline"><Button variant="secondary" loading={testing} onClick={micTest}>Mikrofon testen</Button><Button onClick={() => save(form)}>Speichern</Button></div>
+  <SaveBar onSave={saveDevices} />
   </section></div>;
 }
 

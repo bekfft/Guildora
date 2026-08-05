@@ -78,6 +78,27 @@ test('zentrale App-Ansichten bleiben visuell stabil', async ({ page }, testInfo)
   await screenshot(page, 'settings.png');
 });
 
+test('Voice-Einstellungen enthalten auf Desktop und Mobile nur Geräte', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-1440', 'Desktop und Mobile werden gemeinsam geprüft.');
+  await prepareAccount(page, testInfo, 'voice-devices');
+  await page.goto('/app/channels/@me');
+  await page.getByRole('button', { name: 'Einstellungen', exact: true }).click();
+  const settingsDialog = page.getByRole('dialog', { name: 'Einstellungen' });
+  await settingsDialog.getByRole('button', { name: 'Voice & Video', exact: true }).click();
+
+  const voiceCard = settingsDialog.locator('.user-settings-card');
+  await expect(voiceCard).toContainText('Eingabegerät');
+  await expect(voiceCard).toContainText('Ausgabegerät');
+  await expect(voiceCard).toContainText('Kamera');
+  await expect(voiceCard.locator('select')).toHaveCount(3);
+  await expect(voiceCard).not.toContainText(/Eingabemodus|Empfindlichkeit|Push-to-Talk|Rauschunterdrückung|Echounterdrückung|Automatische Verstärkung|Mikrofon testen/);
+  await expect(settingsDialog).toHaveScreenshot('voice-settings-desktop.png', { caret: 'hide' });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(voiceCard.locator('select')).toHaveCount(3);
+  await expect(settingsDialog).toHaveScreenshot('voice-settings-mobile.png', { caret: 'hide' });
+});
+
 test('Landingpage bleibt an jeder Zielgröße stabil', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.landing')).toBeVisible();

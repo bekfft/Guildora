@@ -48,12 +48,11 @@ export function resolveAudioDeviceId(currentId, rawDevices, visibleDevices) {
   )?.id || '';
 }
 
-export function audioCaptureOptions(settings = {}, deviceId = '') {
+export function audioCaptureOptions(deviceId = '') {
   return {
-    autoGainControl: settings.voice_auto_gain !== false,
-    echoCancellation: settings.voice_echo_cancellation !== false,
-    noiseSuppression: settings.voice_noise_suppression !== false,
-    voiceIsolation: settings.voice_noise_suppression !== false,
+    autoGainControl: false,
+    echoCancellation: true,
+    noiseSuppression: true,
     channelCount: { ideal: 1 },
     sampleRate: { ideal: 48_000 },
     sampleSize: { ideal: 16 },

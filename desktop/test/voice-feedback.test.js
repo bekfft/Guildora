@@ -12,7 +12,7 @@ test('Voice-Aktivität wird direkt am Audiotrack gemessen', () => {
   assert.match(voiceContext, /createImmediateVoiceAnalyser/);
   assert.match(voiceContext, /requestAnimationFrame\(measure\)/);
   assert.match(voiceContext, /fastSpeakingIdsRef/);
-  assert.match(voiceContext, /voiceActivityThreshold\(settings\?\.voice_sensitivity\)/);
+  assert.match(voiceContext, /voiceActivityThreshold\(\)/);
   assert.match(voiceContext, /}, 140\)/);
   assert.match(voiceFeedback, /createMediaStreamSource\(new MediaStream\(\[mediaStreamTrack\]\)\)/);
 });

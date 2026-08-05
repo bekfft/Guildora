@@ -278,10 +278,10 @@ export function VoiceProvider({ children }) {
       dynacast: true,
       reconnectPolicy: new DefaultReconnectPolicy([0, 500, 1000, 2000, 5000, 10_000, 15_000, 30_000]),
       disconnectOnPageLeave: true,
-      audioCaptureDefaults: audioCaptureOptions(settings, inputDeviceId),
+      audioCaptureDefaults: audioCaptureOptions(inputDeviceId),
       publishDefaults: {
         audioPreset: AudioPresets.musicHighQuality,
-        dtx: true,
+        dtx: false,
         red: true,
         forceStereo: false
       },
@@ -348,7 +348,7 @@ export function VoiceProvider({ children }) {
         speaking: false,
         track
       };
-      const threshold = voiceActivityThreshold(settings?.voice_sensitivity);
+      const threshold = voiceActivityThreshold();
       const measure = () => {
         if (
           room !== roomRef.current
@@ -496,7 +496,7 @@ export function VoiceProvider({ children }) {
       }
       try {
         await room.localParticipant.setMicrophoneEnabled(
-          settings?.voice_input_mode !== 'push_to_talk' && !mutedRef.current && !deafenedRef.current
+          !mutedRef.current && !deafenedRef.current
         );
       } catch {
         mutedRef.current = true;
@@ -664,28 +664,6 @@ export function VoiceProvider({ children }) {
     if (settings.voice_input_device !== undefined) setInputDeviceId(settings.voice_input_device || '');
     if (settings.voice_output_device !== undefined) setOutputDeviceId(settings.voice_output_device || '');
   }, [settings?.voice_input_device, settings?.voice_output_device]);
-
-  useEffect(() => {
-    if (settings?.voice_input_mode !== 'push_to_talk') return undefined;
-    const expected = settings.push_to_talk_key || 'Space';
-    const matches = (event) => event.code === expected || event.key === expected;
-    const down = (event) => {
-      if (!matches(event) || event.repeat || deafenedRef.current || mutedRef.current) return;
-      event.preventDefault();
-      void roomRef.current?.localParticipant.setMicrophoneEnabled(true);
-    };
-    const up = (event) => {
-      if (!matches(event)) return;
-      event.preventDefault();
-      void roomRef.current?.localParticipant.setMicrophoneEnabled(false);
-    };
-    window.addEventListener('keydown', down);
-    window.addEventListener('keyup', up);
-    return () => {
-      window.removeEventListener('keydown', down);
-      window.removeEventListener('keyup', up);
-    };
-  }, [settings?.push_to_talk_key, settings?.voice_input_mode]);
 
   useEffect(() => {
     const syncParticipants = () => {
