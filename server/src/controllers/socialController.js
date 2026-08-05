@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { db } from '../db/index.js';
 import { ApiError } from '../middleware/errorHandler.js';
-import { emitToConversation, emitToUsers, isUserOnline } from '../realtime.js';
+import { emitToConversation, emitToUsers, getUserActivity, getUserActivityJoin, isUserOnline } from '../realtime.js';
 import {
   dmMessageSchema,
   friendActionSchema,
@@ -19,7 +19,8 @@ function publicUser(row, prefix = '') {
     username: row[`${prefix}username`],
     display_name: row[`${prefix}display_name`],
     avatar_url: row[`${prefix}avatar_url`],
-    status: isUserOnline(row[`${prefix}id`]) ? 'online' : 'offline'
+    status: isUserOnline(row[`${prefix}id`]) ? 'online' : 'offline',
+    activity: getUserActivity(row[`${prefix}id`])
   };
 }
 
@@ -52,6 +53,17 @@ async function shareGuild(first, second) {
     [first, second]
   );
   return Boolean(row);
+}
+
+export async function joinUserActivity(req, res) {
+  if (req.params.userId === req.userId) throw new ApiError(400, 'ACTIVITY_JOIN_SELF', 'Du kannst deiner eigenen Aktivität nicht beitreten.');
+  const relationship = await relationshipBetween(req.userId, req.params.userId);
+  if (relationship?.status !== 'accepted' && !(await shareGuild(req.userId, req.params.userId))) {
+    throw new ApiError(403, 'ACTIVITY_JOIN_FORBIDDEN', 'Du kannst dieser Aktivität nicht beitreten.');
+  }
+  const join = getUserActivityJoin(req.params.userId);
+  if (!join) throw new ApiError(409, 'ACTIVITY_NOT_JOINABLE', 'Diese Aktivität kann gerade nicht betreten werden.');
+  return res.json({ join });
 }
 
 async function setting(userId, field, fallback) {
@@ -112,7 +124,8 @@ export async function listFriends(req, res) {
           username: row[`${userPrefix}_username`],
           display_name: row[`${userPrefix}_display_name`],
           avatar_url: row[`${userPrefix}_avatar_url`],
-          status: isUserOnline(row[`${userPrefix}_user_id`]) ? 'online' : 'offline'
+          status: isUserOnline(row[`${userPrefix}_user_id`]) ? 'online' : 'offline',
+          activity: getUserActivity(row[`${userPrefix}_user_id`])
         }
       };
     });

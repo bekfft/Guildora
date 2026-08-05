@@ -156,6 +156,29 @@ test('sichtbare Voice-Channels zeigen Teilnehmer ohne eigenen Beitritt', async (
   await expect(page.getByRole('button', { name: `${voiceChannel.name} beitreten` })).not.toHaveClass(/is-active/);
 });
 
+test('Rich Presence steht wie bei Discord unter dem Mitglied und im Profil', async ({ page }, testInfo) => {
+  test.skip(!['desktop-1440', 'mobile-390'].includes(testInfo.project.name), 'Desktop und Mobile decken beide Mitgliederlisten ab.');
+  const { guild, channel } = await prepareAccount(page, testInfo, 'rich-presence');
+  const activity = await page.request.put('/api/account/activity', {
+    data: {
+      type: 'streaming', name: 'RescueX', details: 'Großeinsatz in Hamburg', state: '4 von 8 Einsatzkräften',
+      startedAt: Date.now() - 180_000, source: 'rpc', buttons: [{ label: 'RescueX', url: 'https://example.test/rescuex' }]
+    }
+  });
+  expect(activity.ok()).toBeTruthy();
+  await page.goto(`/app/channels/${guild.id}/${channel.id}`);
+  await expect(page.locator('.main-header')).toBeVisible();
+  await expect(page.locator('.sidebar-loading')).toHaveCount(0);
+  if (!await page.locator('.member-list').isVisible()) await page.getByRole('button', { name: 'Mitgliederliste umschalten' }).click();
+  await expect(page.locator('.member-list')).toBeVisible();
+  await expect(page.locator('.member-activity')).toHaveText('Streamt RescueX');
+  const row = page.locator('.member-row').filter({ hasText: 'Streamt RescueX' });
+  await row.click();
+  await expect(page.locator('.full-profile__activity')).toContainText('Großeinsatz in Hamburg');
+  const overflow = await page.locator('.full-profile__activity').evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(overflow).toBe(false);
+});
+
 test('Guildora-Startbildschirm wartet auf echte App-Daten und bleibt mobil vollständig', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-1440', 'Desktop und Mobile werden in einem kontrollierten Start gemeinsam geprüft.');
   test.setTimeout(45_000);

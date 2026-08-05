@@ -11,12 +11,15 @@ import {
 } from '../validation/accountSchemas.js';
 import { clearAuthCookies, setAuthCookies } from '../utils/tokens.js';
 import { decryptSecret, encryptSecret, generateTotpSecret, verifyTotp } from '../utils/totp.js';
+import { activitySchema } from '../validation/activitySchemas.js';
+import { clearUserActivity, setUserActivity } from '../realtime.js';
 
 const BOOLEAN_FIELDS = new Set([
   'desktop_notifications', 'notification_sounds', 'notify_mentions',
   'notify_direct_messages', 'notify_friend_requests', 'reduce_motion',
   'high_contrast', 'screen_reader', 'captions', 'spellcheck',
-  'voice_noise_suppression', 'voice_echo_cancellation', 'voice_auto_gain'
+  'voice_noise_suppression', 'voice_echo_cancellation', 'voice_auto_gain',
+  'activity_status', 'detect_games'
 ]);
 
 async function ensureSettings(userId) {
@@ -59,7 +62,23 @@ export async function updateSettings(req, res) {
       [...entries.map(([, value]) => value), new Date().toISOString(), req.userId]
     );
   }
+  if (data.activity_status === false) await clearUserActivity(req.userId);
   return res.json({ settings: publicSettings(await ensureSettings(req.userId)) });
+}
+
+export async function updateActivity(req, res) {
+  const settings = await ensureSettings(req.userId);
+  if (!Boolean(settings.activity_status)) {
+    await clearUserActivity(req.userId);
+    throw new ApiError(403, 'ACTIVITY_STATUS_DISABLED', 'Dein Aktivitätsstatus ist deaktiviert.');
+  }
+  const activity = activitySchema.parse(req.body);
+  return res.json({ activity: await setUserActivity(req.userId, activity) });
+}
+
+export async function deleteActivity(req, res) {
+  await clearUserActivity(req.userId);
+  return res.status(204).end();
 }
 
 export async function updateAccount(req, res) {

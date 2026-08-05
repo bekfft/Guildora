@@ -12,7 +12,12 @@ const IPC = Object.freeze({
   SETTINGS_SET: 'desktop:settings-set',
   OFFLINE_RETRY: 'desktop:offline-retry',
   OPEN_DOWNLOAD: 'desktop:open-download',
-  TRAY_HINT: 'desktop:tray-hint'
+  TRAY_HINT: 'desktop:tray-hint',
+  ACTIVITY_GET: 'desktop:activity-get',
+  ACTIVITY_CONFIGURE: 'desktop:activity-configure',
+  ACTIVITY_CHANGE: 'desktop:activity-change',
+  ACTIVITY_JOIN: 'desktop:activity-join',
+  ACTIVITY_PROCESSES: 'desktop:activity-processes'
 });
 
 module.exports = { IPC };

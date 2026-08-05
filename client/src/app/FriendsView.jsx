@@ -36,10 +36,15 @@ export default function FriendsView({ onOpenDm, onOpenProfile, onToast, onConver
     )));
     socket.on('social:refresh', update);
     socket.on('social:presence', updatePresence);
+    const updateActivity = ({ userId, activity }) => setFriends((current) => current.map((friend) => (
+      friend.user.id === userId ? { ...friend, user: { ...friend.user, activity } } : friend
+    )));
+    socket.on('social:activity', updateActivity);
     if (!socket.connected) socket.connect();
     return () => {
       socket.off('social:refresh', update);
       socket.off('social:presence', updatePresence);
+      socket.off('social:activity', updateActivity);
     };
   }, [refresh]);
 

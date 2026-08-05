@@ -7,6 +7,9 @@ import { clientOrigins } from './config/clientOrigins.js';
 
 let io;
 const onlineUsers = new Map();
+const userActivities = new Map();
+const activityTimers = new Map();
+const ACTIVITY_TTL_MS = 75_000;
 
 function addOnlineUser(userId) {
   onlineUsers.set(userId, (onlineUsers.get(userId) || 0) + 1);
@@ -21,6 +24,76 @@ function removeOnlineUser(userId) {
 
 export function isUserOnline(userId) {
   return onlineUsers.has(userId);
+}
+
+export function getUserActivity(userId) {
+  const entry = userActivities.get(userId);
+  if (!entry || entry.expiresAt <= Date.now()) return null;
+  return publicActivity(entry.activity);
+}
+
+export function getUserActivityJoin(userId) {
+  const entry = userActivities.get(userId);
+  if (!entry || entry.expiresAt <= Date.now() || !entry.activity.joinSecret) return null;
+  return { applicationId: entry.activity.applicationId, joinSecret: entry.activity.joinSecret };
+}
+
+function publicActivity(activity) {
+  if (!activity) return null;
+  const { joinSecret: _joinSecret, ...visible } = activity;
+  return { ...visible, joinable: Boolean(activity.joinSecret) };
+}
+
+async function activityAudience(userId) {
+  const [guilds, friends] = await Promise.all([
+    db.all('SELECT guild_id FROM guild_members WHERE user_id = ?', [userId]),
+    db.all(
+      `SELECT CASE WHEN requester_id = ? THEN addressee_id ELSE requester_id END AS user_id
+       FROM friendships WHERE status = 'accepted' AND (requester_id = ? OR addressee_id = ?)`,
+      [userId, userId, userId]
+    )
+  ]);
+  return { guilds, friends };
+}
+
+async function broadcastUserActivity(userId, activity) {
+  if (!io) return;
+  const { guilds, friends } = await activityAudience(userId);
+  const payload = { userId, activity: publicActivity(activity) };
+  for (const guild of guilds) io.to(`guild:${guild.guild_id}`).emit('activity:update', payload);
+  emitToUsers([userId, ...friends.map((friend) => friend.user_id)], 'social:activity', payload);
+}
+
+export async function setUserActivity(userId, activity) {
+  const normalized = {
+    ...activity,
+    details: activity.details || null,
+    state: activity.state || null,
+    startedAt: activity.startedAt || null,
+    endsAt: activity.endsAt || null,
+    applicationId: activity.applicationId || null,
+    assets: activity.assets || null,
+    party: activity.party || null,
+    buttons: activity.buttons || [],
+    joinable: Boolean(activity.joinSecret),
+    updatedAt: Date.now()
+  };
+  userActivities.set(userId, { activity: normalized, expiresAt: Date.now() + ACTIVITY_TTL_MS });
+  clearTimeout(activityTimers.get(userId));
+  activityTimers.set(userId, setTimeout(() => {
+    userActivities.delete(userId);
+    activityTimers.delete(userId);
+    void broadcastUserActivity(userId, null);
+  }, ACTIVITY_TTL_MS));
+  await broadcastUserActivity(userId, normalized);
+  return publicActivity(normalized);
+}
+
+export async function clearUserActivity(userId) {
+  clearTimeout(activityTimers.get(userId));
+  activityTimers.delete(userId);
+  const existed = userActivities.delete(userId);
+  if (existed) await broadcastUserActivity(userId, null);
 }
 
 async function canAccessChannel(userId, channelId) {
@@ -151,6 +224,7 @@ export function configureRealtime(httpServer) {
       const guildRooms = [...socket.rooms].filter((room) => room.startsWith('guild:'));
       const staysOnline = removeOnlineUser(socket.data.userId);
       if (staysOnline) return;
+      await clearUserActivity(socket.data.userId);
       await emitFriendPresence(socket.data.userId, 'offline');
       for (const room of guildRooms) {
         io.to(room).emit('presence:update', {

@@ -18,15 +18,20 @@ import {
   twoFactorStatus,
   updateAccount,
   updatePassword,
-  updateSettings
+  updateSettings,
+  updateActivity,
+  deleteActivity
 } from '../controllers/accountController.js';
 import { addMyAppealMessage, createAppeal, myAppeal, myAppeals } from '../controllers/staffController.js';
 
 const router = Router();
 const securityLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 15, standardHeaders: 'draft-7', legacyHeaders: false });
+const activityLimiter = rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: 'draft-7', legacyHeaders: false });
 router.use(requireAuth);
 router.get('/settings', asyncHandler(getSettings));
 router.patch('/settings', asyncHandler(updateSettings));
+router.put('/activity', activityLimiter, asyncHandler(updateActivity));
+router.delete('/activity', activityLimiter, asyncHandler(deleteActivity));
 router.patch('/', securityLimiter, asyncHandler(updateAccount));
 router.patch('/password', securityLimiter, asyncHandler(updatePassword));
 router.get('/sessions', asyncHandler(listSessions));

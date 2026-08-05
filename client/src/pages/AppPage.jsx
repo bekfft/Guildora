@@ -550,13 +550,20 @@ export default function AppPage() {
         member.user_id === userId ? { ...member, status } : member
       )));
     };
+    const updateActivity = ({ userId, activity }) => {
+      setMembers((current) => current.map((member) => (
+        member.user_id === userId ? { ...member, activity } : member
+      )));
+    };
     socket.on('connect', joinGuildPresence);
     socket.on('presence:update', updatePresence);
+    socket.on('activity:update', updateActivity);
     if (!socket.connected) socket.connect();
     else joinGuildPresence();
     return () => {
       socket.off('connect', joinGuildPresence);
       socket.off('presence:update', updatePresence);
+      socket.off('activity:update', updateActivity);
     };
   }, [guildId]);
 

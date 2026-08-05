@@ -7,6 +7,7 @@ import {
   ChevronUp,
   Eye,
   EyeOff,
+  Gamepad2,
   ImagePlus,
   Info,
   LoaderCircle,
@@ -29,6 +30,7 @@ import Modal from './Modal.jsx';
 import DeveloperSection from './DeveloperSection.jsx';
 import {
   AccountSection,
+  ActivitySettingsSection,
   ConnectionsSection,
   PreferencesSection,
   PrivacySection,
@@ -42,6 +44,7 @@ const TABS = [
   { id: 'Profil', label: 'Profile', icon: UserPen },
   { id: 'Datenschutz', label: 'Datenschutz & Sicherheit', icon: LockKeyhole },
   { id: 'Voice', label: 'Voice & Video', icon: Mic2 },
+  { id: 'Aktivität', label: 'Aktivitätsstatus', icon: Gamepad2 },
   { id: 'Benachrichtigungen', label: 'Benachrichtigungen', icon: Bell },
   { id: 'Erscheinungsbild', label: 'Erscheinungsbild', icon: Palette },
   { id: 'Barrierefreiheit', label: 'Barrierefreiheit', icon: Accessibility },
@@ -294,6 +297,7 @@ export default function SettingsModal({ onClose, onToast, initialTab = 'Mein Kon
             {tab === 'Profil' && <ProfileSettings user={user} refreshUser={refreshUser} onToast={onToast} />}
             {settings && tab === 'Datenschutz' && <PrivacySection settings={settings} save={savePreferences} onToast={onToast} />}
             {settings && tab === 'Voice' && <VoiceSettingsSection settings={settings} save={savePreferences} onToast={onToast} />}
+            {settings && tab === 'Aktivität' && <ActivitySettingsSection settings={settings} save={savePreferences} desktop={desktop} onToast={onToast} />}
             {settings && tab === 'Benachrichtigungen' && <PreferencesSection kind="notifications" settings={settings} save={savePreferences} />}
             {settings && tab === 'Erscheinungsbild' && <PreferencesSection kind="appearance" settings={settings} save={savePreferences} />}
             {settings && tab === 'Barrierefreiheit' && <PreferencesSection kind="accessibility" settings={settings} save={savePreferences} />}

@@ -15,7 +15,12 @@ const IPC = Object.freeze({
   SETTINGS_SET: 'desktop:settings-set',
   OFFLINE_RETRY: 'desktop:offline-retry',
   OPEN_DOWNLOAD: 'desktop:open-download',
-  TRAY_HINT: 'desktop:tray-hint'
+  TRAY_HINT: 'desktop:tray-hint',
+  ACTIVITY_GET: 'desktop:activity-get',
+  ACTIVITY_CONFIGURE: 'desktop:activity-configure',
+  ACTIVITY_CHANGE: 'desktop:activity-change',
+  ACTIVITY_JOIN: 'desktop:activity-join',
+  ACTIVITY_PROCESSES: 'desktop:activity-processes'
 });
 
 function subscribe(channel, callback) {
@@ -41,5 +46,10 @@ contextBridge.exposeInMainWorld('desktop', {
   setSettings: (partial) => ipcRenderer.invoke(IPC.SETTINGS_SET, partial),
   onTrayHint: (callback) => subscribe(IPC.TRAY_HINT, callback),
   retry: () => ipcRenderer.send(IPC.OFFLINE_RETRY),
-  openDownload: () => ipcRenderer.send(IPC.OPEN_DOWNLOAD)
+  openDownload: () => ipcRenderer.send(IPC.OPEN_DOWNLOAD),
+  getActivity: () => ipcRenderer.invoke(IPC.ACTIVITY_GET),
+  configureActivity: (settings) => ipcRenderer.invoke(IPC.ACTIVITY_CONFIGURE, settings),
+  onActivityChange: (callback) => subscribe(IPC.ACTIVITY_CHANGE, callback),
+  joinActivity: (join) => ipcRenderer.invoke(IPC.ACTIVITY_JOIN, join),
+  listActivityProcesses: () => ipcRenderer.invoke(IPC.ACTIVITY_PROCESSES)
 });

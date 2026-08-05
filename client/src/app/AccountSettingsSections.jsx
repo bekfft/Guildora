@@ -199,6 +199,57 @@ export function PrivacySection({ settings, save, onToast }) {
   </div>;
 }
 
+export function ActivitySettingsSection({ settings, save, desktop, onToast }) {
+  const [form, setForm] = useState(settings);
+  const [processes, setProcesses] = useState([]);
+  const [selected, setSelected] = useState('');
+  const [gameName, setGameName] = useState('');
+  const registeredGames = desktop?.settings?.registeredGames || [];
+  const refreshProcesses = () => desktop?.listActivityProcesses?.().then(setProcesses).catch(() => setProcesses([]));
+
+  useEffect(() => {
+    if (desktop?.isDesktop) refreshProcesses();
+  }, [desktop?.isDesktop]);
+
+  async function addGame() {
+    const process = processes.find((item) => item.executable === selected);
+    const name = gameName.trim() || process?.executable.replace(/\.exe$/i, '');
+    if (!process || !name) return;
+    const next = [
+      ...registeredGames.filter((game) => game.executable.toLowerCase() !== process.executable.toLowerCase()),
+      { executable: process.executable, name }
+    ];
+    await desktop.setSettings({ registeredGames: next });
+    setSelected('');
+    setGameName('');
+    onToast('Spiel wurde lokal registriert.', 'success');
+  }
+
+  async function removeGame(executable) {
+    await desktop.setSettings({ registeredGames: registeredGames.filter((game) => game.executable !== executable) });
+  }
+
+  return <div className="user-settings-stack">
+    <section className="user-settings-card"><h4>Aktivitätsstatus</h4><p>Lege fest, ob andere deine Spiele und Rich-Presence-Aktivitäten sehen dürfen.</p>
+      <Switch label="Aktuelle Aktivität anzeigen" description="Zeigt Aktivitäten bei Freunden, im Profil und in Mitgliederlisten gemeinsamer Server." checked={form.activity_status} onChange={(value) => setForm({ ...form, activity_status: value })} />
+      <Switch label="Spiele automatisch erkennen" description="Prüft alle 15 Sekunden lokal, ob ein unterstütztes Spiel läuft. Prozessnamen werden nie an Guildora übertragen." checked={form.detect_games} onChange={(value) => setForm({ ...form, detect_games: value })} />
+      <SaveBar onSave={() => save({ activity_status: form.activity_status, detect_games: form.detect_games })} />
+    </section>
+    <section className="user-settings-card"><h4>Registrierte Spiele</h4>
+      {desktop?.isDesktop ? <>
+        <p>Falls ein Spiel nicht automatisch erkannt wird, kannst du ein aktuell laufendes Programm lokal hinzufügen.</p>
+        <div className="activity-registration">
+          <Field label="Laufendes Programm"><select value={selected} onChange={(event) => { setSelected(event.target.value); setGameName(event.target.value.replace(/\.exe$/i, '')); }}><option value="">Programm auswählen …</option>{processes.map((process) => <option value={process.executable} key={`${process.executable}:${process.pid}`}>{process.executable}</option>)}</select></Field>
+          <Field label="Anzeigename"><input maxLength={128} value={gameName} onChange={(event) => setGameName(event.target.value)} placeholder="Name des Spiels" /></Field>
+          <Button type="button" disabled={!selected} onClick={addGame}>Spiel hinzufügen</Button>
+          <button className="activity-registration__refresh" type="button" onClick={refreshProcesses}>Liste aktualisieren</button>
+        </div>
+        <div className="simple-list">{registeredGames.length ? registeredGames.map((game) => <div key={game.executable}><span><strong>{game.name}</strong><small>{game.executable} · nur auf diesem Gerät</small></span><button type="button" onClick={() => removeGame(game.executable)}>Entfernen</button></div>) : <p>Noch keine eigenen Spiele registriert.</p>}</div>
+      </> : <p>Automatische Erkennung und eigene Spiele sind in der Guildora-Desktop-App verfügbar. Rich Presence anderer Nutzer bleibt auch im Browser sichtbar.</p>}
+    </section>
+  </div>;
+}
+
 function UserAppealThread({ value, onClose, onToast, onRefresh }) {
   const [body,setBody]=useState('');
   const closed=['accepted','rejected'].includes(value.appeal.status);

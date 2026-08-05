@@ -9,11 +9,13 @@ export function DesktopProvider({ children }) {
   const [notice, setNotice] = useState(null);
   const [settings, setSettingsState] = useState(null);
   const [trayHint, setTrayHint] = useState(false);
+  const [activity, setActivity] = useState(null);
 
   useEffect(() => {
     if (!desktopApi?.isDesktop) return undefined;
     document.documentElement.classList.add('is-desktop');
     desktopApi.getSettings().then(setSettingsState);
+    desktopApi.getActivity?.().then(setActivity);
     if (desktopApi.getUpdateState) desktopApi.getUpdateState().then(setUpdate);
     const checkAfterReconnect = () => {
       desktopApi.checkForUpdates().then(setUpdate);
@@ -23,7 +25,8 @@ export function DesktopProvider({ children }) {
       desktopApi.onMaximizeChange(setMaximized),
       desktopApi.onUpdateEvent(setUpdate),
       desktopApi.onNotice(setNotice),
-      desktopApi.onTrayHint(() => setTrayHint(true))
+      desktopApi.onTrayHint(() => setTrayHint(true)),
+      desktopApi.onActivityChange?.(setActivity)
     ];
     return () => {
       document.documentElement.classList.remove('is-desktop');
@@ -44,6 +47,12 @@ export function DesktopProvider({ children }) {
     return next;
   }
 
+  async function configureActivity(settings) {
+    const result = await desktopApi?.configureActivity?.(settings);
+    if (result && Object.hasOwn(result, 'activity')) setActivity(result.activity);
+    return result;
+  }
+
   const value = useMemo(() => ({
     isDesktop: Boolean(desktopApi?.isDesktop),
     platform: desktopApi?.platform,
@@ -53,6 +62,7 @@ export function DesktopProvider({ children }) {
     notice,
     settings,
     trayHint,
+    activity,
     dismissTrayHint: () => setTrayHint(false),
     dismissUpdate: () => setUpdate({ type: 'none' }),
     minimize: () => desktopApi?.minimize(),
@@ -60,8 +70,11 @@ export function DesktopProvider({ children }) {
     close: () => desktopApi?.close(),
     checkForUpdates,
     installUpdate: () => desktopApi?.installUpdate(),
-    setSettings
-  }), [maximized, notice, settings, trayHint, update]);
+    setSettings,
+    configureActivity,
+    joinActivity: (join) => desktopApi?.joinActivity?.(join),
+    listActivityProcesses: () => desktopApi?.listActivityProcesses?.() || Promise.resolve([])
+  }), [activity, maximized, notice, settings, trayHint, update]);
 
   return <DesktopContext.Provider value={value}>{children}</DesktopContext.Provider>;
 }

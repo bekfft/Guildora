@@ -8,12 +8,14 @@ const { readSettings, writeSettings } = require('./settings');
 const { createTray } = require('./tray');
 const { checkForUpdates, getUpdateState, initializeUpdater, installUpdate, stopUpdater } = require('./updater');
 const { createMainWindow, loadApp } = require('./window');
+const { ActivityBridge } = require('./activity');
 
 let mainWindow;
 let tray;
 let currentConfig;
 let quitting = false;
 let configInterval;
+let activityBridge;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -76,12 +78,26 @@ function registerIpc() {
     const safe = {};
     if (typeof partial?.autostart === 'boolean') safe.autostart = partial.autostart;
     if (typeof partial?.minimizeToTray === 'boolean') safe.minimizeToTray = partial.minimizeToTray;
+    if (Array.isArray(partial?.registeredGames)) {
+      safe.registeredGames = partial.registeredGames.slice(0, 50).map((game) => ({
+        executable: typeof game?.executable === 'string' ? game.executable.trim().slice(0, 260) : '',
+        name: typeof game?.name === 'string' ? game.name.trim().slice(0, 128) : ''
+      })).filter((game) => game.executable && game.name);
+    }
     return writeSettings(safe);
   });
   ipcMain.on(IPC.OFFLINE_RETRY, () => currentConfig && loadApp(mainWindow, currentConfig.appUrl));
   ipcMain.on(IPC.OPEN_DOWNLOAD, () => {
     if (currentConfig) shell.openExternal(`${currentConfig.appUrl}/api/download/windows`);
   });
+  ipcMain.handle(IPC.ACTIVITY_GET, () => activityBridge?.getActivity() || null);
+  ipcMain.handle(IPC.ACTIVITY_CONFIGURE, (_event, settings) => activityBridge?.configure({
+    enabled: settings?.enabled === true,
+    detectGames: settings?.detectGames === true,
+    registeredGames: Array.isArray(settings?.registeredGames) ? settings.registeredGames : []
+  }));
+  ipcMain.handle(IPC.ACTIVITY_JOIN, (_event, join) => activityBridge?.sendJoin(join) || false);
+  ipcMain.handle(IPC.ACTIVITY_PROCESSES, () => activityBridge?.listProcesses() || []);
 }
 
 app.setAsDefaultProtocolClient(APP_PROTOCOL);
@@ -116,6 +132,10 @@ app.whenReady().then(async () => {
     mainWindow.webContents.send(IPC.MAXIMIZE_CHANGE, mainWindow.isMaximized());
   });
   registerIpc();
+  activityBridge = new ActivityBridge({
+    onActivity: (activity) => mainWindow?.webContents.send(IPC.ACTIVITY_CHANGE, activity)
+  });
+  activityBridge.start();
   initializeUpdater(mainWindow);
   tray = createTray({
     window: mainWindow,
@@ -146,6 +166,7 @@ app.on('before-quit', () => {
   quitting = true;
   clearInterval(configInterval);
   stopUpdater();
+  activityBridge?.stop();
 });
 app.on('window-all-closed', () => {
   // Das Tray hält die App unter Windows bewusst am Leben.

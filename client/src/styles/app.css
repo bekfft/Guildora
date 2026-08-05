@@ -2208,11 +2208,46 @@ html:is([data-display-mode="standalone"], [data-mobile-app]) .user-panel {
   background: var(--bg-hover);
 }
 
-.member-row > span:last-child {
+.member-row__body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.member-row__body > strong,
+.member-activity {
   overflow: hidden;
-  font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.member-row__body > strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.member-activity {
+  color: var(--channel-idle);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.member-activity.is-streaming { color: #c7a0ff; }
+
+.activity-registration {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.activity-registration > :is(button, .button) { align-self: end; }
+.activity-registration__refresh { color: var(--text-muted); background: transparent; }
+
+@media (max-width: 700px) {
+  .activity-registration { grid-template-columns: 1fr; }
 }
 
 .member-avatar {
@@ -7435,6 +7470,32 @@ html[data-theme="light"] .app-modal--settings .settings-layout nav button.is-act
 .full-profile__actions button:disabled {
   opacity: .55;
 }
+
+.full-profile__activity {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 12px;
+  margin: 0 24px 16px;
+  padding: 12px;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 8px;
+  background: rgb(0 0 0 / 15%);
+}
+
+.full-profile__activity.is-streaming { border-color: rgb(145 71 255 / 45%); }
+.full-profile__activity > img,
+.full-profile__activity > span { width: 64px; height: 64px; border-radius: 8px; }
+.full-profile__activity > img { object-fit: cover; }
+.full-profile__activity > span { display: grid; place-items: center; color: var(--brand); background: var(--bg-elevated); }
+.full-profile__activity > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.full-profile__activity small { color: var(--text-muted); font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.full-profile__activity strong,
+.full-profile__activity p { overflow: hidden; margin: 0; text-overflow: ellipsis; white-space: nowrap; }
+.full-profile__activity strong { font-size: 13px; }
+.full-profile__activity p,
+.full-profile__activity em { color: var(--text-muted); font-size: 11px; font-style: normal; }
+.full-profile__activity nav { display: flex; gap: 6px; margin-top: 6px; }
+.full-profile__activity nav :is(button, a) { padding: 5px 9px; border: 0; border-radius: 4px; color: var(--text-primary); background: var(--brand); font-size: 11px; font-weight: 700; text-decoration: none; cursor: pointer; }
 
 .full-profile__section,
 .full-profile__mutual {

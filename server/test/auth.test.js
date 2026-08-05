@@ -117,6 +117,46 @@ test('/me liefert nur das öffentliche Nutzerobjekt', async () => {
   assert.equal('birthdate' in body.user, false);
 });
 
+test('Rich Presence bleibt flüchtig, privat steuerbar und gibt Join-Secrets nicht öffentlich aus', async () => {
+  const activityResponse = await request('/api/account/activity', {
+    method: 'PUT',
+    cookie: authCookie,
+    body: {
+      type: 'streaming',
+      name: 'Guildora Testspiel',
+      details: 'Ranglistenrunde',
+      state: '2 von 5',
+      startedAt: Date.now() - 60_000,
+      source: 'rpc',
+      applicationId: 'test-game',
+      party: { id: 'party-1', currentSize: 2, maxSize: 5 },
+      buttons: [{ label: 'Website', url: 'https://guildora.example/game' }],
+      joinSecret: 'private-lobby-token'
+    }
+  });
+  assert.equal(activityResponse.status, 200);
+  const visible = (await activityResponse.json()).activity;
+  assert.equal(visible.type, 'streaming');
+  assert.equal(visible.joinable, true);
+  assert.equal('joinSecret' in visible, false);
+
+  const profile = await request(`/api/social/users/${registeredUserId}/profile`, { cookie: authCookie });
+  assert.equal(profile.status, 200);
+  assert.equal((await profile.json()).profile.activity.name, 'Guildora Testspiel');
+
+  const disabled = await request('/api/account/settings', {
+    method: 'PATCH', cookie: authCookie, body: { activity_status: false }
+  });
+  assert.equal(disabled.status, 200);
+  const rejected = await request('/api/account/activity', {
+    method: 'PUT', cookie: authCookie, body: { type: 'playing', name: 'Unsichtbar', source: 'detected' }
+  });
+  assert.equal(rejected.status, 403);
+  await request('/api/account/settings', {
+    method: 'PATCH', cookie: authCookie, body: { activity_status: true, detect_games: true }
+  });
+});
+
 test('Kontoeinstellungen und Sitzungen werden serverseitig gespeichert', async () => {
   const initial = await request('/api/account/settings', { cookie: authCookie });
   assert.equal(initial.status, 200);

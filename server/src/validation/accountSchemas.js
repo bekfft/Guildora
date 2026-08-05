@@ -62,5 +62,7 @@ export const settingsSchema = z.object({
   voice_noise_suppression: z.boolean().optional(),
   voice_echo_cancellation: z.boolean().optional(),
   voice_auto_gain: z.boolean().optional(),
-  push_to_talk_key: z.string().trim().min(1).max(40).optional()
+  push_to_talk_key: z.string().trim().min(1).max(40).optional(),
+  activity_status: z.boolean().optional(),
+  detect_games: z.boolean().optional()
 }).strict();

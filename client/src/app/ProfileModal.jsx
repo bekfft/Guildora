@@ -10,6 +10,7 @@ import {
   Handshake,
   Heart,
   ImagePlus,
+  Gamepad2,
   LoaderCircle,
   MessageCircle,
   Plus,
@@ -26,6 +27,8 @@ import { api } from '../lib/api.js';
 import { socket } from '../lib/socket.js';
 import Modal from './Modal.jsx';
 import { useGuildoraDialog } from '../context/GuildoraDialogContext.jsx';
+import { useDesktop } from '../context/DesktopContext.jsx';
+import { activityElapsed, activityHeadline } from '../lib/activity.js';
 
 const BADGE_ICONS = {
   'badge-check': BadgeCheck,
@@ -59,6 +62,7 @@ export default function ProfileModal({
   onToast
 }) {
   const dialog = useGuildoraDialog();
+  const desktop = useDesktop();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(null);
@@ -104,9 +108,16 @@ export default function ProfileModal({
     };
     socket.on('social:refresh', refreshSocialProfile);
     socket.on('guild:refresh', refreshGuildProfile);
+    const updateActivity = ({ userId: changedUserId, activity }) => {
+      if (changedUserId === userId) setProfile((current) => current ? { ...current, activity } : current);
+    };
+    socket.on('activity:update', updateActivity);
+    socket.on('social:activity', updateActivity);
     return () => {
       socket.off('social:refresh', refreshSocialProfile);
       socket.off('guild:refresh', refreshGuildProfile);
+      socket.off('activity:update', updateActivity);
+      socket.off('social:activity', updateActivity);
     };
   }, [guildId, loadProfile, userId]);
 
@@ -139,6 +150,24 @@ export default function ProfileModal({
       onSocialChanged?.();
       onClose();
       onOpenDm(result.conversation.id);
+    } catch (error) {
+      onToast(error.message, 'error');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function joinActivity() {
+    if (!desktop?.isDesktop) {
+      onToast('Zum Beitreten wird die Guildora-Desktop-App benötigt.', 'error');
+      return;
+    }
+    setBusy('activity-join');
+    try {
+      const { join } = await api.joinActivity(profile.id);
+      const delivered = await desktop.joinActivity(join);
+      if (!delivered) throw new Error('Das passende Spiel ist auf diesem Gerät nicht geöffnet oder noch nicht mit Guildora verbunden.');
+      onToast('Beitrittsanfrage an das Spiel übergeben.', 'success');
     } catch (error) {
       onToast(error.message, 'error');
     } finally {
@@ -311,6 +340,26 @@ export default function ProfileModal({
             </>
           )}
         </div>
+
+        {profile.activity && (
+          <section className={`full-profile__activity is-${profile.activity.type}`}>
+            {/^https?:\/\//i.test(profile.activity.assets?.largeImage || '') ? (
+              <img src={profile.activity.assets.largeImage} alt="" />
+            ) : <span><Gamepad2 size={24} /></span>}
+            <div>
+              <small>{activityHeadline(profile.activity)}</small>
+              <strong>{profile.activity.details || profile.activity.name}</strong>
+              {profile.activity.state && <p>{profile.activity.state}</p>}
+              <em>{profile.activity.party ? `${profile.activity.party.currentSize} von ${profile.activity.party.maxSize} · ` : ''}{activityElapsed(profile.activity.startedAt)}</em>
+              {(profile.activity.buttons.length > 0 || (profile.activity.joinable && !profile.is_self)) && (
+                <nav>
+                  {profile.activity.joinable && !profile.is_self && <button type="button" disabled={busy === 'activity-join'} onClick={joinActivity}>Beitreten</button>}
+                  {profile.activity.buttons.map((button) => <a href={button.url} target="_blank" rel="noreferrer" key={`${button.label}:${button.url}`}>{button.label}</a>)}
+                </nav>
+              )}
+            </div>
+          </section>
+        )}
 
         {profile.is_self && guildId && editingServerProfile && (
           <form className="server-profile-editor" onSubmit={saveServerProfile}>

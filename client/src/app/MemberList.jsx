@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useGuildoraDialog } from '../context/GuildoraDialogContext.jsx';
 import { api } from '../lib/api.js';
+import { activityHeadline } from '../lib/activity.js';
 
 function memberName(member) {
   return member.nickname || member.display_name || member.username;
@@ -265,7 +266,14 @@ export default function MemberList({
                 {member.avatar_url ? <img src={member.avatar_url} alt="" /> : memberName(member)[0].toUpperCase()}
                 <i className={`status-dot status-dot--${member.status}`} />
               </span>
-              <span style={{ color: group.role.color || 'var(--channel-hover)' }}>{memberName(member)}</span>
+              <span className="member-row__body">
+                <strong style={{ color: group.role.color || 'var(--channel-hover)' }}>{memberName(member)}</strong>
+                {member.activity && (
+                  <small className={`member-activity is-${member.activity.type}`} title={activityHeadline(member.activity)}>
+                    {activityHeadline(member.activity)}
+                  </small>
+                )}
+              </span>
             </button>
           ))}
         </section>

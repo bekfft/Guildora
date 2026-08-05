@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api.js';
+import { useDesktop } from './DesktopContext.jsx';
 
 const AuthContext = createContext(null);
 
@@ -37,14 +38,40 @@ const DEFAULT_SETTINGS = Object.freeze({
   voice_noise_suppression: true,
   voice_echo_cancellation: true,
   voice_auto_gain: true,
-  push_to_talk_key: 'Space'
+  push_to_talk_key: 'Space',
+  activity_status: true,
+  detect_games: true
 });
 
 export function AuthProvider({ children }) {
+  const desktop = useDesktop();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState(null);
   const [sessionUnavailable, setSessionUnavailable] = useState(false);
+
+  useEffect(() => {
+    if (!desktop?.isDesktop || !settings) return undefined;
+    const enabled = Boolean(user && settings.activity_status);
+    desktop.configureActivity({
+      enabled,
+      detectGames: Boolean(settings.detect_games),
+      registeredGames: desktop.settings?.registeredGames || []
+    });
+    if (!enabled) {
+      api.clearActivity().catch(() => {});
+      return undefined;
+    }
+    const publish = () => {
+      if (desktop.activity) api.updateActivity(desktop.activity).catch(() => {});
+      else api.clearActivity().catch(() => {});
+    };
+    publish();
+    const heartbeat = desktop.activity ? window.setInterval(publish, 45_000) : null;
+    return () => {
+      if (heartbeat) window.clearInterval(heartbeat);
+    };
+  }, [desktop?.activity, desktop?.isDesktop, desktop?.settings?.registeredGames, settings?.activity_status, settings?.detect_games, user?.id]);
 
   const loadSettings = useCallback(async () => {
     try {
@@ -116,13 +143,14 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(async () => {
     try {
+      if (desktop?.isDesktop) await api.clearActivity().catch(() => {});
       await api.logout();
     } finally {
       setUser(null);
       setSettings(null);
       setSessionUnavailable(false);
     }
-  }, []);
+  }, [desktop?.isDesktop]);
 
   const refreshUser = useCallback(async () => {
     const result = await api.me();

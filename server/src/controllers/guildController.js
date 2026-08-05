@@ -4,7 +4,7 @@ import { db } from '../db/index.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { createGuildSchema, discoveryQuerySchema } from '../validation/guildSchemas.js';
 import { getChannelPermissions, requireChannelPermission } from '../utils/channelPermissions.js';
-import { emitGuildRefresh, emitGuildRemoved, isUserOnline } from '../realtime.js';
+import { emitGuildRefresh, emitGuildRemoved, getUserActivity, isUserOnline } from '../realtime.js';
 import {
   initializeGuildReadStates,
   unreadCountForGuild,
@@ -238,7 +238,8 @@ export async function getGuildMembers(req, res) {
       is_owner: member.user_id === guild.owner_id,
       roles: rolesByMember.get(member.id) || [],
       badges: badgesByUser.get(member.user_id) || [],
-      status: isUserOnline(member.user_id) ? 'online' : 'offline'
+      status: isUserOnline(member.user_id) ? 'online' : 'offline',
+      activity: getUserActivity(member.user_id)
     }))
   });
 }

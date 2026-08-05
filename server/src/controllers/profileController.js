@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { assertNotProtectedOwner, createPlatformCase } from '../services/platformModeration.js';
 import { db } from '../db/index.js';
 import { ApiError } from '../middleware/errorHandler.js';
-import { emitGuildRefresh, emitToUsers, isUserOnline } from '../realtime.js';
+import { emitGuildRefresh, emitToUsers, getUserActivity, isUserOnline } from '../realtime.js';
 import {
   badgePreferencesSchema,
   guildProfileUpdateSchema,
@@ -181,6 +181,7 @@ export async function getUserProfile(req, res) {
     profile: {
       ...user,
       status: isUserOnline(user.id) ? 'online' : 'offline',
+      activity: getUserActivity(user.id),
       is_self: isSelf,
       relationship: relationship ? {
         id: relationship.id,

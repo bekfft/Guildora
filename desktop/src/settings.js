@@ -6,7 +6,8 @@ const DEFAULTS = {
   autostart: false,
   minimizeToTray: true,
   trayHintShown: false,
-  zoomFactor: 1
+  zoomFactor: 1,
+  registeredGames: []
 };
 
 function settingsPath() {

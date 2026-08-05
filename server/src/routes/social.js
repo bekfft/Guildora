@@ -10,6 +10,7 @@ import {
   getDmMessages,
   listConversations,
   listFriends,
+  joinUserActivity,
   markDmRead,
   removeFriend,
   respondFriendRequest,
@@ -29,6 +30,7 @@ router.use(requireAuth);
 const writeLimiter = rateLimit({ windowMs: 10_000, limit: 40, standardHeaders: 'draft-7', legacyHeaders: false });
 router.get('/users/search', asyncHandler(searchUsers));
 router.get('/users/:userId/profile', asyncHandler(getUserProfile));
+router.post('/users/:userId/activity/join', writeLimiter, asyncHandler(joinUserActivity));
 router.patch('/profile', writeLimiter, asyncHandler(updateMyProfile));
 router.patch('/profile/guilds/:guildId', writeLimiter, asyncHandler(updateMyGuildProfile));
 router.put('/profile/badges', writeLimiter, asyncHandler(updateMyBadgePreferences));
