@@ -11,11 +11,32 @@ const uploadRoot = resolveServerDataPath(process.env.UPLOAD_DIR, 'uploads');
 fs.mkdirSync(uploadRoot, { recursive: true });
 
 const allowedTypes = new Set([
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-  'application/pdf', 'text/plain',
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif', 'image/heic', 'image/heif',
+  'application/pdf', 'text/plain', 'text/csv', 'application/json',
+  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/zip', 'application/x-7z-compressed', 'application/vnd.rar', 'application/x-rar-compressed',
   'audio/mpeg', 'audio/ogg', 'audio/webm', 'audio/mp4', 'audio/wav',
   'video/mp4', 'video/webm'
 ]);
+
+const allowedExtensions = new Map([
+  ['.jpg', 'image/jpeg'], ['.jpeg', 'image/jpeg'], ['.png', 'image/png'], ['.gif', 'image/gif'], ['.webp', 'image/webp'],
+  ['.pdf', 'application/pdf'],
+  ['.txt', 'text/plain'], ['.csv', 'text/csv'], ['.json', 'application/json'],
+  ['.doc', 'application/msword'], ['.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+  ['.xls', 'application/vnd.ms-excel'], ['.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+  ['.ppt', 'application/vnd.ms-powerpoint'], ['.pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+  ['.zip', 'application/zip'], ['.7z', 'application/x-7z-compressed'], ['.rar', 'application/vnd.rar'],
+  ['.heic', 'image/heic'], ['.heif', 'image/heif'], ['.avif', 'image/avif'],
+  ['.mp3', 'audio/mpeg'], ['.ogg', 'audio/ogg'], ['.wav', 'audio/wav'], ['.webm', 'video/webm'], ['.mp4', 'video/mp4']
+]);
+
+function normalizeOriginalName(value) {
+  const decoded = Buffer.from(value, 'latin1').toString('utf8');
+  return decoded.includes('\uFFFD') ? value : decoded;
+}
 
 export const attachmentUpload = multer({
   storage: multer.diskStorage({
@@ -23,10 +44,13 @@ export const attachmentUpload = multer({
     filename: (_req, file, callback) => callback(null, `${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase().slice(0, 10)}`)
   }),
   limits: { fileSize: 10 * 1024 * 1024, files: 5 },
-  fileFilter: (_req, file, callback) => callback(
-    allowedTypes.has(file.mimetype) ? null : new ApiError(400, 'INVALID_FILE_TYPE', 'Dieser Dateityp ist nicht erlaubt.'),
-    allowedTypes.has(file.mimetype)
-  )
+  fileFilter: (_req, file, callback) => {
+    file.originalname = normalizeOriginalName(file.originalname);
+    const fallbackType = allowedExtensions.get(path.extname(file.originalname).toLowerCase());
+    if ((!file.mimetype || file.mimetype === 'application/octet-stream') && fallbackType) file.mimetype = fallbackType;
+    const allowed = allowedTypes.has(file.mimetype);
+    callback(allowed ? null : new ApiError(400, 'INVALID_FILE_TYPE', 'Dieser Dateityp ist nicht erlaubt.'), allowed);
+  }
 });
 
 export async function createUploads(req, res) {
@@ -88,6 +112,8 @@ export async function getUpload(req, res) {
   const filePath = path.join(uploadRoot, attachment.stored_name);
   if (!fs.existsSync(filePath)) throw new ApiError(404, 'ATTACHMENT_FILE_MISSING', 'Die Datei ist nicht mehr verfügbar.');
   res.setHeader('Content-Type', attachment.mime_type);
-  res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(attachment.original_name)}`);
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  const disposition = req.query.download === '1' ? 'attachment' : 'inline';
+  res.setHeader('Content-Disposition', `${disposition}; filename*=UTF-8''${encodeURIComponent(attachment.original_name)}`);
   return res.sendFile(filePath);
 }

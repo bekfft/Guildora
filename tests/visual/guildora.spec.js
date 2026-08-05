@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import fs from 'node:fs';
 
 async function prepareAccount(page, testInfo, variant = 'app') {
   await page.goto('/');
@@ -120,6 +121,35 @@ test('Community-Medien, Serverprofil und Statistiken bleiben Discord-orientiert 
   await expect(page.locator('.voice-message')).toBeVisible();
   await expect(page.locator('.message-link-preview')).toContainText('Example Domain');
   await expect(page.getByTitle('Sprachnachricht aufnehmen')).toBeVisible();
+
+  await page.locator('.composer-shell input[type="file"]').setInputFiles([
+    { name: 'guildora-vorschau.png', mimeType: 'image/png', buffer: fs.readFileSync('client/public/assets/guildora-mark.png') },
+    { name: 'community-regeln.txt', mimeType: 'text/plain', buffer: Buffer.from('Guildora Community-Regeln') }
+  ]);
+  await expect(page.locator('.pending-attachment')).toHaveCount(2);
+  await expect(page.locator('.pending-attachment.is-image img')).toBeVisible();
+  await expect.poll(() => page.locator('.pending-attachment.is-image img').evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
+  await expect(page.locator('.guildora-app')).toHaveScreenshot('community-attachments-pending.png', { caret: 'hide' });
+  await page.getByRole('button', { name: 'Nachricht senden' }).click();
+  await expect(page.locator('.message-image-attachment')).toBeVisible();
+  await expect.poll(() => page.locator('.message-image-attachment img').evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
+  await expect(page.locator('.message-file-attachment')).toContainText('community-regeln.txt');
+  await expect(page.locator('.message-file-attachment')).toContainText('25 B');
+  await expect(page.locator('.guildora-app')).toHaveScreenshot('community-attachments-sent.png', { caret: 'hide' });
+  await page.locator('.message-image-attachment').click();
+  const attachmentDialog = page.getByRole('dialog', { name: 'Bildvorschau guildora-vorschau.png' });
+  await expect(attachmentDialog).toBeVisible();
+  await expect(attachmentDialog).toHaveScreenshot('community-attachment-lightbox.png', { caret: 'hide' });
+  await attachmentDialog.getByRole('button', { name: 'Bildvorschau schließen' }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('.message-image-attachment').scrollIntoViewIfNeeded();
+  await expect(page.locator('.guildora-app')).toHaveScreenshot('community-attachments-mobile.png', { caret: 'hide' });
+  await page.locator('.message-image-attachment').click();
+  await expect(attachmentDialog).toBeVisible();
+  await expect(attachmentDialog).toHaveScreenshot('community-attachment-lightbox-mobile.png', { caret: 'hide' });
+  await attachmentDialog.getByRole('button', { name: 'Bildvorschau schließen' }).click();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.locator('.voice-message').scrollIntoViewIfNeeded();
   await expect(page.locator('.guildora-app')).toHaveScreenshot('community-media-desktop.png', { caret: 'hide' });
 
   await page.getByRole('button', { name: 'Profil von Mira im Testlabor öffnen' }).first().click();

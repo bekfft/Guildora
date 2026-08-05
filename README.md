@@ -199,7 +199,8 @@ Serverbesitzer und Rollen mit Serververwaltung behalten administrativen Zugriff.
 
 ## Aktueller Funktionsumfang
 
-- Antworten, Reaktionen, Erwähnungen, Emoji-Auswahl und geschützte Dateianhänge
+- Antworten, Reaktionen, Erwähnungen und Emoji-Auswahl
+- Geschützte Bild- und Dateianhänge mit Auswahlvorschau, Bild-Lightbox, Typ, Größe sowie Öffnen/Download
 - Live-Typing, Lesestatus, ungelesene Marker und Benachrichtigungen
 - Freundschaftsanfragen, Blockierungen und Direktnachrichten
 - Servermoderation mit Sperren, Timeouts, Meldungen und Audit-Log

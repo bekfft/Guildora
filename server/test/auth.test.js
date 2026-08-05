@@ -1263,6 +1263,38 @@ test('Freunde, Direktnachrichten, Anhänge und Moderation funktionieren vollstä
   assert.equal(download.status, 200);
   assert.equal(await download.text(), 'Guildora Upload');
 
+  const imageBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mNkYPj/n4GBgYGJAQoAHgQCAWkR+VQAAAAASUVORK5CYII=', 'base64');
+  const imageForm = new FormData();
+  imageForm.append('files', new Blob([imageBytes], { type: 'image/png' }), 'übersicht.png');
+  const imageUpload = await fetch(`${baseUrl}/api/uploads`, {
+    method: 'POST', headers: { Cookie: authCookie }, body: imageForm
+  });
+  assert.equal(imageUpload.status, 201);
+  const uploadedImage = (await imageUpload.json()).attachments[0];
+  assert.equal(uploadedImage.name, 'übersicht.png');
+  assert.equal(uploadedImage.mime_type, 'image/png');
+  const imageMessage = await request(`/api/channels/${createdChannelId}/messages`, {
+    cookie: authCookie,
+    body: { content: 'Bildanhang', attachmentIds: [uploadedImage.id] }
+  });
+  assert.equal(imageMessage.status, 201);
+  const imageMessageBody = await imageMessage.json();
+  assert.equal(imageMessageBody.message.attachments[0].size_bytes, imageBytes.length);
+  const inlineImage = await request(`/api/uploads/${uploadedImage.id}`, { cookie: authCookie });
+  assert.equal(inlineImage.headers.get('content-type'), 'image/png');
+  assert.match(inlineImage.headers.get('content-disposition'), /^inline;/);
+  const downloadedImage = await request(`/api/uploads/${uploadedImage.id}?download=1`, { cookie: authCookie });
+  assert.match(downloadedImage.headers.get('content-disposition'), /^attachment;/);
+  assert.deepEqual(Buffer.from(await downloadedImage.arrayBuffer()), imageBytes);
+
+  const officeForm = new FormData();
+  officeForm.append('files', new Blob(['docx-test'], { type: 'application/octet-stream' }), 'planung.docx');
+  const officeUpload = await fetch(`${baseUrl}/api/uploads`, {
+    method: 'POST', headers: { Cookie: authCookie }, body: officeForm
+  });
+  assert.equal(officeUpload.status, 201);
+  assert.equal((await officeUpload.json()).attachments[0].mime_type, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+
   const ban = await request(`/api/guilds/${createdGuildId}/moderation/bans`, {
     cookie: authCookie,
     body: { userId: friendId, reason: 'Integrationstest' }

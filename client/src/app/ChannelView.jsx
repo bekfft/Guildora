@@ -1,7 +1,6 @@
 import {
   Check,
   CornerUpLeft,
-  FileText,
   Flag,
   Hash,
   LoaderCircle,
@@ -18,6 +17,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { socket } from '../lib/socket.js';
 import { useGuildoraDialog } from '../context/GuildoraDialogContext.jsx';
+import { appendSelectedFiles, ATTACHMENT_ACCEPT, MessageAttachment, PendingAttachments } from './MessageAttachment.jsx';
 
 const GROUP_WINDOW = 5 * 60 * 1000;
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '👀', '🔥'];
@@ -627,10 +627,7 @@ export default function ChannelView({
                         {message.attachments.map((attachment) => attachment.is_voice_message
                           ? <VoiceMessage attachment={attachment} key={attachment.id} />
                           : (
-                            <a className={`message-attachment ${attachment.mime_type.startsWith('image/') ? 'is-image' : ''}`} href={attachment.url} target="_blank" rel="noreferrer" key={attachment.id}>
-                              {attachment.mime_type.startsWith('image/') ? <img src={attachment.url} alt={attachment.name} /> : <FileText size={22} />}
-                              <span>{attachment.name}</span>
-                            </a>
+                            <MessageAttachment attachment={attachment} key={attachment.id} />
                           ))}
                       </div>
                     )}
@@ -722,7 +719,7 @@ export default function ChannelView({
             <button type="button" aria-label="Antwort abbrechen" onClick={() => setReplyingTo(null)}><X size={16} /></button>
           </div>
         )}
-        {pendingFiles.length > 0 && <div className="pending-attachments">{pendingFiles.map((file, index) => <span key={`${file.name}-${index}`}>{file.name}<button type="button" onClick={() => setPendingFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={13} /></button></span>)}</div>}
+        {pendingFiles.length > 0 && <PendingAttachments files={pendingFiles} onRemove={(index) => setPendingFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} />}
         {recording && (
           <div className="voice-recorder is-recording">
             <span><i /> Aufnahme läuft</span><time>{formatDuration(recordingMs)}</time>
@@ -739,7 +736,7 @@ export default function ChannelView({
         )}
         {composerEmojiOpen && <div className="emoji-picker">{QUICK_REACTIONS.map((emoji) => <button type="button" key={emoji} onClick={() => updateDraft(`${draft}${emoji}`)}>{emoji}</button>)}</div>}
         <div className="composer-shell">
-          {canAttachFiles && <label className="composer-tool" title="Datei anhängen"><Paperclip size={19} /><input type="file" multiple hidden onChange={(event) => setPendingFiles([...event.target.files].slice(0, 5))} /></label>}
+          {canAttachFiles && <label className="composer-tool" title="Datei anhängen"><Paperclip size={19} /><input type="file" multiple hidden accept={ATTACHMENT_ACCEPT} onChange={(event) => setPendingFiles((current) => appendSelectedFiles(event, current, onToast))} /></label>}
           <button className="composer-tool" type="button" title="Emoji auswählen" onClick={() => setComposerEmojiOpen((current) => !current)}><SmilePlus size={19} /></button>
           {canAttachFiles && <button className={`composer-tool ${recording ? 'is-recording' : ''}`} type="button" title="Sprachnachricht aufnehmen" onClick={recording ? stopVoiceRecording : startVoiceRecording} disabled={Boolean(pendingVoice)}><Mic size={19} /></button>}
           <textarea

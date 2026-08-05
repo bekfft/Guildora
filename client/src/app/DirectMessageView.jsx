@@ -1,7 +1,8 @@
-import { FileText, LoaderCircle, Mic, Paperclip, Send, SmilePlus, Square, Trash2, X } from 'lucide-react';
+import { LoaderCircle, Mic, Paperclip, Send, SmilePlus, Square, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { socket } from '../lib/socket.js';
+import { appendSelectedFiles, ATTACHMENT_ACCEPT, MessageAttachment, PendingAttachments } from './MessageAttachment.jsx';
 
 const EMOJIS = ['😀', '😂', '😍', '👍', '❤️', '🎉', '🔥', '👀', '🙏', '✅', '🤝', '💬', '🚀', '✨', '😎', '🤔'];
 
@@ -22,13 +23,7 @@ function Attachment({ attachment }) {
     const waveform = attachment.waveform?.length ? attachment.waveform : Array.from({ length: 32 }, (_, index) => 24 + ((index * 17) % 58));
     return <div className="voice-message"><audio controls preload="metadata" src={attachment.url} /><div className="voice-message__waveform" aria-hidden="true">{waveform.map((height, index) => <i style={{ height: `${height}%` }} key={index} />)}</div><time>{formatDuration(attachment.duration_ms)}</time></div>;
   }
-  const image = attachment.mime_type?.startsWith('image/');
-  return (
-    <a className={`message-attachment ${image ? 'is-image' : ''}`} href={attachment.url} target="_blank" rel="noreferrer">
-      {image ? <img src={attachment.url} alt={attachment.name} /> : <FileText size={22} />}
-      <span>{attachment.name}</span>
-    </a>
-  );
+  return <MessageAttachment attachment={attachment} />;
 }
 
 function formatDuration(durationMs = 0) {
@@ -261,12 +256,12 @@ export default function DirectMessageView({ conversation, currentUserId, onOpenP
       </div>
       <div className="composer-area">
         {typingUsers.size > 0 && <div className="typing-indicator">{nameOf(conversation.user)} schreibt …</div>}
-        {pendingFiles.length > 0 && <div className="pending-attachments">{pendingFiles.map((file, index) => <span key={`${file.name}-${index}`}>{file.name}<button type="button" onClick={() => setPendingFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={13} /></button></span>)}</div>}
+        {pendingFiles.length > 0 && <PendingAttachments files={pendingFiles} onRemove={(index) => setPendingFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} />}
         {recording && <div className="voice-recorder is-recording"><span><i /> Aufnahme läuft</span><time>{formatDuration(recordingMs)}</time><button type="button" onClick={stopVoiceRecording}><Square size={14} fill="currentColor" /> Aufnahme beenden</button></div>}
         {pendingVoice && <div className="voice-recorder is-ready"><audio controls src={pendingVoice.url} /><time>{formatDuration(pendingVoice.durationMs)}</time><button type="button" className="is-cancel" onClick={discardVoice}><Trash2 size={15} /> Verwerfen</button><button type="button" className="is-send" onClick={sendVoiceMessage} disabled={sending}><Send size={15} /> Senden</button></div>}
         {emojiOpen && <div className="emoji-picker">{EMOJIS.map((emoji) => <button type="button" key={emoji} onClick={() => updateDraft(`${draft}${emoji}`)}>{emoji}</button>)}</div>}
         <div className="composer-shell">
-          <label className="composer-tool" title="Datei anhängen"><Paperclip size={19} /><input type="file" multiple hidden onChange={(event) => setPendingFiles([...event.target.files].slice(0, 5))} /></label>
+          <label className="composer-tool" title="Datei anhängen"><Paperclip size={19} /><input type="file" multiple hidden accept={ATTACHMENT_ACCEPT} onChange={(event) => setPendingFiles((current) => appendSelectedFiles(event, current, onToast))} /></label>
           <button className="composer-tool" type="button" title="Emoji" onClick={() => setEmojiOpen((current) => !current)}><SmilePlus size={19} /></button>
           <button className={`composer-tool ${recording ? 'is-recording' : ''}`} type="button" title="Sprachnachricht aufnehmen" onClick={recording ? stopVoiceRecording : startVoiceRecording} disabled={Boolean(pendingVoice)}><Mic size={19} /></button>
           <textarea ref={composer} value={draft} maxLength={2000} rows={1} placeholder="Nachricht schreiben …" onChange={(event) => updateDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} />
