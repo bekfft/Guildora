@@ -5,6 +5,7 @@ import { ApiError } from '../middleware/errorHandler.js';
 import { emitGuildRefresh, emitToUsers, isUserOnline } from '../realtime.js';
 import {
   badgePreferencesSchema,
+  guildProfileUpdateSchema,
   profileReportSchema,
   profileUpdateSchema
 } from '../validation/socialSchemas.js';
@@ -89,7 +90,11 @@ async function serverProfile(guildId, viewerId, targetId) {
   );
   if (!viewer) return null;
   const member = await db.get(
-    'SELECT id, nickname, joined_at FROM guild_members WHERE guild_id = ? AND user_id = ?',
+    `SELECT gm.id, gm.nickname, gm.joined_at,
+            gmp.display_name, gmp.avatar_url, gmp.banner_url, COALESCE(gmp.bio, '') AS bio
+     FROM guild_members gm
+     LEFT JOIN guild_member_profiles gmp ON gmp.guild_id = gm.guild_id AND gmp.user_id = gm.user_id
+     WHERE gm.guild_id = ? AND gm.user_id = ?`,
     [guildId, targetId]
   );
   if (!member) return null;
@@ -102,6 +107,20 @@ async function serverProfile(guildId, viewerId, targetId) {
     [member.id]
   );
   return { guild_id: guildId, ...member, roles };
+}
+
+async function guildProfileAssetUrl(userId, attachmentId, label) {
+  if (attachmentId === undefined) return undefined;
+  if (attachmentId === null) return null;
+  const attachment = await db.get(
+    `SELECT id, mime_type FROM attachments
+     WHERE id = ? AND owner_id = ? AND message_id IS NULL AND dm_message_id IS NULL`,
+    [attachmentId, userId]
+  );
+  if (!attachment?.mime_type?.startsWith('image/')) {
+    throw new ApiError(400, 'INVALID_GUILD_PROFILE_IMAGE', `${label} muss ein eigener Bild-Upload sein.`);
+  }
+  return `/api/uploads/${attachment.id}`;
 }
 
 async function profileAssetUrl(userId, attachmentId, fieldName) {
@@ -213,6 +232,46 @@ export async function updateMyProfile(req, res) {
   req.params = { userId: req.userId };
   req.query = {};
   return getUserProfile(req, res);
+}
+
+export async function updateMyGuildProfile(req, res) {
+  const guildId = req.params.guildId;
+  const data = guildProfileUpdateSchema.parse(req.body);
+  const membership = await db.get(
+    `SELECT gm.id, gmp.display_name, gmp.avatar_url, gmp.banner_url, COALESCE(gmp.bio, '') AS bio
+     FROM guild_members gm
+     LEFT JOIN guild_member_profiles gmp ON gmp.guild_id = gm.guild_id AND gmp.user_id = gm.user_id
+     WHERE gm.guild_id = ? AND gm.user_id = ?`,
+    [guildId, req.userId]
+  );
+  if (!membership) throw new ApiError(403, 'NOT_MEMBER', 'Du bist kein Mitglied dieses Servers.');
+  const [avatarUrl, bannerUrl] = await Promise.all([
+    guildProfileAssetUrl(req.userId, data.avatarAttachmentId, 'Der Serveravatar'),
+    guildProfileAssetUrl(req.userId, data.bannerAttachmentId, 'Das Serverbanner')
+  ]);
+  await db.run(
+    `INSERT INTO guild_member_profiles
+     (guild_id, user_id, display_name, avatar_url, banner_url, bio, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(guild_id, user_id) DO UPDATE SET
+       display_name = excluded.display_name,
+       avatar_url = excluded.avatar_url,
+       banner_url = excluded.banner_url,
+       bio = excluded.bio,
+       updated_at = excluded.updated_at`,
+    [
+      guildId,
+      req.userId,
+      data.displayName === undefined ? membership.display_name : data.displayName,
+      avatarUrl === undefined ? membership.avatar_url : avatarUrl,
+      bannerUrl === undefined ? membership.banner_url : bannerUrl,
+      data.bio ?? membership.bio,
+      new Date().toISOString()
+    ]
+  );
+  await emitGuildRefresh(guildId, ['members']);
+  emitToUsers([req.userId], 'social:refresh', { profile: true, userId: req.userId });
+  return res.json({ profile: await serverProfile(guildId, req.userId, req.userId) });
 }
 
 export async function updateMyBadgePreferences(req, res) {

@@ -83,6 +83,67 @@ test('Landingpage bleibt an jeder Zielgröße stabil', async ({ page }) => {
   await expect(page.locator('.landing')).toHaveScreenshot('landing.png', { caret: 'hide', fullPage: true });
 });
 
+test('Community-Medien, Serverprofil und Statistiken bleiben Discord-orientiert und responsiv', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-1440', 'Die neuen Community-Flächen werden einmal auf Desktop und Mobile geprüft.');
+  test.setTimeout(90_000);
+  const { guild, channel, user } = await prepareAccount(page, testInfo, 'community-features');
+  const profileResponse = await page.request.patch(`/api/social/profile/guilds/${guild.id}`, {
+    data: { displayName: 'Mira im Testlabor', bio: 'Community-Profil nur für diesen Server.' }
+  });
+  expect(profileResponse.ok()).toBeTruthy();
+
+  const voiceUpload = await page.request.post('/api/uploads', {
+    multipart: {
+      files: { name: 'guildora-sprachnachricht.webm', mimeType: 'audio/webm', buffer: Buffer.from('visual-voice-message') }
+    }
+  });
+  expect(voiceUpload.ok()).toBeTruthy();
+  const voiceAttachmentId = (await voiceUpload.json()).attachments[0].id;
+  const voiceMessage = await page.request.post(`/api/channels/${channel.id}/messages`, {
+    data: {
+      content: '',
+      attachmentIds: [voiceAttachmentId],
+      voiceMessage: {
+        attachmentId: voiceAttachmentId,
+        durationMs: 7800,
+        waveform: Array.from({ length: 36 }, (_, index) => 18 + (index % 9) * 9)
+      }
+    }
+  });
+  expect(voiceMessage.ok()).toBeTruthy();
+  const linkMessage = await page.request.post(`/api/channels/${channel.id}/messages`, {
+    data: { content: 'Weitere Informationen findest du auf https://example.com/' }
+  });
+  expect(linkMessage.ok()).toBeTruthy();
+
+  await page.goto(`/app/channels/${guild.id}/${channel.id}`);
+  await expect(page.locator('.voice-message')).toBeVisible();
+  await expect(page.locator('.message-link-preview')).toContainText('Example Domain');
+  await expect(page.getByTitle('Sprachnachricht aufnehmen')).toBeVisible();
+  await expect(page.locator('.guildora-app')).toHaveScreenshot('community-media-desktop.png', { caret: 'hide' });
+
+  await page.getByRole('button', { name: 'Profil von Mira im Testlabor öffnen' }).first().click();
+  const profileDialog = page.getByRole('dialog', { name: 'Profil' });
+  await expect(profileDialog).toContainText('Mira im Testlabor');
+  await expect(profileDialog).toContainText('Community-Profil nur für diesen Server.');
+  await expect(profileDialog).toHaveScreenshot('community-server-profile.png', { caret: 'hide' });
+  await profileDialog.getByRole('button', { name: 'Serverprofil', exact: true }).click();
+  await expect(profileDialog.locator('.server-profile-editor')).toBeVisible();
+  await expect(profileDialog).toHaveScreenshot('community-server-profile-editor.png', { caret: 'hide' });
+  await profileDialog.getByRole('button', { name: 'Dialog schließen' }).click();
+
+  await page.locator('.guild-sidebar-header > button').click();
+  await page.getByRole('button', { name: 'Server-Einstellungen', exact: true }).click();
+  await page.getByRole('button', { name: 'Serverstatistiken', exact: true }).click();
+  await expect(page.locator('.server-insights')).toBeVisible();
+  await expect(page.locator('.insights-cards')).toContainText('Mitglieder');
+  await expect(page.locator('.server-settings')).toHaveScreenshot('community-statistics-desktop.png', { caret: 'hide' });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('.server-settings')).toHaveScreenshot('community-statistics-mobile.png', { caret: 'hide' });
+  expect(user.id).toBeTruthy();
+});
+
 test('Staff-Konsole passt visuell zu Guildora auf Desktop und Mobile', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-1440', 'Desktop und Mobile werden in einer isolierten Inhaber-Sitzung geprüft.');
   const registration = await page.request.post('/api/auth/register', { data: {

@@ -54,7 +54,9 @@ test('Voice-Avatare verwenden denselben neutralen Bildrahmen wie die Mitgliederl
 });
 
 test('Serverprofile zeigen den Servernamen vollständig unterhalb des Banners', () => {
-  assert.match(profileModal, /const displayName = profile\.server_profile\?\.nickname \|\| nameOf\(profile\)/);
+  assert.match(profileModal, /const displayName = profile\.server_profile\?\.display_name \|\| profile\.server_profile\?\.nickname \|\| nameOf\(profile\)/);
+  assert.match(profileModal, /const avatarUrl = profile\.server_profile\?\.avatar_url \|\| profile\.avatar_url/);
+  assert.match(profileModal, /const bannerUrl = profile\.server_profile\?\.banner_url \|\| profile\.banner_url/);
   assert.match(profileModal, /<h2>\{displayName\}<\/h2>/);
   assert.match(appCss, /\.full-profile__identity > div:last-child\s*\{[^}]*padding-top:\s*54px/s);
 });

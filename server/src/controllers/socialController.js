@@ -9,6 +9,7 @@ import {
   userSearchSchema
 } from '../validation/socialSchemas.js';
 import { assertCapability } from '../services/platformModeration.js';
+import { createDmLinkPreview } from '../services/linkPreviewService.js';
 
 const USER_FIELDS = 'id, username, display_name, avatar_url';
 
@@ -234,21 +235,51 @@ async function attachmentsForDm(ids) {
   if (!ids.length) return new Map();
   const markers = ids.map(() => '?').join(',');
   const rows = await db.all(
-    `SELECT id, dm_message_id, original_name, mime_type, size_bytes
-     FROM attachments WHERE dm_message_id IN (${markers}) ORDER BY created_at`,
+    `SELECT a.id, a.dm_message_id, a.original_name, a.mime_type, a.size_bytes,
+            voice.duration_ms, voice.waveform
+     FROM attachments a
+     LEFT JOIN voice_message_attachments voice ON voice.attachment_id = a.id
+     WHERE a.dm_message_id IN (${markers}) ORDER BY a.created_at`,
     ids
   );
   const grouped = new Map();
   for (const row of rows) {
     const list = grouped.get(row.dm_message_id) || [];
-    list.push({ id: row.id, name: row.original_name, mime_type: row.mime_type, size_bytes: Number(row.size_bytes), url: `/api/uploads/${row.id}` });
+    list.push({
+      id: row.id,
+      name: row.original_name,
+      mime_type: row.mime_type,
+      size_bytes: Number(row.size_bytes),
+      is_voice_message: row.duration_ms !== null,
+      duration_ms: row.duration_ms === null ? null : Number(row.duration_ms),
+      waveform: row.waveform ? JSON.parse(row.waveform) : null,
+      url: `/api/uploads/${row.id}`
+    });
+    grouped.set(row.dm_message_id, list);
+  }
+  return grouped;
+}
+
+async function previewsForDm(ids) {
+  if (!ids.length) return new Map();
+  const markers = ids.map(() => '?').join(',');
+  const rows = await db.all(
+    `SELECT id, dm_message_id, url, site_name, title, description
+     FROM dm_message_link_previews WHERE dm_message_id IN (${markers}) ORDER BY created_at`,
+    ids
+  );
+  const grouped = new Map();
+  for (const row of rows) {
+    const list = grouped.get(row.dm_message_id) || [];
+    list.push({ id: row.id, url: row.url, site_name: row.site_name, title: row.title, description: row.description });
     grouped.set(row.dm_message_id, list);
   }
   return grouped;
 }
 
 async function hydrateDmMessages(rows) {
-  const grouped = await attachmentsForDm(rows.map((row) => row.id));
+  const ids = rows.map((row) => row.id);
+  const [grouped, previews] = await Promise.all([attachmentsForDm(ids), previewsForDm(ids)]);
   return rows.map((row) => ({
     id: row.id,
     conversation_id: row.conversation_id,
@@ -257,7 +288,8 @@ async function hydrateDmMessages(rows) {
     updated_at: row.updated_at,
     edited: Boolean(row.edited),
     author: { id: row.author_id, username: row.username, display_name: row.display_name, avatar_url: row.avatar_url },
-    attachments: grouped.get(row.id) || []
+    attachments: grouped.get(row.id) || [],
+    link_previews: previews.get(row.id) || []
   }));
 }
 
@@ -349,6 +381,12 @@ export async function createDmMessage(req, res) {
     [req.userId, ...data.attachmentIds]
   ) : [];
   if (attachments.length !== data.attachmentIds.length) throw new ApiError(400, 'INVALID_ATTACHMENTS', 'Mindestens ein Anhang ist ungültig.');
+  if (data.voiceMessage) {
+    const voiceAttachment = await db.get('SELECT mime_type FROM attachments WHERE id = ?', [data.voiceMessage.attachmentId]);
+    if (!voiceAttachment?.mime_type?.startsWith('audio/')) {
+      throw new ApiError(400, 'INVALID_VOICE_MESSAGE', 'Eine Sprachnachricht muss eine Audiodatei enthalten.');
+    }
+  }
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   await db.run(
@@ -356,6 +394,13 @@ export async function createDmMessage(req, res) {
     [id, req.params.id, req.userId, data.content.trim(), now, now]
   );
   for (const attachment of attachments) await db.run('UPDATE attachments SET dm_message_id = ? WHERE id = ?', [id, attachment.id]);
+  if (data.voiceMessage) {
+    await db.run(
+      `INSERT INTO voice_message_attachments (attachment_id, duration_ms, waveform) VALUES (?, ?, ?)`,
+      [data.voiceMessage.attachmentId, data.voiceMessage.durationMs, JSON.stringify(data.voiceMessage.waveform)]
+    );
+  }
+  await createDmLinkPreview(id, data.content);
   await db.run('UPDATE dm_conversations SET updated_at = ? WHERE id = ?', [now, req.params.id]);
   const message = (await hydrateDmMessages([await db.get(`${DM_SELECT} WHERE m.id = ?`, [id])]))[0];
   emitToConversation(req.params.id, 'dm:message', { message });

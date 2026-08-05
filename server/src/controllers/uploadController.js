@@ -13,7 +13,8 @@ fs.mkdirSync(uploadRoot, { recursive: true });
 const allowedTypes = new Set([
   'image/jpeg', 'image/png', 'image/gif', 'image/webp',
   'application/pdf', 'text/plain',
-  'audio/mpeg', 'audio/ogg', 'video/mp4', 'video/webm'
+  'audio/mpeg', 'audio/ogg', 'audio/webm', 'audio/mp4', 'audio/wav',
+  'video/mp4', 'video/webm'
 ]);
 
 export const attachmentUpload = multer({
@@ -69,9 +70,10 @@ export async function getUpload(req, res) {
       `SELECT 1 AS allowed
        FROM users u
        LEFT JOIN user_profiles p ON p.user_id = u.id
-       WHERE u.avatar_url = ? OR p.banner_url = ?
+       LEFT JOIN guild_member_profiles gp ON gp.user_id = u.id
+       WHERE u.avatar_url = ? OR p.banner_url = ? OR gp.avatar_url = ? OR gp.banner_url = ?
        LIMIT 1`,
-      [`/api/uploads/${attachment.id}`, `/api/uploads/${attachment.id}`]
+      Array(4).fill(`/api/uploads/${attachment.id}`)
     );
     const guildAsset = await db.get(
       `SELECT 1 AS allowed FROM guilds

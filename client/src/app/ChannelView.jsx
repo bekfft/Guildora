@@ -5,10 +5,12 @@ import {
   Flag,
   Hash,
   LoaderCircle,
+  Mic,
   Paperclip,
   Pencil,
   Send,
   SmilePlus,
+  Square,
   Trash2,
   X
 } from 'lucide-react';
@@ -83,6 +85,35 @@ function MessageText({ message }) {
   );
 }
 
+function formatDuration(durationMs = 0) {
+  const total = Math.max(0, Math.round(durationMs / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}
+
+function VoiceMessage({ attachment }) {
+  const waveform = attachment.waveform?.length ? attachment.waveform : Array.from({ length: 32 }, (_, index) => 24 + ((index * 17) % 58));
+  return (
+    <div className="voice-message">
+      <audio controls preload="metadata" src={attachment.url}>Dein Browser unterstützt keine Audiowiedergabe.</audio>
+      <div className="voice-message__waveform" aria-hidden="true">
+        {waveform.map((height, index) => <i style={{ height: `${Math.max(8, height)}%` }} key={index} />)}
+      </div>
+      <time>{formatDuration(attachment.duration_ms)}</time>
+    </div>
+  );
+}
+
+function LinkPreview({ preview }) {
+  return (
+    <a className="message-link-preview" href={preview.url} target="_blank" rel="noreferrer">
+      <span>{preview.site_name}</span>
+      <strong>{preview.title || preview.url}</strong>
+      {preview.description && <p>{preview.description}</p>}
+      <small>{new URL(preview.url).hostname}</small>
+    </a>
+  );
+}
+
 export default function ChannelView({
   channel,
   currentUserId,
@@ -107,15 +138,29 @@ export default function ChannelView({
   const [reactionPickerId, setReactionPickerId] = useState(null);
   const [mobileActionsId, setMobileActionsId] = useState(null);
   const [pendingFiles, setPendingFiles] = useState([]);
+  const [recording, setRecording] = useState(false);
+  const [recordingMs, setRecordingMs] = useState(0);
+  const [pendingVoice, setPendingVoice] = useState(null);
   const [composerEmojiOpen, setComposerEmojiOpen] = useState(false);
   const [typingUsers, setTypingUsers] = useState(new Set());
   const scrollerRef = useRef(null);
   const composerRef = useRef(null);
   const longPressRef = useRef(null);
+  const recorderRef = useRef(null);
+  const recordingTimerRef = useRef(null);
+  const recordingStartedRef = useRef(0);
+  const recordingChunksRef = useRef([]);
+  const waveformRef = useRef([]);
 
   useEffect(() => {
     fitComposer(composerRef.current);
   }, [draft, channel?.id]);
+
+  useEffect(() => () => {
+    if (recordingTimerRef.current) window.clearInterval(recordingTimerRef.current);
+    recorderRef.current?.stream?.getTracks().forEach((track) => track.stop());
+    if (pendingVoice?.url) URL.revokeObjectURL(pendingVoice.url);
+  }, [channel?.id, pendingVoice?.url]);
   const typingTimerRef = useRef(null);
   const initialScrollDone = useRef(false);
   const draftKey = channel ? `guildora:draft:${channel.id}` : '';
@@ -356,6 +401,87 @@ export default function ChannelView({
     }
   }
 
+  async function startVoiceRecording() {
+    if (recording || pendingVoice || !canAttachFiles || !canSendMessages) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus']
+        .find((type) => window.MediaRecorder?.isTypeSupported(type)) || '';
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      recordingChunksRef.current = [];
+      waveformRef.current = [];
+      recordingStartedRef.current = Date.now();
+      recorder.ondataavailable = (event) => event.data.size && recordingChunksRef.current.push(event.data);
+      recorder.onstop = () => {
+        const durationMs = Math.max(250, Date.now() - recordingStartedRef.current);
+        const type = recorder.mimeType || 'audio/webm';
+        const blob = new Blob(recordingChunksRef.current, { type });
+        const extension = type.includes('ogg') ? 'ogg' : 'webm';
+        const waveform = waveformRef.current.length
+          ? waveformRef.current.slice(-48)
+          : Array.from({ length: 32 }, (_, index) => 28 + ((index * 19) % 52));
+        setPendingVoice({
+          file: new File([blob], `sprachnachricht-${Date.now()}.${extension}`, { type }),
+          url: URL.createObjectURL(blob),
+          durationMs,
+          waveform
+        });
+        stream.getTracks().forEach((track) => track.stop());
+      };
+      recorderRef.current = recorder;
+      recorder.start(250);
+      setRecording(true);
+      setRecordingMs(0);
+      recordingTimerRef.current = window.setInterval(() => {
+        const elapsed = Date.now() - recordingStartedRef.current;
+        setRecordingMs(elapsed);
+        waveformRef.current.push(18 + Math.round(Math.random() * 78));
+        if (elapsed >= 300000) {
+          window.clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+          setRecording(false);
+          if (recorder.state === 'recording') recorder.stop();
+        }
+      }, 180);
+    } catch (error) {
+      onToast(error.name === 'NotAllowedError' ? 'Mikrofonzugriff wurde nicht erlaubt.' : 'Das Mikrofon konnte nicht gestartet werden.', 'error');
+    }
+  }
+
+  function stopVoiceRecording() {
+    if (!recording) return;
+    if (recordingTimerRef.current) window.clearInterval(recordingTimerRef.current);
+    recordingTimerRef.current = null;
+    setRecording(false);
+    recorderRef.current?.stop();
+  }
+
+  function discardVoice() {
+    if (pendingVoice?.url) URL.revokeObjectURL(pendingVoice.url);
+    setPendingVoice(null);
+  }
+
+  async function sendVoiceMessage() {
+    if (!pendingVoice || sending) return;
+    setSending(true);
+    try {
+      const uploaded = await api.uploadFiles([pendingVoice.file]);
+      const attachmentId = uploaded.attachments[0].id;
+      const result = await api.sendMessage(channel.id, '', replyingTo?.id || null, [attachmentId], {
+        attachmentId,
+        durationMs: Math.min(300000, pendingVoice.durationMs),
+        waveform: pendingVoice.waveform.map((value) => Math.max(1, Math.min(100, Math.round(value))))
+      });
+      setMessages((current) => mergeMessage(current, result.message));
+      discardVoice();
+      setReplyingTo(null);
+    } catch (error) {
+      onToast(error.message, 'error');
+    } finally {
+      setSending(false);
+    }
+  }
+
   async function saveEdit(messageId) {
     const content = editContent.trim();
     if (!content) return;
@@ -495,17 +621,20 @@ export default function ChannelView({
                         <button type="button" onClick={() => saveEdit(message.id)} aria-label="Änderung speichern"><Check size={17} /></button>
                         <button type="button" onClick={() => setEditingId(null)} aria-label="Bearbeiten abbrechen"><X size={17} /></button>
                       </div>
-                    ) : <MessageText message={message} />}
+                    ) : message.content ? <MessageText message={message} /> : null}
                     {message.attachments?.length > 0 && (
                       <div className="message-attachments">
-                        {message.attachments.map((attachment) => (
-                          <a className={`message-attachment ${attachment.mime_type.startsWith('image/') ? 'is-image' : ''}`} href={attachment.url} target="_blank" rel="noreferrer" key={attachment.id}>
-                            {attachment.mime_type.startsWith('image/') ? <img src={attachment.url} alt={attachment.name} /> : <FileText size={22} />}
-                            <span>{attachment.name}</span>
-                          </a>
-                        ))}
+                        {message.attachments.map((attachment) => attachment.is_voice_message
+                          ? <VoiceMessage attachment={attachment} key={attachment.id} />
+                          : (
+                            <a className={`message-attachment ${attachment.mime_type.startsWith('image/') ? 'is-image' : ''}`} href={attachment.url} target="_blank" rel="noreferrer" key={attachment.id}>
+                              {attachment.mime_type.startsWith('image/') ? <img src={attachment.url} alt={attachment.name} /> : <FileText size={22} />}
+                              <span>{attachment.name}</span>
+                            </a>
+                          ))}
                       </div>
                     )}
+                    {message.link_previews?.map((preview) => <LinkPreview preview={preview} key={preview.id} />)}
                     {(message.reactions || []).length > 0 && (
                       <div className="message-reactions" aria-label="Reaktionen">
                         {message.reactions.map((reaction) => (
@@ -594,10 +723,25 @@ export default function ChannelView({
           </div>
         )}
         {pendingFiles.length > 0 && <div className="pending-attachments">{pendingFiles.map((file, index) => <span key={`${file.name}-${index}`}>{file.name}<button type="button" onClick={() => setPendingFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={13} /></button></span>)}</div>}
+        {recording && (
+          <div className="voice-recorder is-recording">
+            <span><i /> Aufnahme läuft</span><time>{formatDuration(recordingMs)}</time>
+            <button type="button" onClick={stopVoiceRecording}><Square size={14} fill="currentColor" /> Aufnahme beenden</button>
+          </div>
+        )}
+        {pendingVoice && (
+          <div className="voice-recorder is-ready">
+            <audio controls src={pendingVoice.url} />
+            <time>{formatDuration(pendingVoice.durationMs)}</time>
+            <button type="button" className="is-cancel" onClick={discardVoice}><Trash2 size={15} /> Verwerfen</button>
+            <button type="button" className="is-send" onClick={sendVoiceMessage} disabled={sending}><Send size={15} /> Senden</button>
+          </div>
+        )}
         {composerEmojiOpen && <div className="emoji-picker">{QUICK_REACTIONS.map((emoji) => <button type="button" key={emoji} onClick={() => updateDraft(`${draft}${emoji}`)}>{emoji}</button>)}</div>}
         <div className="composer-shell">
           {canAttachFiles && <label className="composer-tool" title="Datei anhängen"><Paperclip size={19} /><input type="file" multiple hidden onChange={(event) => setPendingFiles([...event.target.files].slice(0, 5))} /></label>}
           <button className="composer-tool" type="button" title="Emoji auswählen" onClick={() => setComposerEmojiOpen((current) => !current)}><SmilePlus size={19} /></button>
+          {canAttachFiles && <button className={`composer-tool ${recording ? 'is-recording' : ''}`} type="button" title="Sprachnachricht aufnehmen" onClick={recording ? stopVoiceRecording : startVoiceRecording} disabled={Boolean(pendingVoice)}><Mic size={19} /></button>}
           <textarea
             ref={composerRef}
             value={draft}

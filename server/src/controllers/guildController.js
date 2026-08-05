@@ -179,11 +179,15 @@ export async function getGuildMembers(req, res) {
   await requireMembership(guild.id, req.userId);
   const members = await db.all(
     `SELECT gm.id, gm.nickname, gm.joined_at,
-      u.id AS user_id, u.username, u.display_name, u.avatar_url
+      u.id AS user_id, u.username,
+      COALESCE(NULLIF(gmp.display_name, ''), u.display_name) AS display_name,
+      COALESCE(gmp.avatar_url, u.avatar_url) AS avatar_url,
+      gmp.banner_url AS server_banner_url, COALESCE(gmp.bio, '') AS server_bio
      FROM guild_members gm
      JOIN users u ON u.id = gm.user_id
+     LEFT JOIN guild_member_profiles gmp ON gmp.guild_id = gm.guild_id AND gmp.user_id = gm.user_id
      WHERE gm.guild_id = ?
-     ORDER BY COALESCE(gm.nickname, u.display_name, u.username) ASC`,
+     ORDER BY COALESCE(gmp.display_name, gm.nickname, u.display_name, u.username) ASC`,
     [guild.id]
   );
   const roleRows = await db.all(

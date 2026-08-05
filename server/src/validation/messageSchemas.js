@@ -7,9 +7,16 @@ const content = z.string({ required_error: 'Bitte gib eine Nachricht ein.' })
 export const createMessageSchema = z.object({
   content: z.string().max(2000).optional().default(''),
   replyToId: z.string().uuid('Die Antwortreferenz ist ungültig.').nullable().optional(),
-  attachmentIds: z.array(z.string().uuid()).max(5).optional().default([])
+  attachmentIds: z.array(z.string().uuid()).max(5).optional().default([]),
+  voiceMessage: z.object({
+    attachmentId: z.string().uuid(),
+    durationMs: z.number().int().min(250).max(300000),
+    waveform: z.array(z.number().int().min(1).max(100)).min(20).max(64)
+  }).nullable().optional()
 }).refine((data) => data.content.trim().length > 0 || data.attachmentIds.length > 0, {
   message: 'Eine Nachricht braucht Text oder einen Anhang.'
+}).refine((data) => !data.voiceMessage || data.attachmentIds.includes(data.voiceMessage.attachmentId), {
+  message: 'Die Sprachnachricht muss als Anhang übertragen werden.'
 });
 
 export const updateMessageSchema = z.object({

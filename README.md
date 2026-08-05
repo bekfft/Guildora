@@ -204,6 +204,10 @@ Serverbesitzer und Rollen mit Serververwaltung behalten administrativen Zugriff.
 - Freundschaftsanfragen, Blockierungen und Direktnachrichten
 - Servermoderation mit Sperren, Timeouts, Meldungen und Audit-Log
 - Voice-Channels mit individueller Nutzerlautstärke, Kamera und Bildschirmfreigabe
+- Sprachnachrichten mit Aufnahmevorschau, Dauer und Discord-orientierter Wellenform
+- Sichere Linkvorschauen mit serverseitigem Schutz vor internen und privaten Netzwerkzielen
+- Eigene Namen, Avatare, Banner und Beschreibungen pro Server
+- Serverstatistiken mit 30-Tage-Aktivität, Wachstum, Top-Channels und aktiven Mitgliedern
 
 ## Nächste Phase
 

@@ -42,6 +42,7 @@ import {
   timeoutMember,
   unbanMember
 } from '../controllers/moderationController.js';
+import { getGuildStatistics } from '../controllers/guildStatisticsController.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -50,6 +51,7 @@ router.get('/discovery', asyncHandler(discoverGuilds));
 router.post('/', asyncHandler(createGuild));
 router.get('/:id', asyncHandler(getGuild));
 router.get('/:id/members', asyncHandler(getGuildMembers));
+router.get('/:id/statistics', asyncHandler(getGuildStatistics));
 router.get('/:id/invites', asyncHandler(listGuildInvites));
 router.post('/:id/invites', asyncHandler(createGuildInvite));
 router.delete('/:id/invites/:inviteId', asyncHandler(deleteGuildInvite));

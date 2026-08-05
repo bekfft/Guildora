@@ -9,10 +9,12 @@ import {
   Gem,
   Handshake,
   Heart,
+  ImagePlus,
   LoaderCircle,
   MessageCircle,
   Plus,
   Search,
+  Save,
   ShieldCheck,
   UserMinus,
   UserPlus,
@@ -63,6 +65,10 @@ export default function ProfileModal({
   const [activeBadgeId, setActiveBadgeId] = useState(null);
   const [rolePickerOpen, setRolePickerOpen] = useState(false);
   const [roleQuery, setRoleQuery] = useState('');
+  const [editingServerProfile, setEditingServerProfile] = useState(false);
+  const [serverProfileForm, setServerProfileForm] = useState({ displayName: '', bio: '' });
+  const [serverAvatarFile, setServerAvatarFile] = useState(null);
+  const [serverBannerFile, setServerBannerFile] = useState(null);
 
   const loadProfile = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -80,6 +86,14 @@ export default function ProfileModal({
   useEffect(() => {
     loadProfile();
   }, [loadProfile]);
+
+  useEffect(() => {
+    if (!profile?.server_profile) return;
+    setServerProfileForm({
+      displayName: profile.server_profile.display_name || profile.server_profile.nickname || '',
+      bio: profile.server_profile.bio || ''
+    });
+  }, [profile?.server_profile]);
 
   useEffect(() => {
     const refreshSocialProfile = (payload = {}) => {
@@ -148,6 +162,32 @@ export default function ProfileModal({
     }
   }
 
+  async function saveServerProfile(event) {
+    event.preventDefault();
+    if (!guildId || busy) return;
+    setBusy('server-profile');
+    try {
+      const avatarUpload = serverAvatarFile ? await api.uploadFiles([serverAvatarFile]) : null;
+      const bannerUpload = serverBannerFile ? await api.uploadFiles([serverBannerFile]) : null;
+      await api.updateGuildProfile(guildId, {
+        displayName: serverProfileForm.displayName.trim() || null,
+        bio: serverProfileForm.bio.trim(),
+        ...(avatarUpload ? { avatarAttachmentId: avatarUpload.attachments[0].id } : {}),
+        ...(bannerUpload ? { bannerAttachmentId: bannerUpload.attachments[0].id } : {})
+      });
+      setServerAvatarFile(null);
+      setServerBannerFile(null);
+      setEditingServerProfile(false);
+      await loadProfile(true);
+      onRolesChanged?.();
+      onToast('Serverprofil gespeichert.', 'success');
+    } catch (error) {
+      onToast(error.message, 'error');
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function reportProfile() {
     const reason = await dialog.prompt({
       title: 'Profil melden',
@@ -180,18 +220,21 @@ export default function ProfileModal({
   if (!profile) return null;
 
   const relationship = profile.relationship?.state;
-  const displayName = profile.server_profile?.nickname || nameOf(profile);
+  const displayName = profile.server_profile?.display_name || profile.server_profile?.nickname || nameOf(profile);
+  const avatarUrl = profile.server_profile?.avatar_url || profile.avatar_url;
+  const bannerUrl = profile.server_profile?.banner_url || profile.banner_url;
+  const bio = profile.server_profile?.bio || profile.bio;
   return (
     <Modal title="Profil" onClose={onClose}>
       <article className="full-profile">
         <div
           className="full-profile__banner"
-          style={profile.banner_url ? { backgroundImage: `url("${profile.banner_url}")` } : undefined}
+          style={bannerUrl ? { backgroundImage: `url("${bannerUrl}")` } : undefined}
         />
         <div className="full-profile__identity">
           <div className="full-profile__avatar">
             <span className="full-profile__avatar-media">
-              {profile.avatar_url ? <img src={profile.avatar_url} alt="" /> : displayName[0].toUpperCase()}
+              {avatarUrl ? <img src={avatarUrl} alt="" /> : displayName[0].toUpperCase()}
             </span>
             <i className={`status-dot status-dot--${profile.status}`} />
           </div>
@@ -204,9 +247,12 @@ export default function ProfileModal({
 
         <div className="full-profile__actions">
           {profile.is_self ? (
-            <button type="button" className="is-primary" onClick={() => { onClose(); onEditProfile(); }}>
-              <Edit3 size={16} /> Profil bearbeiten
-            </button>
+            <>
+              <button type="button" className="is-primary" onClick={() => { onClose(); onEditProfile(); }}>
+                <Edit3 size={16} /> Globales Profil
+              </button>
+              {guildId && <button type="button" onClick={() => setEditingServerProfile((value) => !value)}><Users size={16} /> Serverprofil</button>}
+            </>
           ) : (
             <>
               {relationship === 'accepted' && (
@@ -266,6 +312,19 @@ export default function ProfileModal({
           )}
         </div>
 
+        {profile.is_self && guildId && editingServerProfile && (
+          <form className="server-profile-editor" onSubmit={saveServerProfile}>
+            <header><div><strong>Serverprofil bearbeiten</strong><small>Gilt nur auf diesem Server.</small></div><button type="button" onClick={() => setEditingServerProfile(false)}><X size={16} /></button></header>
+            <label><span>Anzeigename auf diesem Server</span><input maxLength={32} value={serverProfileForm.displayName} onChange={(event) => setServerProfileForm({ ...serverProfileForm, displayName: event.target.value })} placeholder={profile.display_name || profile.username} /></label>
+            <label><span>Über mich auf diesem Server</span><textarea maxLength={190} rows={3} value={serverProfileForm.bio} onChange={(event) => setServerProfileForm({ ...serverProfileForm, bio: event.target.value })} /></label>
+            <div className="server-profile-editor__uploads">
+              <label><ImagePlus size={15} />{serverAvatarFile ? serverAvatarFile.name : 'Serveravatar'}<input hidden type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => setServerAvatarFile(event.target.files?.[0] || null)} /></label>
+              <label><ImagePlus size={15} />{serverBannerFile ? serverBannerFile.name : 'Serverbanner'}<input hidden type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => setServerBannerFile(event.target.files?.[0] || null)} /></label>
+            </div>
+            <button className="is-primary" disabled={busy === 'server-profile'}><Save size={15} /> Speichern</button>
+          </form>
+        )}
+
         {visibleBadges.length > 0 && (
           <section className="full-profile__section">
             <h3>Abzeichen</h3>
@@ -290,7 +349,7 @@ export default function ProfileModal({
 
         <section className="full-profile__section">
           <h3>Über mich</h3>
-          <p>{profile.bio || 'Noch keine Profilbeschreibung vorhanden.'}</p>
+          <p>{bio || 'Noch keine Profilbeschreibung vorhanden.'}</p>
           <small>Bei Guildora seit {new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium' }).format(new Date(profile.created_at))}</small>
         </section>
 

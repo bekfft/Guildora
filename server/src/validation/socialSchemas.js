@@ -20,6 +20,13 @@ export const profileUpdateSchema = z.object({
   bannerAttachmentId: z.string().uuid().nullable().optional()
 });
 
+export const guildProfileUpdateSchema = z.object({
+  displayName: z.string().trim().min(2).max(32).nullable().optional(),
+  bio: z.string().trim().max(190).optional().default(''),
+  avatarAttachmentId: z.string().uuid().nullable().optional(),
+  bannerAttachmentId: z.string().uuid().nullable().optional()
+});
+
 export const badgePreferencesSchema = z.object({
   badges: z.array(z.object({
     id: z.string().uuid(),
@@ -33,9 +40,16 @@ export const profileReportSchema = z.object({
 
 export const dmMessageSchema = z.object({
   content: z.string().max(2000).optional().default(''),
-  attachmentIds: z.array(z.string().uuid()).max(5).optional().default([])
+  attachmentIds: z.array(z.string().uuid()).max(5).optional().default([]),
+  voiceMessage: z.object({
+    attachmentId: z.string().uuid(),
+    durationMs: z.number().int().min(250).max(300000),
+    waveform: z.array(z.number().int().min(1).max(100)).min(20).max(64)
+  }).nullable().optional()
 }).refine((data) => data.content.trim().length > 0 || data.attachmentIds.length > 0, {
   message: 'Eine Nachricht braucht Text oder einen Anhang.'
+}).refine((data) => !data.voiceMessage || data.attachmentIds.includes(data.voiceMessage.attachmentId), {
+  message: 'Die Sprachnachricht muss als Anhang übertragen werden.'
 });
 
 export const moderationSchema = z.object({

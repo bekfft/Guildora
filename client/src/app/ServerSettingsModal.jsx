@@ -1,7 +1,7 @@
 import {
-  BadgeCheck, Check, ChevronRight, CircleUserRound, Copy, FolderPlus, Hash, LayoutDashboard,
+  Activity, BadgeCheck, BarChart3, Check, ChevronRight, CircleUserRound, Copy, FolderPlus, Hash, LayoutDashboard,
   Gavel, ImagePlus, Link2, LoaderCircle, Lock, Minus, Plus, RotateCcw, Save, Settings2, Shield, Trash2,
-  UserMinus, Users, Volume2, X
+  MessageSquare, TrendingUp, UserMinus, UserPlus, Users, Volume2, X
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
@@ -45,6 +45,7 @@ const TABS = [
   { id: 'channels', label: 'Channels', icon: Hash },
   { id: 'roles', label: 'Rollen', icon: Shield },
   { id: 'members', label: 'Mitglieder', icon: Users },
+  { id: 'statistics', label: 'Serverstatistiken', icon: BarChart3 },
   { id: 'moderation', label: 'Moderation', icon: Gavel }
 ];
 
@@ -86,6 +87,7 @@ export default function ServerSettingsModal({
     || (item.id === 'channels' && capabilities.manageChannels)
     || (item.id === 'roles' && capabilities.manageRoles)
     || (item.id === 'members' && (capabilities.manageServer || capabilities.manageRoles || capabilities.kickMembers))
+    || (item.id === 'statistics' && capabilities.manageServer)
     || (item.id === 'moderation' && capabilities.kickMembers)
   ));
   const [tab, setTab] = useState(
@@ -114,6 +116,7 @@ export default function ServerSettingsModal({
   const [invites, setInvites] = useState([]);
   const [inviteDraft, setInviteDraft] = useState({ expiresIn: '86400', maxUses: 'none' });
   const [moderation, setModeration] = useState({ bans: [], timeouts: [], reports: [], audit_logs: [] });
+  const [statistics, setStatistics] = useState(null);
   const dialogRef = useRef(null);
   const iconObjectUrl = useMemo(() => iconFile ? URL.createObjectURL(iconFile) : null, [iconFile]);
   const iconPreview = iconObjectUrl || (!removeIcon ? guildData.guild.icon_url : null);
@@ -148,6 +151,11 @@ export default function ServerSettingsModal({
   useEffect(() => {
     if (tab !== 'moderation') return;
     api.moderation(guildData.guild.id).then(setModeration).catch((error) => onToast(error.message, 'error'));
+  }, [tab, guildData.guild.id, onToast]);
+
+  useEffect(() => {
+    if (tab !== 'statistics') return;
+    api.guildStatistics(guildData.guild.id).then(setStatistics).catch((error) => onToast(error.message, 'error'));
   }, [tab, guildData.guild.id, onToast]);
 
   useEffect(() => () => {
@@ -699,6 +707,35 @@ export default function ServerSettingsModal({
               </div>
             </div>
           )}
+          {tab === 'statistics' && (
+            <div className="settings-page settings-page--wide server-insights">
+              <header><h2>Serverstatistiken</h2><p>Aktivität und Wachstum der letzten 30 Tage – übersichtlich wie bei Discord Server Insights.</p></header>
+              {!statistics ? <div className="insights-loading"><LoaderCircle className="spin" size={24} /> Statistiken werden geladen …</div> : (
+                <>
+                  <div className="insights-cards">
+                    <InsightCard icon={Users} label="Mitglieder" value={statistics.overview.total_members} detail={`${statistics.overview.online_members} gerade online`} />
+                    <InsightCard icon={MessageSquare} label="Nachrichten" value={statistics.overview.messages_30d} detail={`${statistics.overview.messages_7d} in 7 Tagen`} />
+                    <InsightCard icon={Activity} label="Aktive Mitglieder" value={statistics.overview.active_members_30d} detail="in den letzten 30 Tagen" />
+                    <InsightCard icon={UserPlus} label="Neue Mitglieder" value={statistics.overview.new_members_30d} detail="in den letzten 30 Tagen" />
+                  </div>
+                  <section className="insights-panel insights-chart-panel">
+                    <div className="insights-panel__heading"><div><h3>Nachrichtenaktivität</h3><p>Nachrichten pro Tag</p></div><span className={statistics.overview.message_change_percent >= 0 ? 'is-positive' : 'is-negative'}><TrendingUp size={15} />{statistics.overview.message_change_percent >= 0 ? '+' : ''}{statistics.overview.message_change_percent}%</span></div>
+                    <div className="insights-chart" aria-label="Nachrichten der letzten 30 Tage">
+                      {statistics.daily.map((day) => {
+                        const maximum = Math.max(1, ...statistics.daily.map((item) => item.messages));
+                        return <i style={{ height: `${Math.max(3, (day.messages / maximum) * 100)}%` }} title={`${new Date(day.date).toLocaleDateString('de-DE')}: ${day.messages} Nachrichten`} key={day.date} />;
+                      })}
+                    </div>
+                    <div className="insights-chart__axis"><span>{new Date(statistics.daily[0].date).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}</span><span>Heute</span></div>
+                  </section>
+                  <div className="insights-columns">
+                    <section className="insights-panel"><h3>Top-Channels</h3>{statistics.top_channels.map((channel, index) => <div className="insights-ranking" key={channel.id}><b>{index + 1}</b><span><strong># {channel.name}</strong><i><em style={{ width: `${Math.max(4, (channel.messages / Math.max(1, statistics.top_channels[0]?.messages)) * 100)}%` }} /></i></span><small>{channel.messages}</small></div>)}</section>
+                    <section className="insights-panel"><h3>Aktivste Mitglieder</h3>{statistics.top_members.map((member, index) => <div className="insights-member" key={member.user_id}><b>{index + 1}</b><span className="member-avatar">{member.avatar_url ? <img src={member.avatar_url} alt="" /> : (member.display_name || member.username)[0]}</span><span><strong>{member.display_name || member.nickname || member.username}</strong><small>@{member.username}</small></span><em>{member.messages}</em></div>)}</section>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           {tab === 'moderation' && (
             <div className="settings-page settings-page--wide moderation-page">
               <header><h2>Moderation & Audit-Log</h2><p>Bearbeite Meldungen, Sperren und aktive Timeouts nachvollziehbar.</p></header>
@@ -725,6 +762,10 @@ export default function ServerSettingsModal({
       </section>
     </div>
   );
+}
+
+function InsightCard({ icon: Icon, label, value, detail }) {
+  return <article><span><Icon size={19} /></span><div><small>{label}</small><strong>{new Intl.NumberFormat('de-DE').format(value)}</strong><p>{detail}</p></div></article>;
 }
 
 function CategoryEditor({

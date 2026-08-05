@@ -23,6 +23,7 @@ router.use(requireAuth);
 const sendLimiter = rateLimit({
   windowMs: 10 * 1000,
   limit: 12,
+  keyGenerator: (req) => req.userId,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   handler: (req, res) => res.status(429).json({

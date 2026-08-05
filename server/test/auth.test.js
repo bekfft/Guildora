@@ -639,12 +639,88 @@ test('Nachrichten unterstützen Antworten, Reaktionen, Erwähnungen und Echtzeit
   assert.equal(survivingMessages[0].id, replyBody.message.id);
   assert.equal(survivingMessages[0].reply_to, null);
 
+  const voiceForm = new FormData();
+  voiceForm.append('files', new Blob(['guildora-voice-test'], { type: 'audio/webm' }), 'sprachnachricht.webm');
+  const voiceUpload = await fetch(`${baseUrl}/api/uploads`, {
+    method: 'POST', headers: { Cookie: authCookie }, body: voiceForm
+  });
+  assert.equal(voiceUpload.status, 201);
+  const voiceAttachmentId = (await voiceUpload.json()).attachments[0].id;
+  const waveform = Array.from({ length: 32 }, (_, index) => 20 + (index % 8) * 10);
+  const voice = await request(`/api/channels/${createdChannelId}/messages`, {
+    cookie: authCookie,
+    body: {
+      content: '',
+      attachmentIds: [voiceAttachmentId],
+      voiceMessage: { attachmentId: voiceAttachmentId, durationMs: 4200, waveform }
+    }
+  });
+  assert.equal(voice.status, 201);
+  const voiceBody = await voice.json();
+  assert.equal(voiceBody.message.attachments[0].is_voice_message, true);
+  assert.equal(voiceBody.message.attachments[0].duration_ms, 4200);
+  assert.deepEqual(voiceBody.message.attachments[0].waveform, waveform);
+
+  await db.run(
+    `INSERT INTO message_link_previews (id, message_id, url, site_name, title, description)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [crypto.randomUUID(), replyBody.message.id, 'https://example.com/info', 'Example', 'Guildora Linkvorschau', 'Sicher gespeicherte Metadaten.']
+  );
+  const withMedia = await request(`/api/channels/${createdChannelId}/messages`, { cookie: authCookie });
+  const mediaMessages = (await withMedia.json()).messages;
+  assert.equal(mediaMessages.find((message) => message.id === replyBody.message.id).link_previews[0].title, 'Guildora Linkvorschau');
+  assert.equal(mediaMessages.find((message) => message.id === voiceBody.message.id).attachments[0].is_voice_message, true);
+
+  const blockedPreview = await request(`/api/channels/${createdChannelId}/messages`, {
+    cookie: authCookie,
+    body: { content: 'Interne Adresse darf keine Vorschau erhalten: http://localhost/private' }
+  });
+  assert.equal(blockedPreview.status, 201);
+  const blockedPreviewBody = await blockedPreview.json();
+  assert.deepEqual(blockedPreviewBody.message.link_previews, []);
+  assert.equal((await request(`/api/messages/${blockedPreviewBody.message.id}`, { method: 'DELETE', cookie: authCookie })).status, 204);
+  assert.equal((await request(`/api/messages/${voiceBody.message.id}`, { method: 'DELETE', cookie: authCookie })).status, 204);
+
   assert.equal((await request(`/api/messages/${replyBody.message.id}`, {
     method: 'DELETE',
     cookie: authCookie
   })).status, 204);
   realtimeClient.disconnect();
   mentionedClient.disconnect();
+});
+
+test('Serverprofile und Serverstatistiken verwenden echte Guild-Daten', async () => {
+  const profile = await request(`/api/social/profile/guilds/${createdGuildId}`, {
+    method: 'PATCH',
+    cookie: authCookie,
+    body: { displayName: 'Mira Community', bio: 'Nur auf diesem Server sichtbar.' }
+  });
+  assert.equal(profile.status, 200);
+  const profileBody = await profile.json();
+  assert.equal(profileBody.profile.display_name, 'Mira Community');
+  assert.equal(profileBody.profile.bio, 'Nur auf diesem Server sichtbar.');
+
+  const viewed = await request(`/api/social/users/${registeredUserId}/profile?guildId=${createdGuildId}`, { cookie: authCookie });
+  assert.equal(viewed.status, 200);
+  assert.equal((await viewed.json()).profile.server_profile.display_name, 'Mira Community');
+  const memberList = await request(`/api/guilds/${createdGuildId}/members`, { cookie: authCookie });
+  assert.equal((await memberList.json()).members.find((member) => member.user_id === registeredUserId).display_name, 'Mira Community');
+
+  const activity = await request(`/api/channels/${createdChannelId}/messages`, {
+    cookie: authCookie,
+    body: { content: 'Aktivität für die Serverstatistik.' }
+  });
+  assert.equal(activity.status, 201);
+  const activityBody = await activity.json();
+  const statistics = await request(`/api/guilds/${createdGuildId}/statistics`, { cookie: authCookie });
+  assert.equal(statistics.status, 200);
+  const statisticsBody = await statistics.json();
+  assert.ok(statisticsBody.overview.total_members >= 1);
+  assert.ok(statisticsBody.overview.messages_30d >= 1);
+  assert.equal(statisticsBody.daily.length, 30);
+  assert.equal(statisticsBody.top_channels[0].id, createdChannelId);
+  assert.equal(statisticsBody.top_members[0].display_name, 'Mira Community');
+  assert.equal((await request(`/api/messages/${activityBody.message.id}`, { method: 'DELETE', cookie: authCookie })).status, 204);
 });
 
 test('Discovery, Join und Leave funktionieren vollständig', async () => {
@@ -1134,6 +1210,38 @@ test('Freunde, Direktnachrichten, Anhänge und Moderation funktionieren vollstä
     method: 'POST',
     cookie: friendCookie
   })).status, 200);
+
+  const voiceForm = new FormData();
+  voiceForm.append('files', new Blob(['Guildora Voice'], { type: 'audio/webm' }), 'sprachnachricht.webm');
+  const voiceUpload = await fetch(`${baseUrl}/api/uploads`, {
+    method: 'POST',
+    headers: { Cookie: authCookie },
+    body: voiceForm
+  });
+  assert.equal(voiceUpload.status, 201);
+  const voiceAttachmentId = (await voiceUpload.json()).attachments[0].id;
+  const voiceDm = await request(`/api/social/dm/conversations/${conversationId}/messages`, {
+    cookie: authCookie,
+    body: {
+      content: '',
+      attachmentIds: [voiceAttachmentId],
+      voiceMessage: { attachmentId: voiceAttachmentId, durationMs: 3456, waveform: Array(24).fill(55) }
+    }
+  });
+  assert.equal(voiceDm.status, 201);
+  const voiceDmBody = await voiceDm.json();
+  assert.equal(voiceDmBody.message.attachments[0].is_voice_message, true);
+  assert.equal(voiceDmBody.message.attachments[0].duration_ms, 3456);
+
+  await db.run(
+    `INSERT INTO dm_message_link_previews (id, dm_message_id, url, site_name, title, description)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [crypto.randomUUID(), voiceDmBody.message.id, 'https://guildora.example/test', 'Guildora', 'Direktnachrichten-Vorschau', 'Sicher gespeicherte Link-Metadaten']
+  );
+  const hydratedDmMessages = await request(`/api/social/dm/conversations/${conversationId}/messages`, { cookie: friendCookie });
+  const hydratedVoiceDm = (await hydratedDmMessages.json()).messages.find((item) => item.id === voiceDmBody.message.id);
+  assert.equal(hydratedVoiceDm.attachments[0].waveform.length, 24);
+  assert.equal(hydratedVoiceDm.link_previews[0].title, 'Direktnachrichten-Vorschau');
 
   const form = new FormData();
   form.append('files', new Blob(['Guildora Upload'], { type: 'text/plain' }), 'notiz.txt');

@@ -106,6 +106,7 @@ export const api = {
   discoverGuilds: (query = '') => request(`/api/guilds/discovery${query}`),
   guild: (id) => request(`/api/guilds/${id}`),
   guildMembers: (id) => request(`/api/guilds/${id}/members`),
+  guildStatistics: (id) => request(`/api/guilds/${id}/statistics`),
   joinGuild: (id) => request(`/api/guilds/${id}/join`, { method: 'POST' }),
   leaveGuild: (id) => request(`/api/guilds/${id}/leave`, { method: 'DELETE' }),
   createGuild: (data) => request('/api/guilds', { method: 'POST', body: JSON.stringify(data) }),
@@ -150,6 +151,10 @@ export const api = {
     method: 'PATCH',
     body: JSON.stringify(data)
   }),
+  updateGuildProfile: (guildId, data) => request(`/api/social/profile/guilds/${guildId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data)
+  }),
   updateBadgePreferences: (badges) => request('/api/social/profile/badges', {
     method: 'PUT',
     body: JSON.stringify({ badges })
@@ -167,9 +172,9 @@ export const api = {
   conversations: () => request('/api/social/dm/conversations'),
   openConversation: (userId) => request(`/api/social/dm/users/${userId}`, { method: 'POST' }),
   dmMessages: (id) => request(`/api/social/dm/conversations/${id}/messages`),
-  sendDm: (id, content, attachmentIds = []) => request(`/api/social/dm/conversations/${id}/messages`, {
+  sendDm: (id, content, attachmentIds = [], voiceMessage = null) => request(`/api/social/dm/conversations/${id}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ content, attachmentIds })
+    body: JSON.stringify({ content, attachmentIds, voiceMessage })
   }),
   markDmRead: (id) => request(`/api/social/dm/conversations/${id}/read`, { method: 'POST' }),
   uploadFiles: (files) => {
@@ -190,9 +195,9 @@ export const api = {
   resolveReport: (guildId, reportId, status) => request(`/api/guilds/${guildId}/reports/${reportId}`, {
     method: 'PATCH', body: JSON.stringify({ status })
   }),
-  sendMessage: (channelId, content, replyToId = null, attachmentIds = []) => request(`/api/channels/${channelId}/messages`, {
+  sendMessage: (channelId, content, replyToId = null, attachmentIds = [], voiceMessage = null) => request(`/api/channels/${channelId}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ content, replyToId, attachmentIds })
+    body: JSON.stringify({ content, replyToId, attachmentIds, voiceMessage })
   }),
   updateMessage: (messageId, content) => request(`/api/messages/${messageId}`, {
     method: 'PATCH',

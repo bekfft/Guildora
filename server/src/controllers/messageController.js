@@ -6,6 +6,7 @@ import { requireChannelPermission } from '../utils/channelPermissions.js';
 import { createNotification } from '../utils/notifications.js';
 import { requireNotTimedOut } from '../utils/moderation.js';
 import { assertCapability } from '../services/platformModeration.js';
+import { createLinkPreview } from '../services/linkPreviewService.js';
 import {
   createMessageSchema,
   messageQuerySchema,
@@ -15,18 +16,25 @@ import {
 
 export const MESSAGE_SELECT = `
   SELECT m.id, m.channel_id, m.author_id, m.content, m.created_at,
-         m.updated_at, m.edited, u.username, u.display_name, u.avatar_url,
+         m.updated_at, m.edited, u.username,
+         COALESCE(NULLIF(gmp.display_name, ''), gm.nickname, u.display_name) AS display_name,
+         COALESCE(gmp.avatar_url, u.avatar_url) AS avatar_url,
          replies.reply_to_id,
          replied.content AS reply_content,
          replied_author.id AS reply_author_id,
          replied_author.username AS reply_username,
-         replied_author.display_name AS reply_display_name,
-         replied_author.avatar_url AS reply_avatar_url
+         COALESCE(NULLIF(replied_gmp.display_name, ''), replied_gm.nickname, replied_author.display_name) AS reply_display_name,
+         COALESCE(replied_gmp.avatar_url, replied_author.avatar_url) AS reply_avatar_url
   FROM messages m
+  JOIN channels message_channel ON message_channel.id = m.channel_id
   JOIN users u ON u.id = m.author_id
+  LEFT JOIN guild_members gm ON gm.guild_id = message_channel.guild_id AND gm.user_id = m.author_id
+  LEFT JOIN guild_member_profiles gmp ON gmp.guild_id = message_channel.guild_id AND gmp.user_id = m.author_id
   LEFT JOIN message_replies replies ON replies.message_id = m.id
   LEFT JOIN messages replied ON replied.id = replies.reply_to_id
-  LEFT JOIN users replied_author ON replied_author.id = replied.author_id`;
+  LEFT JOIN users replied_author ON replied_author.id = replied.author_id
+  LEFT JOIN guild_members replied_gm ON replied_gm.guild_id = message_channel.guild_id AND replied_gm.user_id = replied.author_id
+  LEFT JOIN guild_member_profiles replied_gmp ON replied_gmp.guild_id = message_channel.guild_id AND replied_gmp.user_id = replied.author_id`;
 
 function placeholders(values) {
   return values.map(() => '?').join(', ');
@@ -57,7 +65,8 @@ function baseMessageResponse(message) {
       }
     } : null,
     reactions: [],
-    mentions: []
+    mentions: [],
+    link_previews: []
   };
 }
 
@@ -65,7 +74,7 @@ export async function hydrateMessages(rows) {
   if (!rows.length) return [];
   const ids = rows.map((message) => message.id);
   const markerList = placeholders(ids);
-  const [reactionRows, mentionRows, attachmentRows] = await Promise.all([
+  const [reactionRows, mentionRows, attachmentRows, previewRows] = await Promise.all([
     db.all(
       `SELECT message_id, emoji, user_id
        FROM message_reactions
@@ -82,8 +91,16 @@ export async function hydrateMessages(rows) {
       ids
     ),
     db.all(
-      `SELECT id, message_id, original_name, mime_type, size_bytes
-       FROM attachments WHERE message_id IN (${markerList}) ORDER BY created_at`,
+      `SELECT a.id, a.message_id, a.original_name, a.mime_type, a.size_bytes,
+              voice.duration_ms, voice.waveform
+       FROM attachments a
+       LEFT JOIN voice_message_attachments voice ON voice.attachment_id = a.id
+       WHERE a.message_id IN (${markerList}) ORDER BY a.created_at`,
+      ids
+    ),
+    db.all(
+      `SELECT id, message_id, url, site_name, title, description
+       FROM message_link_previews WHERE message_id IN (${markerList}) ORDER BY created_at`,
       ids
     )
   ]);
@@ -118,16 +135,33 @@ export async function hydrateMessages(rows) {
       name: attachment.original_name,
       mime_type: attachment.mime_type,
       size_bytes: Number(attachment.size_bytes),
+      is_voice_message: attachment.duration_ms !== null,
+      duration_ms: attachment.duration_ms === null ? null : Number(attachment.duration_ms),
+      waveform: attachment.waveform ? JSON.parse(attachment.waveform) : null,
       url: `/api/uploads/${attachment.id}`
     });
     attachmentsByMessage.set(attachment.message_id, list);
+  }
+
+  const previewsByMessage = new Map();
+  for (const preview of previewRows) {
+    const list = previewsByMessage.get(preview.message_id) || [];
+    list.push({
+      id: preview.id,
+      url: preview.url,
+      site_name: preview.site_name,
+      title: preview.title,
+      description: preview.description
+    });
+    previewsByMessage.set(preview.message_id, list);
   }
 
   return rows.map((row) => ({
     ...baseMessageResponse(row),
     reactions: [...(reactionsByMessage.get(row.id)?.values() || [])],
     mentions: mentionsByMessage.get(row.id) || [],
-    attachments: attachmentsByMessage.get(row.id) || []
+    attachments: attachmentsByMessage.get(row.id) || [],
+    link_previews: previewsByMessage.get(row.id) || []
   }));
 }
 
@@ -260,6 +294,12 @@ export async function createMessage(req, res) {
   if (attachments.length !== data.attachmentIds.length) {
     throw new ApiError(400, 'INVALID_ATTACHMENTS', 'Mindestens ein Anhang ist ungültig.');
   }
+  if (data.voiceMessage) {
+    const voiceAttachment = await db.get('SELECT mime_type FROM attachments WHERE id = ?', [data.voiceMessage.attachmentId]);
+    if (!voiceAttachment?.mime_type?.startsWith('audio/')) {
+      throw new ApiError(400, 'INVALID_VOICE_MESSAGE', 'Eine Sprachnachricht muss eine Audiodatei enthalten.');
+    }
+  }
   let replyTarget = null;
   if (data.replyToId) {
     replyTarget = await messageOrThrow(data.replyToId);
@@ -279,6 +319,13 @@ export async function createMessage(req, res) {
   for (const attachment of attachments) {
     await db.run('UPDATE attachments SET message_id = ? WHERE id = ?', [id, attachment.id]);
   }
+  if (data.voiceMessage) {
+    await db.run(
+      `INSERT INTO voice_message_attachments (attachment_id, duration_ms, waveform)
+       VALUES (?, ?, ?)`,
+      [data.voiceMessage.attachmentId, data.voiceMessage.durationMs, JSON.stringify(data.voiceMessage.waveform)]
+    );
+  }
   if (data.replyToId) {
     await db.run(
       'INSERT INTO message_replies (message_id, reply_to_id) VALUES (?, ?)',
@@ -287,6 +334,7 @@ export async function createMessage(req, res) {
   }
 
   const mentionSync = await syncMentions(id, req.params.channelId, data.content);
+  await createLinkPreview(id, data.content);
   const message = await hydratedMessage(id);
   emitToChannel(req.params.channelId, 'message:create', { message });
   const notifiedUsers = mentionSync.newUserIds.filter(

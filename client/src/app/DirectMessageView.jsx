@@ -1,4 +1,4 @@
-import { FileText, Image, LoaderCircle, Paperclip, Send, SmilePlus, X } from 'lucide-react';
+import { FileText, LoaderCircle, Mic, Paperclip, Send, SmilePlus, Square, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { socket } from '../lib/socket.js';
@@ -18,11 +18,31 @@ function fitComposer(field) {
 }
 
 function Attachment({ attachment }) {
+  if (attachment.is_voice_message) {
+    const waveform = attachment.waveform?.length ? attachment.waveform : Array.from({ length: 32 }, (_, index) => 24 + ((index * 17) % 58));
+    return <div className="voice-message"><audio controls preload="metadata" src={attachment.url} /><div className="voice-message__waveform" aria-hidden="true">{waveform.map((height, index) => <i style={{ height: `${height}%` }} key={index} />)}</div><time>{formatDuration(attachment.duration_ms)}</time></div>;
+  }
   const image = attachment.mime_type?.startsWith('image/');
   return (
     <a className={`message-attachment ${image ? 'is-image' : ''}`} href={attachment.url} target="_blank" rel="noreferrer">
       {image ? <img src={attachment.url} alt={attachment.name} /> : <FileText size={22} />}
       <span>{attachment.name}</span>
+    </a>
+  );
+}
+
+function formatDuration(durationMs = 0) {
+  const total = Math.max(0, Math.round(durationMs / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}
+
+function LinkPreview({ preview }) {
+  return (
+    <a className="message-link-preview" href={preview.url} target="_blank" rel="noreferrer">
+      <span>{preview.site_name}</span>
+      <strong>{preview.title || preview.url}</strong>
+      {preview.description && <p>{preview.description}</p>}
+      <small>{new URL(preview.url).hostname}</small>
     </a>
   );
 }
@@ -36,8 +56,16 @@ export default function DirectMessageView({ conversation, currentUserId, onOpenP
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [typingUsers, setTypingUsers] = useState(new Set());
   const [readMessageId, setReadMessageId] = useState(null);
+  const [recording, setRecording] = useState(false);
+  const [recordingMs, setRecordingMs] = useState(0);
+  const [pendingVoice, setPendingVoice] = useState(null);
   const typingTimer = useRef(null);
   const scroller = useRef(null);
+  const recorderRef = useRef(null);
+  const recordingTimerRef = useRef(null);
+  const recordingStartedRef = useRef(0);
+  const recordingChunksRef = useRef([]);
+  const waveformRef = useRef([]);
 
   useEffect(() => {
     if (!conversation?.id) return undefined;
@@ -91,6 +119,12 @@ export default function DirectMessageView({ conversation, currentUserId, onOpenP
     fitComposer(composer.current);
   }, [draft, conversation?.id]);
 
+  useEffect(() => () => {
+    if (recordingTimerRef.current) window.clearInterval(recordingTimerRef.current);
+    recorderRef.current?.stream?.getTracks().forEach((track) => track.stop());
+    if (pendingVoice?.url) URL.revokeObjectURL(pendingVoice.url);
+  }, [conversation?.id, pendingVoice?.url]);
+
   function updateDraft(value) {
     setDraft(value);
     if (!conversation?.id) return;
@@ -120,6 +154,83 @@ export default function DirectMessageView({ conversation, currentUserId, onOpenP
     }
   }
 
+  async function startVoiceRecording() {
+    if (recording || pendingVoice) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus']
+        .find((type) => window.MediaRecorder?.isTypeSupported(type)) || '';
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      recordingChunksRef.current = [];
+      waveformRef.current = [];
+      recordingStartedRef.current = Date.now();
+      recorder.ondataavailable = (event) => event.data.size && recordingChunksRef.current.push(event.data);
+      recorder.onstop = () => {
+        const durationMs = Math.max(250, Date.now() - recordingStartedRef.current);
+        const type = recorder.mimeType || 'audio/webm';
+        const blob = new Blob(recordingChunksRef.current, { type });
+        setPendingVoice({
+          file: new File([blob], `sprachnachricht-${Date.now()}.${type.includes('ogg') ? 'ogg' : 'webm'}`, { type }),
+          url: URL.createObjectURL(blob),
+          durationMs,
+          waveform: waveformRef.current.length ? waveformRef.current.slice(-48) : Array.from({ length: 32 }, (_, index) => 24 + ((index * 17) % 58))
+        });
+        stream.getTracks().forEach((track) => track.stop());
+      };
+      recorderRef.current = recorder;
+      recorder.start(250);
+      setRecording(true);
+      setRecordingMs(0);
+      recordingTimerRef.current = window.setInterval(() => {
+        const elapsed = Date.now() - recordingStartedRef.current;
+        setRecordingMs(elapsed);
+        waveformRef.current.push(18 + Math.round(Math.random() * 78));
+        if (elapsed >= 300000) {
+          window.clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+          setRecording(false);
+          if (recorder.state === 'recording') recorder.stop();
+        }
+      }, 180);
+    } catch (error) {
+      onToast(error.name === 'NotAllowedError' ? 'Mikrofonzugriff wurde nicht erlaubt.' : 'Das Mikrofon konnte nicht gestartet werden.', 'error');
+    }
+  }
+
+  function stopVoiceRecording() {
+    if (!recording) return;
+    if (recordingTimerRef.current) window.clearInterval(recordingTimerRef.current);
+    recordingTimerRef.current = null;
+    setRecording(false);
+    recorderRef.current?.stop();
+  }
+
+  function discardVoice() {
+    if (pendingVoice?.url) URL.revokeObjectURL(pendingVoice.url);
+    setPendingVoice(null);
+  }
+
+  async function sendVoiceMessage() {
+    if (!pendingVoice || sending) return;
+    setSending(true);
+    try {
+      const uploaded = await api.uploadFiles([pendingVoice.file]);
+      const attachmentId = uploaded.attachments[0].id;
+      const result = await api.sendDm(conversation.id, '', [attachmentId], {
+        attachmentId,
+        durationMs: Math.min(300000, pendingVoice.durationMs),
+        waveform: pendingVoice.waveform.map((value) => Math.max(1, Math.min(100, Math.round(value))))
+      });
+      setMessages((current) => current.some((item) => item.id === result.message.id) ? current : [...current, result.message]);
+      discardVoice();
+      onRefresh?.();
+    } catch (error) {
+      onToast(error.message, 'error');
+    } finally {
+      setSending(false);
+    }
+  }
+
   if (!conversation) return <div className="content-skeleton"><span /><span /><span /></div>;
   return (
     <section className="channel-view dm-view">
@@ -141,6 +252,7 @@ export default function DirectMessageView({ conversation, currentUserId, onOpenP
                 <div className="message-meta"><button className="message-author-button" type="button" onClick={() => onOpenProfile(message.author.id)}>{nameOf(message.author)}</button><time>{new Date(message.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</time></div>
                 {message.content && <p>{message.content}</p>}
                 {message.attachments?.length > 0 && <div className="message-attachments">{message.attachments.map((item) => <Attachment attachment={item} key={item.id} />)}</div>}
+                {message.link_previews?.map((preview) => <LinkPreview preview={preview} key={preview.id} />)}
               </div>
             </article>
           ))}
@@ -150,10 +262,13 @@ export default function DirectMessageView({ conversation, currentUserId, onOpenP
       <div className="composer-area">
         {typingUsers.size > 0 && <div className="typing-indicator">{nameOf(conversation.user)} schreibt …</div>}
         {pendingFiles.length > 0 && <div className="pending-attachments">{pendingFiles.map((file, index) => <span key={`${file.name}-${index}`}>{file.name}<button type="button" onClick={() => setPendingFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={13} /></button></span>)}</div>}
+        {recording && <div className="voice-recorder is-recording"><span><i /> Aufnahme läuft</span><time>{formatDuration(recordingMs)}</time><button type="button" onClick={stopVoiceRecording}><Square size={14} fill="currentColor" /> Aufnahme beenden</button></div>}
+        {pendingVoice && <div className="voice-recorder is-ready"><audio controls src={pendingVoice.url} /><time>{formatDuration(pendingVoice.durationMs)}</time><button type="button" className="is-cancel" onClick={discardVoice}><Trash2 size={15} /> Verwerfen</button><button type="button" className="is-send" onClick={sendVoiceMessage} disabled={sending}><Send size={15} /> Senden</button></div>}
         {emojiOpen && <div className="emoji-picker">{EMOJIS.map((emoji) => <button type="button" key={emoji} onClick={() => updateDraft(`${draft}${emoji}`)}>{emoji}</button>)}</div>}
         <div className="composer-shell">
           <label className="composer-tool" title="Datei anhängen"><Paperclip size={19} /><input type="file" multiple hidden onChange={(event) => setPendingFiles([...event.target.files].slice(0, 5))} /></label>
           <button className="composer-tool" type="button" title="Emoji" onClick={() => setEmojiOpen((current) => !current)}><SmilePlus size={19} /></button>
+          <button className={`composer-tool ${recording ? 'is-recording' : ''}`} type="button" title="Sprachnachricht aufnehmen" onClick={recording ? stopVoiceRecording : startVoiceRecording} disabled={Boolean(pendingVoice)}><Mic size={19} /></button>
           <textarea ref={composer} value={draft} maxLength={2000} rows={1} placeholder="Nachricht schreiben …" onChange={(event) => updateDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} />
           <button type="button" onClick={send} disabled={sending || (!draft.trim() && !pendingFiles.length)}>{sending ? <LoaderCircle className="spin" size={19} /> : <Send size={19} />}</button>
         </div>
