@@ -29,6 +29,32 @@ async function screenshot(page, name) {
   await expect(page.locator('.guildora-app')).toHaveScreenshot(name, { caret: 'hide' });
 }
 
+async function expectCloseControlsInsideViewport(page, root) {
+  const geometry = await root.evaluate((container) => {
+    const viewport = { width: document.documentElement.clientWidth, height: document.documentElement.clientHeight };
+    const controls = [...container.querySelectorAll('button')].filter((button) => {
+      const label = (button.getAttribute('aria-label') || '').toLocaleLowerCase('de');
+      const rect = button.getBoundingClientRect();
+      return label.includes('schlie') && rect.width > 0 && rect.height > 0;
+    }).map((button) => {
+      const rect = button.getBoundingClientRect();
+      return {
+        label: button.getAttribute('aria-label'),
+        left: Math.round(rect.left), top: Math.round(rect.top),
+        right: Math.round(rect.right), bottom: Math.round(rect.bottom)
+      };
+    });
+    return {
+      controls,
+      violations: controls.filter((control) => (
+        control.left < 0 || control.top < 0 || control.right > viewport.width || control.bottom > viewport.height
+      ))
+    };
+  });
+  expect(geometry.controls.length).toBeGreaterThan(0);
+  expect(geometry.violations).toEqual([]);
+}
+
 test('zentrale App-Ansichten bleiben visuell stabil', async ({ page }, testInfo) => {
   test.setTimeout(90_000);
   const { guild, channel } = await prepareAccount(page, testInfo);
@@ -55,11 +81,13 @@ test('zentrale App-Ansichten bleiben visuell stabil', async ({ page }, testInfo)
 
   await page.getByRole('button', { name: 'Suche', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Nachrichten durchsuchen' })).toBeVisible();
+  await expectCloseControlsInsideViewport(page, page.getByRole('dialog', { name: 'Nachrichten durchsuchen' }));
   await screenshot(page, 'search.png');
   await page.getByRole('button', { name: 'Suche schließen' }).click();
 
   await page.getByRole('button', { name: 'Benachrichtigungen', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Benachrichtigungen' })).toBeVisible();
+  await expectCloseControlsInsideViewport(page, page.getByRole('dialog', { name: 'Benachrichtigungen' }));
   await screenshot(page, 'notifications.png');
   await page.getByRole('button', { name: 'Benachrichtigungen schließen' }).click();
 
@@ -474,6 +502,7 @@ test('iPhone 17 Pro Max Standalone füllt den Bildschirm und bedient Nachrichten
   expect(profileGeometry.scrollWidth).toBeLessThanOrEqual(profileGeometry.clientWidth);
   expect(profileGeometry.closeTop).toBeGreaterThanOrEqual(10);
   expect(profileGeometry.closeRight).toBeLessThanOrEqual(440);
+  await expectCloseControlsInsideViewport(page, profileDialog);
   await expect(profileDialog).toHaveScreenshot('iphone-17-pro-max-profile.png', { caret: 'hide' });
   await profileDialog.getByRole('button', { name: 'Dialog schließen' }).click();
 
@@ -497,6 +526,7 @@ test('iPhone 17 Pro Max Standalone füllt den Bildschirm und bedient Nachrichten
   const memberList = page.getByRole('complementary', { name: 'Mitglieder' });
   await expect(memberList).toBeVisible();
   await page.waitForTimeout(240);
+  await expectCloseControlsInsideViewport(page, memberList);
   expect(await page.evaluate(() => window.__memberOpenProbe)).toEqual({ mounts: 1, animations: 1 });
   const memberGeometry = await memberList.locator('.member-row').first().evaluate((row) => {
     const avatar = row.querySelector('.member-avatar').getBoundingClientRect();
@@ -548,6 +578,52 @@ test('iPhone 17 Pro Max Standalone füllt den Bildschirm und bedient Nachrichten
   expect(navigationGeometry.navigationBackground).toContain('72px');
   await expect(page.locator('.guildora-app')).toHaveScreenshot('iphone-17-pro-max-navigation.png', { caret: 'hide' });
 
+  await navigation.getByRole('button', { name: 'Server hinzufügen' }).click();
+  const guildDialog = page.getByRole('dialog', { name: 'Dein Platz auf Guildora' });
+  await expect(guildDialog).toBeVisible();
+  await guildDialog.getByRole('button', { name: /Eigenen Server erstellen/ }).click();
+  const createGuildDialog = page.getByRole('dialog', { name: 'Server erstellen' });
+  await expect(createGuildDialog).toBeVisible();
+  await expectCloseControlsInsideViewport(page, createGuildDialog);
+  const createGuildGeometry = await createGuildDialog.evaluate((dialog) => {
+    const rect = dialog.getBoundingClientRect();
+    const close = dialog.querySelector('.app-modal__close').getBoundingClientRect();
+    const styles = getComputedStyle(document.documentElement);
+    return {
+      top: Math.round(rect.top), bottom: Math.round(rect.bottom), width: Math.round(rect.width),
+      scrollWidth: dialog.scrollWidth, clientWidth: dialog.clientWidth,
+      closeTop: Math.round(close.top), closeRight: Math.round(close.right),
+      safeTop: Number.parseFloat(styles.getPropertyValue('--safe-area-top'))
+    };
+  });
+  expect(createGuildGeometry.top).toBe(0);
+  expect(createGuildGeometry.bottom).toBe(956);
+  expect(createGuildGeometry.width).toBe(440);
+  expect(createGuildGeometry.scrollWidth).toBeLessThanOrEqual(createGuildGeometry.clientWidth);
+  expect(createGuildGeometry.closeTop).toBeGreaterThanOrEqual(createGuildGeometry.safeTop + 10);
+  expect(createGuildGeometry.closeRight).toBeLessThanOrEqual(440);
+  await expect(createGuildDialog).toHaveScreenshot('iphone-17-pro-max-server-create.png', { caret: 'hide' });
+
+  for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 800 }]) {
+    await page.setViewportSize(viewport);
+    await expectCloseControlsInsideViewport(page, createGuildDialog);
+    const compactGeometry = await createGuildDialog.evaluate((dialog) => ({
+      width: Math.round(dialog.getBoundingClientRect().width),
+      bottom: Math.round(dialog.getBoundingClientRect().bottom),
+      scrollWidth: dialog.scrollWidth,
+      clientWidth: dialog.clientWidth,
+      bodyScrollWidth: document.body.scrollWidth,
+      viewportWidth: document.documentElement.clientWidth
+    }));
+    expect(compactGeometry.width).toBe(viewport.width);
+    expect(compactGeometry.bottom).toBe(viewport.height);
+    expect(compactGeometry.scrollWidth).toBeLessThanOrEqual(compactGeometry.clientWidth);
+    expect(compactGeometry.bodyScrollWidth).toBeLessThanOrEqual(compactGeometry.viewportWidth);
+  }
+  await page.setViewportSize({ width: 440, height: 956 });
+  await createGuildDialog.getByRole('button', { name: 'Dialog schließen' }).click();
+  await expect(createGuildDialog).toBeHidden();
+
   await navigation.getByRole('button', { name: 'Einstellungen' }).click();
   const settingsDialog = page.getByRole('dialog', { name: 'Einstellungen' });
   await expect(settingsDialog).toBeVisible();
@@ -572,6 +648,7 @@ test('iPhone 17 Pro Max Standalone füllt den Bildschirm und bedient Nachrichten
   expect(settingsGeometry.layoutBottom).toBe(956);
   expect(settingsGeometry.contentBottom).toBe(956);
   expect(settingsGeometry.overlayBackground).toBe(settingsGeometry.background);
+  await expectCloseControlsInsideViewport(page, settingsDialog);
   await expect(settingsDialog).toHaveScreenshot('iphone-17-pro-max-settings.png', { caret: 'hide' });
   await settingsDialog.getByRole('button', { name: 'Dialog schließen' }).click();
   await expect(settingsDialog).toBeHidden();
@@ -601,6 +678,7 @@ test('iPhone 17 Pro Max Standalone füllt den Bildschirm und bedient Nachrichten
   expect(channelSettingsGeometry.bottom).toBe(956);
   expect(channelSettingsGeometry.contentBottom).toBe(956);
   expect(channelSettingsGeometry.contentBackground).toBe(channelSettingsGeometry.overlayBackground);
+  await expectCloseControlsInsideViewport(page, channelSettingsDialog);
   await expect(channelSettingsDialog).toHaveScreenshot('iphone-17-pro-max-channel-settings.png', { caret: 'hide' });
 });
 

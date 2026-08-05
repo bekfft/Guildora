@@ -3357,6 +3357,17 @@ html.is-desktop .modal-overlay {
     border-radius: 0;
   }
 
+  .app-modal__close {
+    top: 10px;
+    right: 10px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .app-modal > h2 {
+    padding-right: 44px;
+  }
+
   .profile-popover {
     right: 12px;
     left: 12px;
@@ -5080,6 +5091,7 @@ html.is-desktop .modal-overlay {
   background: #232428;
   box-shadow: -14px 0 36px rgb(0 0 0 / 32%);
   animation: engagement-in 180ms ease-out;
+  transform-origin: right center;
 }
 
 .engagement-panel--search {
@@ -5087,7 +5099,7 @@ html.is-desktop .modal-overlay {
 }
 
 @keyframes engagement-in {
-  from { opacity: 0; transform: translateX(24px); }
+  from { opacity: 0; transform: scale(.985); }
 }
 
 .engagement-panel > header {
@@ -7868,10 +7880,23 @@ html:is([data-display-mode="standalone"], [data-mobile-app]) .modal-overlay {
 
 @media (max-width: 600px) {
   html:is([data-display-mode="standalone"], [data-mobile-app]) .app-modal:not(.app-modal--settings):not(:has(.full-profile)) {
-    padding-top: max(30px, var(--safe-area-top));
-    padding-right: max(24px, var(--safe-area-right));
-    padding-bottom: max(30px, var(--safe-area-bottom));
-    padding-left: max(24px, var(--safe-area-left));
+    padding-top: calc(30px + var(--safe-area-top));
+    padding-right: calc(24px + var(--safe-area-right));
+    padding-bottom: calc(30px + var(--safe-area-bottom));
+    padding-left: calc(24px + var(--safe-area-left));
+  }
+
+  html:is([data-display-mode="standalone"], [data-mobile-app]) .app-modal:not(.app-modal--settings) > .app-modal__close {
+    top: calc(10px + var(--safe-area-top));
+    right: calc(10px + var(--safe-area-right));
+  }
+
+  html:is([data-display-mode="standalone"], [data-mobile-app]) .guild-modal-form .modal-actions {
+    width: calc(100% + 48px + var(--safe-area-left) + var(--safe-area-right));
+    margin-right: calc(-24px - var(--safe-area-right));
+    margin-left: calc(-24px - var(--safe-area-left));
+    padding-right: calc(24px + var(--safe-area-right));
+    padding-left: calc(24px + var(--safe-area-left));
   }
 
   html:is([data-display-mode="standalone"], [data-mobile-app]) .app-modal:has(.full-profile) > .app-modal__close {
