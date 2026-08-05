@@ -181,37 +181,43 @@ test('Staff-Konsole passt visuell zu Guildora auf Desktop und Mobile', async ({ 
   expect(narrowGeometry.controlsOutsideViewport).toBe(0);
 });
 
-test('iPhone 17 Pro Max Standalone füllt den Bildschirm und bedient Nachrichten per Langdruck', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== 'desktop-1440', 'Der iPhone-Viewport wird einmal gezielt geprüft.');
-  test.setTimeout(90_000);
+test('iOS Standalone erweitert einen verkürzten Layout-Viewport bis zum physischen Bildschirm', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-1440', 'Die iOS-Standalone-Geometrie wird einmal gezielt geprüft.');
   await page.addInitScript(() => {
     Object.defineProperty(Navigator.prototype, 'standalone', { configurable: true, get: () => true });
     Object.defineProperty(Screen.prototype, 'width', { configurable: true, get: () => 440 });
     Object.defineProperty(Screen.prototype, 'height', { configurable: true, get: () => 956 });
   });
+  const { guild, channel } = await prepareAccount(page, testInfo, 'iphone-gap');
+
+  await page.setViewportSize({ width: 440, height: 890 });
+  await page.goto(`/app/channels/${guild.id}/${channel.id}?standalone-preview=1`);
+  await expect(page.locator('.guildora-app')).toBeVisible();
+  const geometry = await page.evaluate(() => ({
+    viewport: document.documentElement.clientHeight,
+    screen: window.screen.height,
+    appHeightInline: document.documentElement.style.getPropertyValue('--app-height'),
+    appBottom: Math.round(document.querySelector('.guildora-app').getBoundingClientRect().bottom)
+  }));
+  expect(geometry).toEqual({
+    viewport: 890,
+    screen: 956,
+    appHeightInline: '956px',
+    appBottom: 956
+  });
+});
+
+test('iPhone 17 Pro Max Standalone füllt den Bildschirm und bedient Nachrichten per Langdruck', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-1440', 'Der iPhone-Viewport wird einmal gezielt geprüft.');
+  test.setTimeout(90_000);
   const { guild, channel } = await prepareAccount(page, testInfo, 'iphone17');
   const messageResponse = await page.request.post(`/api/channels/${channel.id}/messages`, {
     data: { content: 'Diese Nachricht prüft Langdruck, Profil und mobile Abstände.', replyToId: null, attachmentIds: [] }
   });
   expect(messageResponse.ok()).toBeTruthy();
 
-  await page.setViewportSize({ width: 440, height: 890 });
-  await page.goto(`/app/channels/${guild.id}/${channel.id}?standalone-preview=1`);
-  await expect(page.locator('.message-row')).toHaveCount(1);
-  const shortenedViewportGeometry = await page.evaluate(() => ({
-    viewport: document.documentElement.clientHeight,
-    screen: window.screen.height,
-    appHeightInline: document.documentElement.style.getPropertyValue('--app-height'),
-    appBottom: Math.round(document.querySelector('.guildora-app').getBoundingClientRect().bottom)
-  }));
-  expect(shortenedViewportGeometry).toEqual({
-    viewport: 890,
-    screen: 956,
-    appHeightInline: '956px',
-    appBottom: 956
-  });
-
   await page.setViewportSize({ width: 440, height: 956 });
+  await page.goto(`/app/channels/${guild.id}/${channel.id}?standalone-preview=1`);
   await expect(page.locator('.message-row')).toHaveCount(1);
   await expect(page.locator('html')).toHaveAttribute('data-display-mode', 'standalone');
   await expect(page.locator('html')).toHaveAttribute('data-mobile-app', '');
