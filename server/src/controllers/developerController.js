@@ -7,6 +7,11 @@ import { requirePermission } from './guildAdminController.js';
 import { createBotMessage } from './messageController.js';
 
 const VALID_SCOPES = new Set(['messages.write', 'commands', 'events.read']);
+const SCOPE_DETAILS = [
+  { id: 'messages.write', name: 'Nachrichten senden', description: 'Der Bot darf in Text-Channels schreiben.' },
+  { id: 'commands', name: 'Slash-Commands verwenden', description: 'Der Bot darf Commands registrieren und beantworten.' },
+  { id: 'events.read', name: 'Interaktionen lesen', description: 'Der Bot darf ausstehende Command-Events über die API abrufen.' }
+];
 
 function parseJson(value, fallback) {
   try { return JSON.parse(value); } catch { return fallback; }
@@ -60,6 +65,8 @@ async function appResponse(app) {
     description: app.description || '',
     bot_user_id: app.bot_user_id,
     enabled: Boolean(app.enabled),
+    public_bot: Boolean(app.public_bot),
+    default_scopes: parseJson(app.default_scopes, ['messages.write', 'commands']),
     created_at: app.created_at,
     guilds: guilds.map((guild) => ({ ...guild, scopes: parseJson(guild.scopes, []) })),
     commands: commands.map((command) => ({ ...command, enabled: Boolean(command.enabled) }))
@@ -104,9 +111,13 @@ export async function updateApp(req, res) {
   const name = req.body.name === undefined ? app.name : text(req.body.name, 'Der Name', { min: 2, max: 48 });
   const description = req.body.description === undefined ? app.description : text(req.body.description, 'Die Beschreibung', { max: 300 });
   const enabled = req.body.enabled === undefined ? Boolean(app.enabled) : Boolean(req.body.enabled);
+  const publicBot = req.body.publicBot === undefined ? Boolean(app.public_bot) : Boolean(req.body.publicBot);
+  const defaultScopes = req.body.defaultScopes === undefined
+    ? parseJson(app.default_scopes, ['messages.write', 'commands'])
+    : scopes(req.body.defaultScopes);
   await db.run(
-    `UPDATE bot_applications SET name = ?, description = ?, enabled = ?, updated_at = ? WHERE id = ?`,
-    [name, description || null, enabled, new Date().toISOString(), app.id]
+    `UPDATE bot_applications SET name = ?, description = ?, enabled = ?, public_bot = ?, default_scopes = ?, updated_at = ? WHERE id = ?`,
+    [name, description || null, enabled, publicBot, JSON.stringify(defaultScopes), new Date().toISOString(), app.id]
   );
   await db.run('UPDATE users SET display_name = ? WHERE id = ?', [name, app.bot_user_id]);
   return res.json({ app: await appResponse(await ownedApp(app.id, req.userId)) });
@@ -141,6 +152,83 @@ export async function installApp(req, res) {
       [crypto.randomUUID(), guildId, app.bot_user_id]
   );
   return res.json({ app: await appResponse(app) });
+}
+
+async function manageableGuilds(userId) {
+  const candidates = await db.all(
+    `SELECT DISTINCT g.id, g.name, g.icon_url
+     FROM guilds g JOIN guild_members gm ON gm.guild_id = g.id
+     WHERE gm.user_id = ? ORDER BY g.name`, [userId]
+  );
+  const allowed = [];
+  for (const guild of candidates) {
+    try {
+      await requirePermission(guild.id, userId, 'manageServer');
+      allowed.push(guild);
+    } catch { /* Server ohne Verwaltungsrecht ausblenden. */ }
+  }
+  return allowed;
+}
+
+export async function installInfo(req, res) {
+  const app = await db.get('SELECT * FROM bot_applications WHERE id = ?', [req.params.appId]);
+  if (!app || (!app.public_bot && app.owner_id !== req.userId)) {
+    throw new ApiError(404, 'BOT_APP_NOT_FOUND', 'Diese Bot-Anwendung ist nicht öffentlich verfügbar.');
+  }
+  return res.json({
+    app: {
+      id: app.id,
+      name: app.name,
+      description: app.description || '',
+      enabled: Boolean(app.enabled),
+      default_scopes: parseJson(app.default_scopes, ['messages.write', 'commands'])
+    },
+    scopes: SCOPE_DETAILS,
+    guilds: await manageableGuilds(req.userId)
+  });
+}
+
+export async function authorizeApp(req, res) {
+  const app = await db.get('SELECT * FROM bot_applications WHERE id = ?', [req.params.appId]);
+  if (!app || (!app.public_bot && app.owner_id !== req.userId)) {
+    throw new ApiError(404, 'BOT_APP_NOT_FOUND', 'Diese Bot-Anwendung ist nicht öffentlich verfügbar.');
+  }
+  if (!app.enabled) throw new ApiError(409, 'BOT_DISABLED', 'Diese Bot-Anwendung ist derzeit pausiert.');
+  const guildId = text(req.body.guildId, 'Die Server-ID', { min: 1, max: 100 });
+  const selectedScopes = scopes(req.body.scopes);
+  await requirePermission(guildId, req.userId, 'manageServer');
+  await db.run(
+    `INSERT INTO bot_guilds (app_id, guild_id, added_by, scopes) VALUES (?, ?, ?, ?)
+     ON CONFLICT(app_id, guild_id) DO UPDATE SET scopes = excluded.scopes, added_by = excluded.added_by`,
+    [app.id, guildId, req.userId, JSON.stringify(selectedScopes)]
+  );
+  await db.run(
+    `INSERT INTO guild_members (id, guild_id, user_id) VALUES (?, ?, ?)
+     ON CONFLICT(guild_id, user_id) DO NOTHING`,
+    [crypto.randomUUID(), guildId, app.bot_user_id]
+  );
+  return res.json({ installed: true, guild_id: guildId, app: { id: app.id, name: app.name } });
+}
+
+export async function guildBots(req, res) {
+  await requirePermission(req.params.guildId, req.userId, 'manageServer');
+  const bots = await db.all(
+    `SELECT ba.id, ba.name, ba.description, ba.enabled, bg.scopes, bg.installed_at,
+            installer.username AS installed_by
+     FROM bot_guilds bg JOIN bot_applications ba ON ba.id = bg.app_id
+     LEFT JOIN users installer ON installer.id = bg.added_by
+     WHERE bg.guild_id = ? ORDER BY ba.name`, [req.params.guildId]
+  );
+  return res.json({ bots: bots.map((bot) => ({ ...bot, enabled: Boolean(bot.enabled), scopes: parseJson(bot.scopes, []) })), scopes: SCOPE_DETAILS });
+}
+
+export async function removeGuildBot(req, res) {
+  await requirePermission(req.params.guildId, req.userId, 'manageServer');
+  const app = await db.get('SELECT bot_user_id FROM bot_applications WHERE id = ?', [req.params.appId]);
+  if (!app) throw new ApiError(404, 'BOT_APP_NOT_FOUND', 'Diese Bot-Anwendung wurde nicht gefunden.');
+  await db.run('DELETE FROM bot_guilds WHERE app_id = ? AND guild_id = ?', [req.params.appId, req.params.guildId]);
+  await db.run('DELETE FROM guild_members WHERE guild_id = ? AND user_id = ?', [req.params.guildId, app.bot_user_id]);
+  return res.status(204).end();
 }
 
 export async function uninstallApp(req, res) {
@@ -186,7 +274,7 @@ export async function guildCommands(req, res) {
     if (!member) throw error;
   });
   const commands = await db.all(
-    `SELECT bc.name, bc.description, ba.name AS bot_name
+    `SELECT bc.name, bc.description, bc.app_id, ba.name AS bot_name
      FROM bot_commands bc
      JOIN bot_applications ba ON ba.id = bc.app_id
      JOIN bot_guilds bg ON bg.app_id = ba.id
@@ -202,13 +290,18 @@ export async function invokeCommand(req, res) {
   if (!channel || channel.type !== 'text') throw new ApiError(404, 'CHANNEL_NOT_FOUND', 'Der Text-Channel wurde nicht gefunden.');
   const membership = await db.get('SELECT 1 AS ok FROM guild_members WHERE guild_id = ? AND user_id = ?', [channel.guild_id, req.userId]);
   if (!membership) throw new ApiError(403, 'FORBIDDEN', 'Du bist kein Mitglied dieses Servers.');
-  const command = await db.get(
+  const appFilter = req.params.appId ? ' AND bc.app_id = ?' : '';
+  const commandParams = [channel.guild_id, name, true, true];
+  if (req.params.appId) commandParams.push(req.params.appId);
+  const matches = await db.all(
     `SELECT bc.*, ba.bot_user_id, ba.name AS bot_name
      FROM bot_commands bc JOIN bot_applications ba ON ba.id = bc.app_id
      JOIN bot_guilds bg ON bg.app_id = ba.id
-     WHERE bg.guild_id = ? AND bc.name = ? AND bc.enabled = ? AND ba.enabled = ?`,
-    [channel.guild_id, name, true, true]
+     WHERE bg.guild_id = ? AND bc.name = ? AND bc.enabled = ? AND ba.enabled = ?${appFilter}`,
+    commandParams
   );
+  if (matches.length > 1) throw new ApiError(409, 'AMBIGUOUS_COMMAND', 'Mehrere Bots bieten diesen Command an. Wähle den Bot aus der Command-Liste.');
+  const command = matches[0];
   if (!command) throw new ApiError(404, 'COMMAND_NOT_FOUND', 'Dieser Slash-Command ist nicht verfügbar.');
   await installedBot(command.app_id, channel.guild_id, 'commands');
   const args = text(req.body.arguments, 'Die Argumente', { max: 1000 });

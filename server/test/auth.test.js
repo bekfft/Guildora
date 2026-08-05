@@ -344,6 +344,32 @@ test('Bot-Plattform schützt Tokens, installiert Bots und verarbeitet Slash-Comm
   assert.equal(installed.status, 200);
   assert.equal((await installed.json()).app.guilds[0].guild_id, botGuildId);
 
+  const adminRegistration = await request('/api/auth/register', {
+    body: { email: 'bot-admin@example.test', username: 'bot.admin', password: 'SicheresPasswort43', birthdate: '1995-04-12', newsletter: false }
+  });
+  assert.equal(adminRegistration.status, 201);
+  const adminCookie = cookiesFrom(adminRegistration);
+  const externalGuildResponse = await request('/api/guilds', { cookie: adminCookie, body: { name: 'Externer Bot Server' } });
+  assert.equal(externalGuildResponse.status, 201);
+  const externalGuild = await externalGuildResponse.json();
+  const installInfo = await request(`/api/developer/apps/${appId}/install`, { cookie: adminCookie });
+  assert.equal(installInfo.status, 200);
+  assert.equal((await installInfo.json()).guilds.some((guild) => guild.id === externalGuild.guild.id), true);
+  const authorized = await request(`/api/developer/apps/${appId}/authorize`, {
+    cookie: adminCookie,
+    body: { guildId: externalGuild.guild.id, scopes: ['messages.write', 'commands'] }
+  });
+  assert.equal(authorized.status, 200);
+  const integrations = await request(`/api/developer/guilds/${externalGuild.guild.id}/bots`, { cookie: adminCookie });
+  assert.equal(integrations.status, 200);
+  assert.equal((await integrations.json()).bots[0].name, 'Status Helfer');
+  const privateApp = await request(`/api/developer/apps/${appId}`, { method: 'PATCH', cookie: authCookie, body: { publicBot: false } });
+  assert.equal(privateApp.status, 200);
+  const hiddenInstall = await request(`/api/developer/apps/${appId}/install`, { cookie: adminCookie });
+  assert.equal(hiddenInstall.status, 404);
+  const publicApp = await request(`/api/developer/apps/${appId}`, { method: 'PATCH', cookie: authCookie, body: { publicBot: true } });
+  assert.equal(publicApp.status, 200);
+
   const command = await request(`/api/developer/apps/${appId}/commands`, {
     cookie: authCookie,
     body: {
@@ -353,6 +379,12 @@ test('Bot-Plattform schützt Tokens, installiert Bots und verarbeitet Slash-Comm
     }
   });
   assert.equal(command.status, 201);
+
+  const explicitInvocation = await request(`/api/developer/guilds/${botGuildId}/commands/${appId}/status/invoke`, {
+    cookie: authCookie,
+    body: { channelId: botChannelId, arguments: 'eindeutig' }
+  });
+  assert.equal(explicitInvocation.status, 201);
 
   const invoked = await request(`/api/developer/guilds/${botGuildId}/commands/status/invoke`, {
     cookie: authCookie,

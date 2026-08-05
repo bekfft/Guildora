@@ -152,6 +152,23 @@ async function recordMigration(filename, checksum) {
   );
 }
 
+async function executeMigration(source) {
+  const statements = source.split(';').map((statement) => statement.trim()).filter(Boolean);
+  const onlyAddColumns = statements.length > 0 && statements.every((statement) => /^ALTER TABLE\s+\S+\s+ADD COLUMN\s+/i.test(statement));
+  if (!onlyAddColumns) {
+    await db.exec(source);
+    return;
+  }
+  for (const statement of statements) {
+    try {
+      await db.exec(statement);
+    } catch (error) {
+      const duplicateColumn = error?.code === '42701' || /duplicate column name/i.test(error?.message || '');
+      if (!duplicateColumn || !/^ALTER TABLE\s+\S+\s+ADD COLUMN\s+/i.test(statement)) throw error;
+    }
+  }
+}
+
 export async function runMigrations() {
   const currentFile = fileURLToPath(import.meta.url);
   const migrationDirectory = path.join(path.dirname(currentFile), 'migrations');
@@ -206,7 +223,7 @@ export async function runMigrations() {
     const selected = selectedMigrationSource(source);
     await db.exec('BEGIN');
     try {
-      await db.exec(selected);
+      await executeMigration(selected);
       await recordMigration(file, migrationChecksum(source));
       await db.exec('COMMIT');
     } catch (error) {

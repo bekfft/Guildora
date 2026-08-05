@@ -106,6 +106,32 @@ test('zentrale App-Ansichten bleiben visuell stabil', async ({ page }, testInfo)
   await screenshot(page, 'settings.png');
 });
 
+test('Bot-Autorisierung bleibt auf Desktop und Mobile vollständig bedienbar', async ({ page }, testInfo) => {
+  test.skip(!['desktop-1440', 'mobile-390'].includes(testInfo.project.name), 'Je ein großer und kleiner Zielviewport reichen für diesen Dialog.');
+  await prepareAccount(page, testInfo, 'bot-auth');
+  const appResponse = await page.request.post('/api/developer/apps', {
+    data: { name: 'Guildora Wächter', description: 'Moderation, Status und hilfreiche Slash-Commands für deine Community.' }
+  });
+  expect(appResponse.ok()).toBeTruthy();
+  const { app } = await appResponse.json();
+  await page.goto(`/bots/${app.id}/install`);
+  await expect(page.getByRole('heading', { name: 'Guildora Wächter' })).toBeVisible();
+  await expect(page.getByText('Berechtigungen', { exact: true })).toBeVisible();
+  const layout = await page.locator('.bot-auth-card').evaluate((card) => {
+    const box = card.getBoundingClientRect();
+    return {
+      left: Math.round(box.left), right: Math.round(box.right), bottom: Math.round(box.bottom),
+      width: document.documentElement.clientWidth, height: document.documentElement.clientHeight,
+      overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth
+    };
+  });
+  expect(layout.left).toBeGreaterThanOrEqual(0);
+  expect(layout.right).toBeLessThanOrEqual(layout.width);
+  expect(layout.overflow).toBe(false);
+  await page.getByRole('button', { name: 'Autorisieren' }).click();
+  await expect(page.getByRole('heading', { name: 'Bot autorisiert' })).toBeVisible();
+});
+
 test('Guildora-Startbildschirm wartet auf echte App-Daten und bleibt mobil vollständig', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-1440', 'Desktop und Mobile werden in einem kontrollierten Start gemeinsam geprüft.');
   test.setTimeout(45_000);

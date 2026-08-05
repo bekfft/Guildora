@@ -1,0 +1,29 @@
+.bot-auth-page { min-height: 100vh; padding: 48px 20px; display: grid; place-items: center; color: #f2f3f5; background: radial-gradient(circle at 50% 0, #30265c 0, #17171d 42%, #111116 100%); font-family: Inter, system-ui, sans-serif; }
+.bot-auth-page > p { color: #b5bac1; }
+.bot-auth-card { width: min(100%, 520px); overflow: hidden; border: 1px solid #ffffff12; border-radius: 18px; background: #242429; box-shadow: 0 28px 80px #0008; }
+.bot-auth-card > a { display: inline-block; margin: 0 24px 24px; color: #b8a8ff; }
+.bot-auth-card > :not(.bot-auth-app) { margin-inline: 24px; }
+.bot-auth-app { padding: 24px; display: flex; gap: 16px; border-bottom: 1px solid #ffffff10; background: linear-gradient(135deg, #342b5c, #242429 70%); }
+.bot-auth-app > span { width: 68px; height: 68px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 18px; color: white; background: #7259d9; }
+.bot-auth-app small { color: #b8a8ff; font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+.bot-auth-app h1 { margin: 5px 0 3px; font-size: 23px; }
+.bot-auth-app p { margin: 0; color: #b5bac1; overflow-wrap: anywhere; }
+.bot-auth-select { margin-top: 22px; display: grid; gap: 8px; }
+.bot-auth-select > span, .bot-auth-permissions h2 { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.bot-auth-select > div { position: relative; }
+.bot-auth-select select { width: 100%; padding: 12px 38px 12px 12px; border: 1px solid #ffffff18; border-radius: 8px; appearance: none; color: #f2f3f5; background: #111116; font: inherit; }
+.bot-auth-select > div svg { position: absolute; top: 50%; right: 12px; translate: 0 -50%; pointer-events: none; }
+.bot-auth-select small, .bot-auth-permissions small, .bot-auth-card footer span { color: #949ba4; }
+.bot-auth-permissions { margin-top: 22px; }
+.bot-auth-permissions h2 { margin: 0 0 10px; font-size: 16px; }
+.bot-auth-permissions label { padding: 12px 0; display: flex; align-items: center; gap: 14px; border-top: 1px solid #ffffff0d; }
+.bot-auth-permissions label span { flex: 1; display: grid; gap: 3px; }
+.bot-auth-permissions input { width: 19px; height: 19px; accent-color: #7259d9; }
+.bot-auth-card footer { margin-top: 14px; margin-bottom: 24px; padding-top: 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid #ffffff10; }
+.bot-auth-card footer span { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.bot-auth-error { color: #ff9da3; }
+.bot-auth-success { padding-block: 32px; text-align: center; }
+.bot-auth-success > span { width: 64px; height: 64px; margin: auto; display: grid; place-items: center; border-radius: 50%; color: #fff; background: #23a55a; }
+.bot-auth-success h2 { margin-bottom: 4px; }
+.bot-auth-success p { color: #b5bac1; }
+@media (max-width: 560px) { .bot-auth-page { padding: 18px 10px; align-items: start; } .bot-auth-card { border-radius: 12px; } .bot-auth-card footer { align-items: stretch; flex-direction: column; } .bot-auth-card footer button { justify-content: center; } }

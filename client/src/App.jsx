@@ -14,6 +14,7 @@ import { GuildoraDialogProvider } from './context/GuildoraDialogContext.jsx';
 const AppPage = lazy(() => import('./pages/AppPage.jsx'));
 const DownloadPage = lazy(() => import('./pages/DownloadPage.jsx'));
 const InvitePage = lazy(() => import('./pages/InvitePage.jsx'));
+const BotInstallPage = lazy(() => import('./pages/BotInstallPage.jsx'));
 const LandingPage = lazy(() => import('./pages/LandingPage.jsx'));
 const LoginPage = lazy(() => import('./pages/LoginPage.jsx'));
 const PlaceholderPage = lazy(() => import('./pages/PlaceholderPage.jsx'));
@@ -91,6 +92,7 @@ export default function App() {
           <Route path="/nutzungsbedingungen" element={<PlaceholderPage title="Nutzungsbedingungen" />} />
           <Route path="/datenschutz" element={<PlaceholderPage title="Datenschutzerklärung" />} />
           <Route element={<ProtectedRoute />}>
+            <Route path="/bots/:appId/install" element={<BotInstallPage />} />
             <Route path="/staff" element={<StaffRoute />} />
             <Route element={<GuildProvider><VoiceProvider><AppPage /></VoiceProvider></GuildProvider>}>
               <Route path="/app" element={null} />

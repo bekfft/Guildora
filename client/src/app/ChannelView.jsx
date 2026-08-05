@@ -145,6 +145,7 @@ export default function ChannelView({
   const [composerEmojiOpen, setComposerEmojiOpen] = useState(false);
   const [typingUsers, setTypingUsers] = useState(new Set());
   const [guildCommands, setGuildCommands] = useState([]);
+  const [selectedCommand, setSelectedCommand] = useState(null);
   const scrollerRef = useRef(null);
   const composerRef = useRef(null);
   const longPressRef = useRef(null);
@@ -405,11 +406,16 @@ export default function ChannelView({
     try {
       const slash = !pendingFiles.length && content.match(/^\/([a-z0-9_-]+)(?:\s+(.*))?$/i);
       if (slash && channel.guild_id) {
-        const result = await api.invokeGuildCommand(channel.guild_id, slash[1], {
+        const matchingCommands = guildCommands.filter((command) => command.name === slash[1].toLowerCase());
+        const commandAppId = selectedCommand?.name === slash[1].toLowerCase()
+          ? selectedCommand.app_id
+          : (matchingCommands.length === 1 ? matchingCommands[0].app_id : '');
+        const result = await api.invokeGuildCommand(channel.guild_id, commandAppId, slash[1], {
           channelId: channel.id,
           arguments: slash[2] || ''
         });
         setDraft('');
+        setSelectedCommand(null);
         setReplyingTo(null);
         socket.emit('channel:typing', { channelId: channel.id, typing: false });
         if (result.status === 'pending') onToast('Command an den Bot gesendet.', 'success');
@@ -749,7 +755,7 @@ export default function ChannelView({
           <div className="mention-suggestions command-suggestions">
             <small>Slash-Command ausführen</small>
             {commandSuggestions.map((command) => (
-              <button type="button" key={`${command.bot_name}:${command.name}`} onClick={() => { setDraft(`/${command.name} `); requestAnimationFrame(() => composerRef.current?.focus()); }}>
+              <button type="button" key={`${command.app_id}:${command.name}`} onClick={() => { setSelectedCommand(command); setDraft(`/${command.name} `); requestAnimationFrame(() => composerRef.current?.focus()); }}>
                 <span className="command-suggestions__icon">/</span>
                 <strong>/{command.name}</strong>
                 <span>{command.description} · {command.bot_name}</span>

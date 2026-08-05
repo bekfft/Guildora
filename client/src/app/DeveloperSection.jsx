@@ -1,9 +1,10 @@
-import { Bot, Check, Clipboard, KeyRound, LoaderCircle, Plus, Server, Terminal, Trash2 } from 'lucide-react';
+import { Bot, Check, Clipboard, KeyRound, Link2, LoaderCircle, Plus, Server, Terminal, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import Button from '../components/Button.jsx';
 import { api } from '../lib/api.js';
 
 const DEFAULT_SCOPES = ['messages.write', 'commands', 'events.read'];
+const SCOPE_LABELS = { 'messages.write': 'Nachrichten senden', commands: 'Slash-Commands', 'events.read': 'Interaktionen lesen' };
 
 export default function DeveloperSection({ onToast }) {
   const [apps, setApps] = useState([]);
@@ -80,10 +81,12 @@ export default function DeveloperSection({ onToast }) {
           <section className="developer-app settings-large-panel" key={app.id}>
             <header><span className="developer-app__icon"><Bot size={22} /></span><span><h4>{app.name}</h4><small>{app.description || 'Keine Beschreibung'}</small></span><i className={app.enabled ? 'is-online' : ''}>{app.enabled ? 'Aktiv' : 'Pausiert'}</i></header>
             <div className="developer-app__actions">
+              <Button type="button" onClick={() => copy(`${location.origin}/bots/${app.id}/install`)}><Link2 size={15} /> Einladungslink kopieren</Button>
               <Button type="button" onClick={() => run(async () => { const result = await api.rotateDeveloperToken(app.id); setToken(result.token); }, 'Token erneuert.')}><KeyRound size={15} /> Token erneuern</Button>
               <Button type="button" onClick={() => run(() => api.updateDeveloperApp(app.id, { enabled: !app.enabled }), app.enabled ? 'Bot pausiert.' : 'Bot aktiviert.')}><Check size={15} /> {app.enabled ? 'Pausieren' : 'Aktivieren'}</Button>
               <button className="developer-danger" type="button" onClick={() => run(() => api.deleteDeveloperApp(app.id), 'Bot gelöscht.')}><Trash2 size={15} /> Löschen</button>
             </div>
+            <label className="settings-switch developer-public-switch"><span><strong>Öffentlicher Bot</strong><small>Andere Server-Admins können den Bot über deinen Einladungslink autorisieren.</small></span><input type="checkbox" checked={app.public_bot} onChange={(event) => run(() => api.updateDeveloperApp(app.id, { publicBot: event.target.checked }), event.target.checked ? 'Öffentlicher Einladungslink aktiviert.' : 'Bot auf privat gestellt.')} /></label>
 
             <div className="developer-grid">
               <div>
@@ -93,7 +96,7 @@ export default function DeveloperSection({ onToast }) {
                   {guilds.map((guild) => <option value={guild.id} key={guild.id}>{guild.name}</option>)}
                 </select>
                 <div className="developer-scopes">
-                  {DEFAULT_SCOPES.map((scope) => <label key={scope}><input type="checkbox" checked={setup.scopes.includes(scope)} onChange={(e) => setInstall({ ...install, [app.id]: { ...setup, scopes: e.target.checked ? [...setup.scopes, scope] : setup.scopes.filter((item) => item !== scope) } })} /> {scope}</label>)}
+                  {DEFAULT_SCOPES.map((scope) => <label title={scope} key={scope}><input type="checkbox" checked={setup.scopes.includes(scope)} onChange={(e) => setInstall({ ...install, [app.id]: { ...setup, scopes: e.target.checked ? [...setup.scopes, scope] : setup.scopes.filter((item) => item !== scope) } })} /> {SCOPE_LABELS[scope]}</label>)}
                 </div>
                 <Button type="button" disabled={!setup.guildId || !setup.scopes.length} onClick={() => run(() => api.installDeveloperApp(app.id, setup), 'Bot installiert.')}><Plus size={15} /> Installieren/aktualisieren</Button>
                 {app.guilds.map((guild) => <div className="developer-installation" key={guild.guild_id}><span><strong>{guild.name}</strong><small>{guild.scopes.join(' · ')}</small></span><button type="button" onClick={() => run(() => api.uninstallDeveloperApp(app.id, guild.guild_id), 'Bot entfernt.')}><Trash2 size={14} /></button></div>)}

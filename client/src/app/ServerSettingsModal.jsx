@@ -1,5 +1,5 @@
 import {
-  Activity, BadgeCheck, BarChart3, Check, ChevronRight, CircleUserRound, Copy, FolderPlus, Hash, LayoutDashboard,
+  Activity, BadgeCheck, BarChart3, Bot, Check, ChevronRight, CircleUserRound, Copy, FolderPlus, Hash, LayoutDashboard,
   Gavel, ImagePlus, Link2, LoaderCircle, Lock, Minus, Plus, RotateCcw, Save, Settings2, Shield, Trash2,
   MessageSquare, TrendingUp, UserMinus, UserPlus, Users, Volume2, X
 } from 'lucide-react';
@@ -45,6 +45,7 @@ const TABS = [
   { id: 'channels', label: 'Channels', icon: Hash },
   { id: 'roles', label: 'Rollen', icon: Shield },
   { id: 'members', label: 'Mitglieder', icon: Users },
+  { id: 'integrations', label: 'Integrationen', icon: Bot },
   { id: 'statistics', label: 'Serverstatistiken', icon: BarChart3 },
   { id: 'moderation', label: 'Moderation', icon: Gavel }
 ];
@@ -87,6 +88,7 @@ export default function ServerSettingsModal({
     || (item.id === 'channels' && capabilities.manageChannels)
     || (item.id === 'roles' && capabilities.manageRoles)
     || (item.id === 'members' && (capabilities.manageServer || capabilities.manageRoles || capabilities.kickMembers))
+    || (item.id === 'integrations' && capabilities.manageServer)
     || (item.id === 'statistics' && capabilities.manageServer)
     || (item.id === 'moderation' && capabilities.kickMembers)
   ));
@@ -117,6 +119,7 @@ export default function ServerSettingsModal({
   const [inviteDraft, setInviteDraft] = useState({ expiresIn: '86400', maxUses: 'none' });
   const [moderation, setModeration] = useState({ bans: [], timeouts: [], reports: [], audit_logs: [] });
   const [statistics, setStatistics] = useState(null);
+  const [integrations, setIntegrations] = useState(null);
   const dialogRef = useRef(null);
   const iconObjectUrl = useMemo(() => iconFile ? URL.createObjectURL(iconFile) : null, [iconFile]);
   const iconPreview = iconObjectUrl || (!removeIcon ? guildData.guild.icon_url : null);
@@ -157,6 +160,25 @@ export default function ServerSettingsModal({
     if (tab !== 'statistics') return;
     api.guildStatistics(guildData.guild.id).then(setStatistics).catch((error) => onToast(error.message, 'error'));
   }, [tab, guildData.guild.id, onToast]);
+
+  useEffect(() => {
+    if (tab !== 'integrations') return;
+    api.guildBots(guildData.guild.id).then(setIntegrations).catch((error) => onToast(error.message, 'error'));
+  }, [tab, guildData.guild.id, onToast]);
+
+  async function removeIntegration(appId) {
+    if (busy) return;
+    const confirmed = await dialog.confirm({ title: 'Bot entfernen?', message: 'Der Bot verliert den Zugriff auf diesen Server. Seine Anwendung und andere Installationen bleiben erhalten.', confirmLabel: 'Bot entfernen', danger: true });
+    if (!confirmed) return;
+    setBusy(`bot-${appId}`);
+    try {
+      await api.removeGuildBot(guildData.guild.id, appId);
+      setIntegrations(await api.guildBots(guildData.guild.id));
+      await onRefresh();
+      onToast('Bot vom Server entfernt.', 'success');
+    } catch (error) { onToast(error.message, 'error'); }
+    finally { setBusy(''); }
+  }
 
   useEffect(() => () => {
     if (iconObjectUrl) URL.revokeObjectURL(iconObjectUrl);
@@ -734,6 +756,21 @@ export default function ServerSettingsModal({
                   </div>
                 </>
               )}
+            </div>
+          )}
+          {tab === 'integrations' && (
+            <div className="settings-page settings-page--wide integrations-page">
+              <header><h2>Integrationen</h2><p>Verwalte Bots, die für diesen Server autorisiert wurden.</p></header>
+              {!integrations ? <div className="insights-loading"><LoaderCircle className="spin" size={24} /> Integrationen werden geladen …</div> : integrations.bots.length ? (
+                <div className="integration-list">{integrations.bots.map((bot) => (
+                  <article key={bot.id}>
+                    <span className="integration-bot-icon"><Bot size={23} /></span>
+                    <div><strong>{bot.name} <i>BOT</i></strong><p>{bot.description || 'Keine Beschreibung'}</p><small>{bot.scopes.map((scope) => integrations.scopes.find((item) => item.id === scope)?.name || scope).join(' · ')}</small></div>
+                    <span className={bot.enabled ? 'integration-status is-online' : 'integration-status'}>{bot.enabled ? 'Aktiv' : 'Pausiert'}</span>
+                    <button className="developer-danger" type="button" disabled={busy === `bot-${bot.id}`} onClick={() => removeIntegration(bot.id)}><Trash2 size={15} /> Entfernen</button>
+                  </article>
+                ))}</div>
+              ) : <div className="invite-management-empty"><Bot size={32} /><strong>Noch keine Bots</strong><span>Installierte Bots erscheinen hier und können zentral entfernt werden.</span></div>}
             </div>
           )}
           {tab === 'moderation' && (
