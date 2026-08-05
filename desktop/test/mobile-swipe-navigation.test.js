@@ -11,7 +11,16 @@ const appCss = fs.readFileSync(path.join(clientRoot, 'styles', 'app.css'), 'utf8
 const swipeModuleUrl = pathToFileURL(path.join(clientRoot, 'lib', 'mobileSwipe.js')).href;
 
 test('mobile Wischrichtung wird nur bei einer klaren horizontalen Geste erkannt', async () => {
-  const { clampSwipe, MOBILE_SWIPE_SETTLE_MS, resolveMobileSwipe } = await import(swipeModuleUrl);
+  const {
+    clampSwipe,
+    hasHorizontalSwipeIntent,
+    MOBILE_SWIPE_SETTLE_MS,
+    resolveMobileSwipe
+  } = await import(swipeModuleUrl);
+  assert.equal(hasHorizontalSwipeIntent({ deltaX: 8, deltaY: 11 }), false);
+  assert.equal(hasHorizontalSwipeIntent({ deltaX: 18, deltaY: 12 }), true);
+  assert.equal(hasHorizontalSwipeIntent({ deltaX: -22, deltaY: 18 }), true);
+  assert.equal(hasHorizontalSwipeIntent({ deltaX: 18, deltaY: 28 }), false);
   assert.equal(resolveMobileSwipe({ deltaX: 90, deltaY: 12, durationMs: 300 }), 'right');
   assert.equal(resolveMobileSwipe({ deltaX: -90, deltaY: 12, durationMs: 300 }), 'left');
   assert.equal(resolveMobileSwipe({ deltaX: 42, deltaY: 4, durationMs: 100 }), 'right');
@@ -37,6 +46,10 @@ test('mobile App verdrahtet Discord-aehnliche Seitenpanel-Gesten', () => {
   assert.match(appPage, /flushSync\(\(\) => \{[\s\S]*?setSwipePreview\(null\);[\s\S]*?\}\);\s*gesture\.kind = null;\s*clearVisualState\(\)/);
   assert.match(appPage, /navigation-open/);
   assert.match(appPage, /members-open/);
+  assert.match(appPage, /hasHorizontalSwipeIntent\(\{ deltaX, deltaY \}\)/);
+  assert.match(appPage, /memberPanelAvailable && membersVisible \? 'members-close' : 'navigation-open'/);
+  assert.doesNotMatch(appPage, /\.welcome-onboarding, \.install-app-prompt/);
+  assert.match(appPage, /\}, \[bootVisible, drawerOpen, isDirect, isDiscovery, isHome, membersVisible\]\);/);
   assert.match(appPage, /membersVisible \|\| swipePreview === 'members'/);
   assert.match(appPage, /setMembersOpenedBySwipe\(true\);\s*setMembersVisible\(true\)/);
   assert.match(appPage, /skipEntranceAnimation=\{membersOpenedBySwipe\}/);

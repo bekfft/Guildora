@@ -20,7 +20,12 @@ import { useGuilds } from '../context/GuildContext.jsx';
 import { useVoice } from '../context/VoiceContext.jsx';
 import { useGuildoraDialog } from '../context/GuildoraDialogContext.jsx';
 import { api } from '../lib/api.js';
-import { clampSwipe, MOBILE_SWIPE_SETTLE_MS, resolveMobileSwipe } from '../lib/mobileSwipe.js';
+import {
+  clampSwipe,
+  hasHorizontalSwipeIntent,
+  MOBILE_SWIPE_SETTLE_MS,
+  resolveMobileSwipe
+} from '../lib/mobileSwipe.js';
 import { socket } from '../lib/socket.js';
 import '../styles/app.css';
 
@@ -130,8 +135,7 @@ export default function AppPage() {
     const ignoredTarget = (target) => target instanceof Element && Boolean(target.closest(
       'input, textarea, select, [contenteditable="true"], [data-swipe-ignore], '
       + '.friends-tabs, .settings-tabs, .emoji-picker, .message-attachment, '
-      + '.modal-overlay, .server-settings-overlay, .engagement-overlay, .profile-popover, '
-      + '.welcome-onboarding, .install-app-prompt'
+      + '.modal-overlay, .server-settings-overlay, .engagement-overlay, .profile-popover'
     ));
     const clearVisualState = () => {
       if (gesture.frame) cancelAnimationFrame(gesture.frame);
@@ -184,10 +188,12 @@ export default function AppPage() {
       if (!gesture.frame) gesture.frame = requestAnimationFrame(renderGesture);
     };
     const chooseGesture = (deltaX) => {
-      if (membersVisible && deltaX > 0) return 'members-close';
       if (drawerOpen && deltaX < 0) return 'navigation-close';
-      if (!membersVisible && !drawerOpen && deltaX > 0) return 'navigation-open';
-      if (!membersVisible && !drawerOpen && deltaX < 0 && !isDiscovery && !isHome && !isDirect) {
+      const memberPanelAvailable = !isDiscovery && !isHome && !isDirect;
+      if (!drawerOpen && deltaX > 0) {
+        return memberPanelAvailable && membersVisible ? 'members-close' : 'navigation-open';
+      }
+      if (memberPanelAvailable && !membersVisible && !drawerOpen && deltaX < 0) {
         return 'members-open';
       }
       return null;
@@ -218,11 +224,7 @@ export default function AppPage() {
       const deltaY = touch.clientY - gesture.startY;
       gesture.lastX = touch.clientX;
       gesture.lastY = touch.clientY;
-      if (!gesture.horizontal && Math.max(Math.abs(deltaX), Math.abs(deltaY)) >= 8) {
-        if (Math.abs(deltaY) > Math.abs(deltaX) * 1.08) {
-          resetGesture();
-          return;
-        }
+      if (!gesture.horizontal && hasHorizontalSwipeIntent({ deltaX, deltaY })) {
         gesture.horizontal = true;
         gesture.kind = chooseGesture(deltaX);
         if (!gesture.kind) {
@@ -313,7 +315,7 @@ export default function AppPage() {
       app.removeEventListener('touchcancel', onTouchCancel);
       clearVisualState();
     };
-  }, [drawerOpen, isDirect, isDiscovery, isHome, membersVisible]);
+  }, [bootVisible, drawerOpen, isDirect, isDiscovery, isHome, membersVisible]);
 
   const showToast = useCallback((message, type = 'info') => {
     toastTimers.current.forEach((timer) => window.clearTimeout(timer));

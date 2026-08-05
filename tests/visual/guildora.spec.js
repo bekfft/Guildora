@@ -146,6 +146,45 @@ test('Guildora-Startbildschirm wartet auf echte App-Daten und bleibt mobil volls
   await expect(page.locator('.main-header')).toBeVisible();
 });
 
+test('Mobile Serverliste reagiert auch nach einem leicht schraegen Start und auf grossen Inhaltsflaechen', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-1440', 'Die reale Touch-Sequenz wird einmal im mobilen Zielviewport geprueft.');
+  await prepareAccount(page, testInfo, 'navigation-swipe-reliability');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/app/channels/@me');
+  await expect(page.locator('.friends-view')).toBeVisible();
+
+  await page.locator('.friends-view').evaluate((view) => {
+    view.classList.add('welcome-onboarding', 'swipe-reliability-probe');
+    view.setAttribute('aria-label', 'Swipe-Testflaeche');
+  });
+  const dispatchTouch = async (type, clientX, clientY, active = true) => {
+    await page.getByLabel('Swipe-Testflaeche').evaluate((target, detail) => {
+      const touch = {
+        identifier: 7,
+        clientX: detail.clientX,
+        clientY: detail.clientY,
+        pageX: detail.clientX,
+        pageY: detail.clientY
+      };
+      const event = new Event(detail.type, { bubbles: true, cancelable: true });
+      Object.defineProperties(event, {
+        touches: { value: detail.active ? [touch] : [] },
+        changedTouches: { value: [touch] }
+      });
+      target.dispatchEvent(event);
+    }, { type, clientX, clientY, active });
+  };
+  await dispatchTouch('touchstart', 48, 520);
+  await dispatchTouch('touchmove', 58, 532);
+  await page.waitForTimeout(20);
+  await dispatchTouch('touchmove', 260, 548);
+  await page.waitForTimeout(30);
+  await dispatchTouch('touchend', 318, 550, false);
+
+  await expect(page.locator('.guildora-app')).toHaveClass(/drawer-open/);
+  await expect(page.locator('.app-navigation')).toBeVisible();
+});
+
 test('Voice-Einstellungen enthalten auf Desktop und Mobile nur Geräte', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-1440', 'Desktop und Mobile werden gemeinsam geprüft.');
   await prepareAccount(page, testInfo, 'voice-devices');

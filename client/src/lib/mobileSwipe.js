@@ -2,7 +2,16 @@ export const MOBILE_SWIPE_MIN_DISTANCE = 48;
 export const MOBILE_SWIPE_MIN_FLICK_DISTANCE = 28;
 export const MOBILE_SWIPE_FLICK_VELOCITY = 0.32;
 export const MOBILE_SWIPE_AXIS_RATIO = 1.12;
+export const MOBILE_SWIPE_INTENT_DISTANCE = 16;
+export const MOBILE_SWIPE_INTENT_AXIS_RATIO = 0.82;
 export const MOBILE_SWIPE_SETTLE_MS = 220;
+
+export function hasHorizontalSwipeIntent({ deltaX, deltaY }) {
+  const horizontalDistance = Math.abs(deltaX);
+  const verticalDistance = Math.abs(deltaY);
+  return horizontalDistance >= MOBILE_SWIPE_INTENT_DISTANCE
+    && horizontalDistance >= verticalDistance * MOBILE_SWIPE_INTENT_AXIS_RATIO;
+}
 
 export function resolveMobileSwipe({ deltaX, deltaY, durationMs, panelWidth = 312 }) {
   const horizontalDistance = Math.abs(deltaX);
