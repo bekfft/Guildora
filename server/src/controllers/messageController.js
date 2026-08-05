@@ -19,22 +19,26 @@ export const MESSAGE_SELECT = `
          m.updated_at, m.edited, u.username,
          COALESCE(NULLIF(gmp.display_name, ''), gm.nickname, u.display_name) AS display_name,
          COALESCE(gmp.avatar_url, u.avatar_url) AS avatar_url,
+         CASE WHEN author_bot.id IS NULL THEN 0 ELSE 1 END AS author_is_bot,
          replies.reply_to_id,
          replied.content AS reply_content,
          replied_author.id AS reply_author_id,
          replied_author.username AS reply_username,
          COALESCE(NULLIF(replied_gmp.display_name, ''), replied_gm.nickname, replied_author.display_name) AS reply_display_name,
-         COALESCE(replied_gmp.avatar_url, replied_author.avatar_url) AS reply_avatar_url
+         COALESCE(replied_gmp.avatar_url, replied_author.avatar_url) AS reply_avatar_url,
+         CASE WHEN reply_bot.id IS NULL THEN 0 ELSE 1 END AS reply_author_is_bot
   FROM messages m
   JOIN channels message_channel ON message_channel.id = m.channel_id
   JOIN users u ON u.id = m.author_id
   LEFT JOIN guild_members gm ON gm.guild_id = message_channel.guild_id AND gm.user_id = m.author_id
   LEFT JOIN guild_member_profiles gmp ON gmp.guild_id = message_channel.guild_id AND gmp.user_id = m.author_id
+  LEFT JOIN bot_applications author_bot ON author_bot.bot_user_id = m.author_id
   LEFT JOIN message_replies replies ON replies.message_id = m.id
   LEFT JOIN messages replied ON replied.id = replies.reply_to_id
   LEFT JOIN users replied_author ON replied_author.id = replied.author_id
   LEFT JOIN guild_members replied_gm ON replied_gm.guild_id = message_channel.guild_id AND replied_gm.user_id = replied.author_id
-  LEFT JOIN guild_member_profiles replied_gmp ON replied_gmp.guild_id = message_channel.guild_id AND replied_gmp.user_id = replied.author_id`;
+  LEFT JOIN guild_member_profiles replied_gmp ON replied_gmp.guild_id = message_channel.guild_id AND replied_gmp.user_id = replied.author_id
+  LEFT JOIN bot_applications reply_bot ON reply_bot.bot_user_id = replied.author_id`;
 
 function placeholders(values) {
   return values.map(() => '?').join(', ');
@@ -52,7 +56,8 @@ function baseMessageResponse(message) {
       id: message.author_id,
       username: message.username,
       display_name: message.display_name,
-      avatar_url: message.avatar_url
+      avatar_url: message.avatar_url,
+      is_bot: Boolean(message.author_is_bot)
     },
     reply_to: message.reply_to_id ? {
       id: message.reply_to_id,
@@ -61,7 +66,8 @@ function baseMessageResponse(message) {
         id: message.reply_author_id,
         username: message.reply_username,
         display_name: message.reply_display_name,
-        avatar_url: message.reply_avatar_url
+        avatar_url: message.reply_avatar_url,
+        is_bot: Boolean(message.reply_author_is_bot)
       }
     } : null,
     reactions: [],
@@ -182,6 +188,33 @@ async function messageOrThrow(messageId) {
 
 async function hydratedMessage(messageId) {
   return (await hydrateMessages([await messageOrThrow(messageId)]))[0];
+}
+
+export async function createBotMessage({ channelId, authorId, content }) {
+  await channelAccess(channelId, authorId, 'sendMessages');
+  const normalized = String(content || '').trim();
+  if (!normalized || normalized.length > 4000) {
+    throw new ApiError(400, 'INVALID_BOT_MESSAGE', 'Bot-Nachrichten müssen zwischen 1 und 4000 Zeichen lang sein.');
+  }
+  const id = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  await db.run(
+    `INSERT INTO messages (id, channel_id, author_id, content, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [id, channelId, authorId, normalized, createdAt, createdAt]
+  );
+  const message = await hydratedMessage(id);
+  emitToChannel(channelId, 'message:create', { message });
+  const channel = await db.get('SELECT guild_id FROM channels WHERE id = ?', [channelId]);
+  const members = await db.all(
+    'SELECT user_id FROM guild_members WHERE guild_id = ? AND user_id <> ?',
+    [channel.guild_id, authorId]
+  );
+  emitToUsers(members.map((member) => member.user_id), 'unread:refresh', {
+    guildId: channel.guild_id,
+    channelId
+  });
+  return message;
 }
 
 function mentionedUsernames(content) {

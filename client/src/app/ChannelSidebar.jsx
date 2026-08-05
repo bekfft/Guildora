@@ -1,7 +1,7 @@
 import {
   BadgeCheck, Bug, ChevronDown, ChevronRight, Copy, Crown, Edit3, FolderPen, Gem,
   Handshake, Headphones, Heart, Hash, LogOut, Mic, MicOff, Search, Settings,
-  ShieldCheck, Trash2, UserRound, Volume2, VolumeX
+  ShieldCheck, Trash2, UserRound, Volume2, VolumeX, MonitorUp
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -40,6 +40,7 @@ function VoiceParticipants({ voice, channelId }) {
           </span>
           <span>{voiceParticipantName(participant)}</span>
           {participant.is_muted && <MicOff size={14} aria-label="Stummgeschaltet" />}
+          {participant.is_screen_sharing && <MonitorUp size={14} aria-label="Bildschirm wird geteilt" />}
           {!participant.is_local && (
             <input
               className="voice-participant-volume"

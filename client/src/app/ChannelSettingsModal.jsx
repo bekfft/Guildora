@@ -128,6 +128,7 @@ export default function ChannelSettingsModal({
               <label className="settings-field">
                 <span>Channelname</span>
                 <input value={form.name} maxLength={80} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+                <small>Großschreibung, Leerzeichen, Emojis und Sonderzeichen sind erlaubt.</small>
               </label>
               <label className="settings-field">
                 <span>Channeltyp</span>

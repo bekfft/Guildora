@@ -20,7 +20,7 @@ import {
   updatePassword,
   updateSettings
 } from '../controllers/accountController.js';
-import { createAppeal, myAppeals } from '../controllers/staffController.js';
+import { addMyAppealMessage, createAppeal, myAppeal, myAppeals } from '../controllers/staffController.js';
 
 const router = Router();
 const securityLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 15, standardHeaders: 'draft-7', legacyHeaders: false });
@@ -41,6 +41,8 @@ router.delete('/connections/:id', asyncHandler(deleteConnection));
 router.get('/safety', asyncHandler(accountSafetyOverview));
 router.get('/appeals', asyncHandler(myAppeals));
 router.post('/appeals', securityLimiter, asyncHandler(createAppeal));
+router.get('/appeals/:id', asyncHandler(myAppeal));
+router.post('/appeals/:id/messages', securityLimiter, asyncHandler(addMyAppealMessage));
 router.post('/deactivate', securityLimiter, asyncHandler(deactivateAccount));
 router.delete('/', securityLimiter, asyncHandler(deleteAccount));
 

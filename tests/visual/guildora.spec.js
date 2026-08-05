@@ -263,6 +263,9 @@ test('Community-Medien, Serverprofil und Statistiken bleiben Discord-orientiert 
   await expect.poll(() => page.locator('.message-image-attachment img').evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
   await expect(page.locator('.message-file-attachment')).toContainText('community-regeln.txt');
   await expect(page.locator('.message-file-attachment')).toContainText('25 B');
+  await page.locator('.messages-scroller').evaluate((scroller) => {
+    scroller.scrollTop = scroller.scrollHeight;
+  });
   await expect(page.locator('.guildora-app')).toHaveScreenshot('community-attachments-sent.png', { caret: 'hide' });
   await page.locator('.message-image-attachment').click();
   const attachmentDialog = page.getByRole('dialog', { name: 'Bildvorschau guildora-vorschau.png' });

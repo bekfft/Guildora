@@ -4,6 +4,7 @@ dist/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+server/data/
 coverage/
 test-results/
 playwright-report/

@@ -621,7 +621,7 @@ export default function ServerSettingsModal({
               <form className="new-channel-card" onSubmit={createChannel}>
                 <h3><Plus size={18} /> Channel erstellen</h3>
                 <div className="new-channel-card__grid">
-                  <label><span>Name</span><input value={newChannel.name} maxLength={80} placeholder="neuer-channel" onChange={(event) => setNewChannel({ ...newChannel, name: event.target.value })} /></label>
+                  <label><span>Name</span><input value={newChannel.name} maxLength={80} placeholder="🎮 Gaming Lounge" onChange={(event) => setNewChannel({ ...newChannel, name: event.target.value })} /><small>Großschreibung, Leerzeichen, Emojis und Sonderzeichen sind erlaubt.</small></label>
                   <label><span>Typ</span><select value={newChannel.type} onChange={(event) => setNewChannel({ ...newChannel, type: event.target.value })}><option value="text">Text</option><option value="voice">Sprache</option></select></label>
                   <label><span>Kategorie</span><select value={newChannel.categoryId || ''} onChange={(event) => setNewChannel({ ...newChannel, categoryId: event.target.value || null })}><option value="">Keine Kategorie</option>{guildData.categories.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
                   <label className="is-wide"><span>Thema</span><input value={newChannel.topic} maxLength={1024} placeholder="Worum geht es in diesem Channel?" onChange={(event) => setNewChannel({ ...newChannel, topic: event.target.value })} /></label>
@@ -824,7 +824,7 @@ function ChannelEditor({ channel, guildId, categories, roles, busy, onSave, onDe
           </div>
           {pane === 'overview' ? (
             <form onSubmit={async (event) => { event.preventDefault(); await onSave(channel, { ...form, topic: form.topic || null }); setEditing(false); }}>
-              <label><span>Name</span><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
+              <label><span>Name</span><input value={form.name} maxLength={80} onChange={(event) => setForm({ ...form, name: event.target.value })} /><small>Großschreibung, Leerzeichen, Emojis und Sonderzeichen sind erlaubt.</small></label>
               <label><span>Typ</span><select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}><option value="text">Text</option><option value="voice">Sprache</option></select></label>
               <label><span>Kategorie</span><select value={form.categoryId || ''} onChange={(event) => setForm({ ...form, categoryId: event.target.value || null })}><option value="">Keine</option>{categories.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
               <label className="is-wide"><span>Thema</span><input value={form.topic} onChange={(event) => setForm({ ...form, topic: event.target.value })} /></label>

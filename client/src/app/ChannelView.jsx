@@ -144,6 +144,7 @@ export default function ChannelView({
   const [pendingVoice, setPendingVoice] = useState(null);
   const [composerEmojiOpen, setComposerEmojiOpen] = useState(false);
   const [typingUsers, setTypingUsers] = useState(new Set());
+  const [guildCommands, setGuildCommands] = useState([]);
   const scrollerRef = useRef(null);
   const composerRef = useRef(null);
   const longPressRef = useRef(null);
@@ -170,6 +171,15 @@ export default function ChannelView({
   const canReadHistory = channel?.permissions?.readHistory !== false;
   const canSendMessages = channel?.permissions?.sendMessages !== false;
   const canAttachFiles = channel?.permissions?.attachFiles !== false;
+
+  useEffect(() => {
+    if (!channel?.guild_id) { setGuildCommands([]); return; }
+    let active = true;
+    api.guildCommands(channel.guild_id)
+      .then((result) => active && setGuildCommands(result.commands))
+      .catch(() => active && setGuildCommands([]));
+    return () => { active = false; };
+  }, [channel?.guild_id]);
 
   useEffect(() => {
     if (!mentionRequest || mentionRequest.channelId !== channel?.id || !canSendMessages) return;
@@ -335,6 +345,13 @@ export default function ChannelView({
       .slice(0, 5);
   }, [draft, members]);
 
+  const commandSuggestions = useMemo(() => {
+    const match = draft.match(/^\/([a-z0-9_-]*)$/i);
+    if (!match) return [];
+    const term = match[1].toLowerCase();
+    return guildCommands.filter((command) => command.name.includes(term)).slice(0, 6);
+  }, [draft, guildCommands]);
+
   function scrollToMessage(messageId) {
     const row = scrollerRef.current?.querySelector(`[data-message-id="${messageId}"]`);
     if (!row) return;
@@ -386,6 +403,18 @@ export default function ChannelView({
     if ((!content && !pendingFiles.length) || sending || !canSendMessages) return;
     setSending(true);
     try {
+      const slash = !pendingFiles.length && content.match(/^\/([a-z0-9_-]+)(?:\s+(.*))?$/i);
+      if (slash && channel.guild_id) {
+        const result = await api.invokeGuildCommand(channel.guild_id, slash[1], {
+          channelId: channel.id,
+          arguments: slash[2] || ''
+        });
+        setDraft('');
+        setReplyingTo(null);
+        socket.emit('channel:typing', { channelId: channel.id, typing: false });
+        if (result.status === 'pending') onToast('Command an den Bot gesendet.', 'success');
+        return;
+      }
       const uploaded = pendingFiles.length ? await api.uploadFiles(pendingFiles) : { attachments: [] };
       const result = await api.sendMessage(channel.id, content, replyingTo?.id || null, uploaded.attachments.map((item) => item.id));
       setMessages((current) => mergeMessage(current, result.message));
@@ -602,6 +631,7 @@ export default function ChannelView({
                     {!grouped && (
                       <div className="message-meta">
                         <button className="message-author-button" type="button" onClick={() => onOpenProfile(message.author.id)}>{authorName(message.author)}</button>
+                        {message.author.is_bot && <span className="message-bot-badge">BOT</span>}
                         <time dateTime={message.created_at}>{messageTime(message.created_at)}</time>
                       </div>
                     )}
@@ -711,6 +741,18 @@ export default function ChannelView({
                 </span>
                 <strong>{authorName(member)}</strong>
                 <span>@{member.username}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {commandSuggestions.length > 0 && (
+          <div className="mention-suggestions command-suggestions">
+            <small>Slash-Command ausführen</small>
+            {commandSuggestions.map((command) => (
+              <button type="button" key={`${command.bot_name}:${command.name}`} onClick={() => { setDraft(`/${command.name} `); requestAnimationFrame(() => composerRef.current?.focus()); }}>
+                <span className="command-suggestions__icon">/</span>
+                <strong>/{command.name}</strong>
+                <span>{command.description} · {command.bot_name}</span>
               </button>
             ))}
           </div>

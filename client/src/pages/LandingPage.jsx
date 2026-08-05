@@ -9,18 +9,18 @@ import ReleaseDownloadButton from '../components/ReleaseDownloadButton.jsx';
 const FEATURES = [
   {
     type: 'friends',
-    title: 'Ein Platz für alle, die dir wichtig sind',
-    text: 'Erstelle gemeinsame Räume für deine Freundeskreise und finde jederzeit das richtige Gespräch. Alles bleibt übersichtlich, egal ob ihr zu dritt oder zu dreißigst seid.'
+    title: 'Alles, was eure Gruppe zusammenbringt',
+    text: 'Organisiert Freunde, Teams und Communities in übersichtlichen Servern. Mit frei benennbaren Channels, Rollen und Direktnachrichten findet jede Unterhaltung sofort ihren Platz.'
   },
   {
     type: 'voice',
-    title: 'Gespräche, die sich leicht anfühlen',
-    text: 'Wechsle nahtlos zwischen Text, Direktnachrichten, Sprache und Video. Teile bei Bedarf deine Kamera oder deinen Bildschirm und starte spontane Abende ohne Umwege.'
+    title: 'Im Gespräch, ohne aus dem Spiel zu fliegen',
+    text: 'Wechselt direkt zwischen Text, Voice und Video, teilt euren Bildschirm und bleibt auch in langen Sessions verbunden. Guildora arbeitet dabei bewusst ressourcenschonend im Hintergrund.'
   },
   {
     type: 'community',
-    title: 'Deine Community, deine Regeln',
-    text: 'Baue einen Ort mit eigener Identität, Rollen und klaren Bereichen. Moderation, Meldungen und ein nachvollziehbares Audit-Log helfen dir, deine Community sicher zu verwalten.'
+    title: 'Eure Community. Eure Regeln.',
+    text: 'Gestaltet Rollen, Channel-Berechtigungen und Moderation so, wie es zu euch passt. Meldungen, Audit-Logs und klare Werkzeuge sorgen für Ordnung, ohne im Weg zu stehen.'
   }
 ];
 
@@ -30,7 +30,7 @@ function HeroArt() {
       <img className="hero-brand-visual__backdrop" src="/assets/guildora-official-banner.png" alt="" />
       <div className="hero-brand-visual__glass">
         <BrandLogo decorative />
-        <span>Ein Ort für eure Community</span>
+        <span>Chats, Voice und Communities an einem Ort</span>
       </div>
     </div>
   );
@@ -62,9 +62,9 @@ export default function LandingPage() {
         <Navbar />
         <div className="hero__content">
           <div className="hero__copy">
-            <p className="hero__eyebrow">Zusammen klingt alles besser</p>
-            <h1>Dein Ort.<br />Deine Leute.<br />Deine Gespräche.</h1>
-            <p className="hero__subtitle">Guildora ist der gemeinsame Treffpunkt für Freundeskreise, Teams und Communities – persönlich, klar und immer erreichbar.</p>
+            <p className="hero__eyebrow">Schnell verbunden. Einfach zusammen.</p>
+            <h1>Euer Chat.<br />Eure Stimmen.<br />Euer Guildora.</h1>
+            <p className="hero__subtitle">Guildora verbindet Text, Voice, Video und Screen-Sharing in einer schnellen Plattform für Freunde, Gaming-Gruppen, Teams und Communities.</p>
             <div className="hero__actions" id="download">
               <ReleaseDownloadButton large />
             </div>
@@ -91,8 +91,8 @@ export default function LandingPage() {
 
       <section className="landing-cta" data-reveal>
         <div className="landing-cta__sparkles" aria-hidden="true">✦　·　✧　·　✦</div>
-        <h2>Bereit für euren neuen Lieblingsort?</h2>
-        <p>Starte jetzt kostenlos und sichere dir deinen Namen.</p>
+        <h2>Eure nächste Runde beginnt hier.</h2>
+        <p>Erstellt kostenlos euren Server und holt eure Leute dazu.</p>
         <Link className="button button--primary button--large" to="/register">Guildora im Browser öffnen <ArrowRight size={20} /></Link>
       </section>
 

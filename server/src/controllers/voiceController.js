@@ -147,6 +147,7 @@ export async function getVoiceParticipants(req, res) {
         metadata = {};
       }
       const microphoneTracks = participant.tracks.filter((track) => track.source === 2);
+      const screenTracks = participant.tracks.filter((track) => track.source === 3);
       return {
         id: participant.identity,
         name: participant.name || metadata.username || 'Unbekannt',
@@ -155,6 +156,7 @@ export async function getVoiceParticipants(req, res) {
         is_local: participant.identity === req.userId,
         is_speaking: false,
         is_muted: microphoneTracks.length === 0 || microphoneTracks.every((track) => track.muted),
+        is_screen_sharing: screenTracks.some((track) => !track.muted),
         connection_quality: 'unknown'
       };
     })

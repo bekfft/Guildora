@@ -3,12 +3,37 @@ import { db } from '../db/index.js';
 import { ApiError } from '../middleware/errorHandler.js';
 
 export const STAFF_ROLES = ['support', 'moderation', 'administration', 'management'];
-const permissions = {
+export const STAFF_PERMISSION_DEFINITIONS = [
+  ['staff.access', 'Staff-Bereich öffnen'],
+  ['cases.view', 'Fälle ansehen'],
+  ['cases.note', 'Notizen, Erwähnungen und Beobachter'],
+  ['cases.manage', 'Fälle bearbeiten und zuweisen'],
+  ['users.view', 'Benutzer und Server ansehen'],
+  ['users.warn', 'Verwarnungen aussprechen'],
+  ['users.restrict', 'Benutzerfunktionen einschränken'],
+  ['users.suspend', 'Accounts suspendieren'],
+  ['content.remove', 'Gemeldete Inhalte entfernen'],
+  ['guilds.manage', 'Servermaßnahmen verwalten'],
+  ['appeals.view', 'Einsprüche ansehen'],
+  ['appeals.manage', 'Einsprüche beantworten und entscheiden'],
+  ['audit.view', 'Auditlog ansehen'],
+  ['staff.manage', 'Staff-Team und Freigaben verwalten']
+].map(([id, label]) => ({ id, label }));
+
+export const ROLE_PERMISSIONS = {
   support: ['staff.access', 'cases.view', 'cases.note', 'users.view', 'appeals.view'],
   moderation: ['staff.access', 'cases.view', 'cases.note', 'cases.manage', 'users.view', 'users.warn', 'users.restrict', 'content.remove', 'appeals.view'],
   administration: ['staff.access', 'cases.view', 'cases.note', 'cases.manage', 'users.view', 'users.warn', 'users.restrict', 'users.suspend', 'guilds.manage', 'appeals.view', 'appeals.manage', 'audit.view'],
   management: ['*']
 };
+
+const permissionIds = new Set(STAFF_PERMISSION_DEFINITIONS.map(({ id }) => id));
+
+export function normalizeCustomPermissions(value) {
+  if (value == null) return null;
+  const source = Array.isArray(value) ? value : (() => { try { return JSON.parse(value); } catch { return []; } })();
+  return [...new Set(source.filter((item) => typeof item === 'string' && permissionIds.has(item)))];
+}
 
 export async function ensurePlatformOwner() {
   const owner = await db.get(`SELECT u.id, ps.role, ps.is_owner FROM users u
@@ -27,14 +52,22 @@ export async function getStaff(userId) {
   const identity = await db.get('SELECT username FROM users WHERE id = ?', [userId]);
   if (identity?.username?.toLowerCase() === 'bekfft') await ensurePlatformOwner();
   const row = await db.get(
-    `SELECT ps.*, u.username, u.display_name, u.avatar_url,
+    `SELECT ps.*, psp.custom_permissions, u.username, u.display_name, u.avatar_url,
        COALESCE(us.two_factor_enabled, 0) AS two_factor_enabled
      FROM platform_staff ps JOIN users u ON u.id = ps.user_id
+     LEFT JOIN platform_staff_permissions psp ON psp.user_id = ps.user_id
      LEFT JOIN user_security us ON us.user_id = ps.user_id WHERE ps.user_id = ?`,
     [userId]
   );
   if (!row) return null;
-  return { ...row, is_owner: Boolean(row.is_owner), two_factor_enabled: Boolean(row.two_factor_enabled), permissions: permissions[row.role] || [] };
+  const customPermissions = normalizeCustomPermissions(row.custom_permissions);
+  return {
+    ...row,
+    is_owner: Boolean(row.is_owner),
+    two_factor_enabled: Boolean(row.two_factor_enabled),
+    custom_permissions: customPermissions,
+    permissions: Boolean(row.is_owner) ? ['*'] : (customPermissions ?? ROLE_PERMISSIONS[row.role] ?? [])
+  };
 }
 
 export function hasStaffPermission(staff, permission) {

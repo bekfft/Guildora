@@ -18,7 +18,11 @@ export const categorySchema = z.object({
 });
 
 export const channelSchema = z.object({
-  name: name('Channelnamen', 80),
+  name: name('Channelnamen', 80)
+    .refine(
+      (value) => !/[\p{Cc}\p{Cs}\u200B\u200C\u200E\u200F\u202A-\u202E\u2060-\u206F]/u.test(value),
+      'Der Channelname enthält unsichtbare oder ungültige Zeichen.'
+    ),
   type: z.enum(['text', 'voice']),
   categoryId: z.string().uuid().nullable(),
   topic: z.string().trim().max(1024, 'Das Thema darf höchstens 1.024 Zeichen lang sein.').nullable().optional(),

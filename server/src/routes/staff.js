@@ -3,9 +3,9 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireStaff } from '../services/platformModeration.js';
 import {
-  addCaseNote, dashboard, decideApproval, getCase, getGuild, getUser, listAppeals, listApprovals, listAudit, listCases, listTeam,
+  addAppealMessage, addCaseNote, dashboard, decideApproval, getAppeal, getCase, getGuild, getUser, listAppeals, listApprovals, listAudit, listCases, listTeam,
   removePlatformMessage, removeTeamMember, reviewAppeal, revokeSanction, sanctionUser, searchGuilds, searchUsers, staffMe,
-  restrictGuild, revokeGuildRestriction, updateCase, upsertTeamMember
+  restrictGuild, revokeGuildRestriction, unwatchCase, updateCase, upsertTeamMember, watchCase
 } from '../controllers/staffController.js';
 
 const router = Router();
@@ -16,6 +16,8 @@ router.get('/cases', requireStaff('cases.view'), asyncHandler(listCases));
 router.get('/cases/:id', requireStaff('cases.view'), asyncHandler(getCase));
 router.patch('/cases/:id', requireStaff('cases.manage'), asyncHandler(updateCase));
 router.post('/cases/:id/notes', requireStaff('cases.note'), asyncHandler(addCaseNote));
+router.put('/cases/:id/watch', requireStaff('cases.note'), asyncHandler(watchCase));
+router.delete('/cases/:id/watch', requireStaff('cases.note'), asyncHandler(unwatchCase));
 router.get('/users', requireStaff('users.view'), asyncHandler(searchUsers));
 router.get('/users/:id', requireStaff('users.view'), asyncHandler(getUser));
 router.post('/users/:id/sanctions', requireStaff('users.warn'), asyncHandler(sanctionUser));
@@ -26,6 +28,8 @@ router.get('/guilds/:id', requireStaff('users.view'), asyncHandler(getGuild));
 router.post('/guilds/:id/restrictions', requireStaff('guilds.manage'), asyncHandler(restrictGuild));
 router.delete('/guild-restrictions/:id', requireStaff('guilds.manage'), asyncHandler(revokeGuildRestriction));
 router.get('/appeals', requireStaff('appeals.view'), asyncHandler(listAppeals));
+router.get('/appeals/:id', requireStaff('appeals.view'), asyncHandler(getAppeal));
+router.post('/appeals/:id/messages', requireStaff('appeals.manage'), asyncHandler(addAppealMessage));
 router.patch('/appeals/:id', requireStaff('appeals.manage'), asyncHandler(reviewAppeal));
 router.get('/audit', requireStaff('audit.view'), asyncHandler(listAudit));
 router.get('/approvals', requireStaff('staff.manage'), asyncHandler(listApprovals));

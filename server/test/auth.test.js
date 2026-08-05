@@ -311,6 +311,92 @@ test('Voice-Tokens sind kurzlebig, rechtegeprüft und nur für Sprachkanäle gü
   assert.equal((await unavailableParticipants.json()).error.code, 'VOICE_UNAVAILABLE');
 });
 
+test('Bot-Plattform schützt Tokens, installiert Bots und verarbeitet Slash-Commands', async () => {
+  const botGuildResponse = await request('/api/guilds', {
+    cookie: authCookie,
+    body: { name: 'Bot Labor' }
+  });
+  assert.equal(botGuildResponse.status, 201);
+  const botGuildBody = await botGuildResponse.json();
+  const botGuildId = botGuildBody.guild.id;
+  const botChannelId = botGuildBody.channel.id;
+  const created = await request('/api/developer/apps', {
+    cookie: authCookie,
+    body: { name: 'Status Helfer', description: 'Antwortet auf Statusfragen' }
+  });
+  assert.equal(created.status, 201);
+  const createdBody = await created.json();
+  assert.match(createdBody.token, /^gld_bot_/);
+  assert.equal(createdBody.app.name, 'Status Helfer');
+  const appId = createdBody.app.id;
+  const token = createdBody.token;
+  const stored = await db.get('SELECT token_hash, bot_user_id FROM bot_applications WHERE id = ?', [appId]);
+  assert.notEqual(stored.token_hash, token);
+  assert.equal(stored.token_hash.length, 64);
+
+  const installed = await request(`/api/developer/apps/${appId}/guilds`, {
+    cookie: authCookie,
+    body: {
+      guildId: botGuildId,
+      scopes: ['messages.write', 'commands', 'events.read']
+    }
+  });
+  assert.equal(installed.status, 200);
+  assert.equal((await installed.json()).app.guilds[0].guild_id, botGuildId);
+
+  const command = await request(`/api/developer/apps/${appId}/commands`, {
+    cookie: authCookie,
+    body: {
+      name: 'status',
+      description: 'Zeigt den aktuellen Status',
+      responseTemplate: 'Hallo {user}, alles läuft. {args}'
+    }
+  });
+  assert.equal(command.status, 201);
+
+  const invoked = await request(`/api/developer/guilds/${botGuildId}/commands/status/invoke`, {
+    cookie: authCookie,
+    body: { channelId: botChannelId, arguments: 'jetzt' }
+  });
+  assert.equal(invoked.status, 201);
+  const invokedBody = await invoked.json();
+  assert.equal(invokedBody.status, 'completed');
+  assert.equal(invokedBody.message.author.is_bot, true);
+  assert.match(invokedBody.message.content, /alles läuft\. jetzt/);
+
+  const identity = await fetch(`${baseUrl}/api/v1/bot`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  assert.equal(identity.status, 200);
+  assert.equal((await identity.json()).bot.id, appId);
+
+  const botMessage = await fetch(`${baseUrl}/api/v1/channels/${botChannelId}/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content: 'API ist verbunden.' })
+  });
+  assert.equal(botMessage.status, 201);
+  assert.equal((await botMessage.json()).message.author.is_bot, true);
+
+  const events = await fetch(`${baseUrl}/api/v1/events`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  assert.equal(events.status, 200);
+  assert.equal((await events.json()).events.some((event) => event.type === 'command.invoked'), true);
+
+  const rotated = await request(`/api/developer/apps/${appId}/token`, {
+    method: 'POST',
+    cookie: authCookie
+  });
+  assert.equal(rotated.status, 200);
+  const nextToken = (await rotated.json()).token;
+  assert.notEqual(nextToken, token);
+  const oldToken = await fetch(`${baseUrl}/api/v1/bot`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  assert.equal(oldToken.status, 401);
+});
+
 test('Serververwaltung ändert Profil, Kategorien, Channels, Rollen und Mitglieder', async () => {
   const guildRealtimeClient = connectSocket(baseUrl, {
     path: '/api/socket.io',
@@ -365,7 +451,7 @@ test('Serververwaltung ändert Profil, Kategorien, Channels, Rollen und Mitglied
   const channel = await request(`/api/guilds/${createdGuildId}/channels`, {
     cookie: authCookie,
     body: {
-      name: 'Projekt Planung',
+      name: '🎮 Projekt Planung + News!',
       type: 'text',
       categoryId: categoryBody.category.id,
       topic: 'Planung und Abstimmung'
@@ -373,13 +459,13 @@ test('Serververwaltung ändert Profil, Kategorien, Channels, Rollen und Mitglied
   });
   assert.equal(channel.status, 201);
   const channelBody = await channel.json();
-  assert.equal(channelBody.channel.name, 'projekt-planung');
+  assert.equal(channelBody.channel.name, '🎮 Projekt Planung + News!');
 
   const updatedChannel = await request(`/api/guilds/${createdGuildId}/channels/${channelBody.channel.id}`, {
     method: 'PATCH',
     cookie: authCookie,
     body: {
-      name: 'Projekt Chat',
+      name: 'Projekt Chat ✨',
       type: 'text',
       categoryId: categoryBody.category.id,
       topic: 'Aktualisiert',
@@ -387,7 +473,18 @@ test('Serververwaltung ändert Profil, Kategorien, Channels, Rollen und Mitglied
     }
   });
   assert.equal(updatedChannel.status, 200);
-  assert.equal((await updatedChannel.json()).channel.name, 'projekt-chat');
+  assert.equal((await updatedChannel.json()).channel.name, 'Projekt Chat ✨');
+
+  const invalidChannel = await request(`/api/guilds/${createdGuildId}/channels`, {
+    cookie: authCookie,
+    body: {
+      name: 'Unsichtbar\u0007',
+      type: 'text',
+      categoryId: categoryBody.category.id,
+      topic: null
+    }
+  });
+  assert.equal(invalidChannel.status, 400);
 
   const role = await request(`/api/guilds/${createdGuildId}/roles`, {
     cookie: authCookie,
@@ -1329,16 +1426,26 @@ test('Plattform-Staff hat Rollenrechte, Audit und unveränderlichen Inhaberschut
   });
   assert.equal(addModerator.status, 200);
   assert.equal((await addModerator.json()).staff.role, 'moderation');
+  const customRights = ['staff.access', 'cases.view', 'cases.note', 'appeals.view'];
+  const customizeModerator = await request(`/api/staff/team/${targetId}`, {
+    method: 'PUT', cookie: ownerCookie, body: { role: 'moderation', customPermissions: customRights }
+  });
+  assert.equal(customizeModerator.status, 200);
+  assert.deepEqual((await customizeModerator.json()).staff.permissions, customRights);
   const team = await request('/api/staff/team', { cookie: ownerCookie });
   assert.equal(team.status, 200);
-  assert.ok((await team.json()).team.some((member) => member.user_id === targetId));
+  const teamBody = await team.json();
+  assert.ok(teamBody.team.some((member) => member.user_id === targetId));
+  assert.ok(teamBody.permission_definitions.some((permission) => permission.id === 'appeals.manage'));
 
   const users = await request('/api/staff/users?q=staff.target', { cookie: ownerCookie });
   assert.equal(users.status, 200);
   assert.deepEqual((await users.json()).users.map((user) => user.id), [targetId]);
   const userDetail = await request(`/api/staff/users/${targetId}`, { cookie: ownerCookie });
   assert.equal(userDetail.status, 200);
-  assert.equal((await userDetail.json()).user.username, 'staff.target');
+  const userDetailBody = await userDetail.json();
+  assert.equal(userDetailBody.user.username, 'staff.target');
+  assert.equal(userDetailBody.risk.advisory_only, true);
 
   const protectedAction = await request(`/api/staff/users/${ownerId}/sanctions`, {
     cookie: ownerCookie, body: { type: 'warning', reason: 'Darf technisch niemals möglich sein' }
@@ -1366,6 +1473,47 @@ test('Plattform-Staff hat Rollenrechte, Audit und unveränderlichen Inhaberschut
   assert.equal(guildDetail.status, 200);
   assert.ok((await guildDetail.json()).restrictions.some((item) => item.id === restrictionId));
   assert.equal((await request(`/api/staff/guild-restrictions/${restrictionId}`, { method: 'DELETE', cookie: ownerCookie })).status, 204);
+
+  const collaborationCaseId = crypto.randomUUID();
+  await db.run(`INSERT INTO platform_cases (id, source_type, target_user_id, reason) VALUES (?, ?, ?, ?)`,
+    [collaborationCaseId, 'manual', targetId, 'Zusammenarbeit im Staff-Test']);
+  const mention = await request(`/api/staff/cases/${collaborationCaseId}/notes`, {
+    cookie: ownerCookie, body: { body: 'Bitte @staff.target diesen Fall ebenfalls prüfen.' }
+  });
+  assert.equal(mention.status, 201);
+  const caseDetail = await request(`/api/staff/cases/${collaborationCaseId}`, { cookie: ownerCookie });
+  const caseDetailBody = await caseDetail.json();
+  assert.ok(caseDetailBody.watchers.some((watcher) => watcher.user_id === targetId));
+  assert.equal((await request(`/api/staff/cases/${collaborationCaseId}/watch`, { method: 'PUT', cookie: ownerCookie })).status, 204);
+  assert.equal((await request(`/api/staff/cases/${collaborationCaseId}/watch`, { method: 'DELETE', cookie: ownerCookie })).status, 204);
+
+  const appealSanction = await request(`/api/staff/users/${targetId}/sanctions`, {
+    cookie: ownerCookie, body: { type: 'warning', reason: 'Maßnahme für Einspruchs-Chat' }
+  });
+  const appealSanctionId = (await appealSanction.json()).sanction.id;
+  const targetCookie = `access_token=${signAccessToken(targetId)}`;
+  const appealCreate = await request('/api/account/appeals', {
+    cookie: targetCookie, body: { sanctionId: appealSanctionId, message: 'Ich möchte diese Maßnahme nachvollziehbar besprechen.' }
+  });
+  assert.equal(appealCreate.status, 201);
+  const appealId = (await appealCreate.json()).appeal.id;
+  const staffReply = await request(`/api/staff/appeals/${appealId}/messages`, {
+    cookie: ownerCookie, body: { body: 'Wir prüfen deinen Hinweis und benötigen noch Details.' }
+  });
+  assert.equal(staffReply.status, 201);
+  assert.equal((await staffReply.json()).messages.length, 2);
+  const userReply = await request(`/api/account/appeals/${appealId}/messages`, {
+    cookie: targetCookie, body: { body: 'Hier sind die zusätzlich angefragten Details.' }
+  });
+  assert.equal(userReply.status, 201);
+  const appealThread = await request(`/api/staff/appeals/${appealId}`, { cookie: ownerCookie });
+  assert.equal((await appealThread.json()).messages.length, 3);
+  assert.equal((await request(`/api/staff/appeals/${appealId}`, {
+    method: 'PATCH', cookie: ownerCookie, body: { status: 'accepted', response: 'Einspruch wurde nach Prüfung angenommen.' }
+  })).status, 200);
+  assert.equal((await request(`/api/account/appeals/${appealId}/messages`, {
+    cookie: targetCookie, body: { body: 'Diese Antwort darf nach Abschluss nicht mehr gespeichert werden.' }
+  })).status, 409);
 
   const cases = await request('/api/staff/cases', { cookie: ownerCookie });
   assert.equal(cases.status, 200);

@@ -75,7 +75,7 @@ async function memberInGuild(memberId, guildId) {
 }
 
 function normalizeChannelName(value) {
-  return value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9äöüß_-]/g, '').replace(/-+/g, '-');
+  return value.normalize('NFC').trim();
 }
 
 function roleResponse(role, permissions) {
@@ -159,7 +159,6 @@ export async function createChannel(req, res) {
   const data = channelSchema.parse(req.body);
   await categoryInGuild(data.categoryId, req.params.id);
   const normalizedName = normalizeChannelName(data.name);
-  if (!normalizedName) throw new ApiError(400, 'INVALID_CHANNEL_NAME', 'Der Channelname enthält keine gültigen Zeichen.', 'name');
   const id = crypto.randomUUID();
   const highest = await db.get('SELECT MAX(position) AS position FROM channels WHERE guild_id = ?', [req.params.id]);
   const position = data.position ?? Number(highest?.position ?? -1) + 1;
@@ -178,7 +177,6 @@ export async function updateChannel(req, res) {
   const data = channelSchema.parse(req.body);
   await categoryInGuild(data.categoryId, req.params.id);
   const normalizedName = normalizeChannelName(data.name);
-  if (!normalizedName) throw new ApiError(400, 'INVALID_CHANNEL_NAME', 'Der Channelname enthält keine gültigen Zeichen.', 'name');
   await db.run(
     `UPDATE channels
      SET name = ?, type = ?, category_id = ?, topic = ?, position = ?

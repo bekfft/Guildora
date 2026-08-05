@@ -13,7 +13,7 @@ const mobileAppQuery = window.matchMedia('(max-width: 1024px)');
 const standalonePreview = import.meta.env.DEV
   && new URLSearchParams(window.location.search).get('standalone-preview') === '1';
 
-function updateAppViewport() {
+function applyAppViewport() {
   const layoutHeight = Math.max(window.innerHeight, document.documentElement.clientHeight);
   const visualViewport = window.visualViewport;
   const visualHeight = visualViewport?.height || layoutHeight;
@@ -42,6 +42,15 @@ function updateAppViewport() {
     'data-composer-keyboard',
     Boolean(keyboardOpen && document.activeElement?.closest('.composer-area'))
   );
+}
+
+let viewportFrame = 0;
+function updateAppViewport() {
+  if (viewportFrame) return;
+  viewportFrame = window.requestAnimationFrame(() => {
+    viewportFrame = 0;
+    applyAppViewport();
+  });
 }
 
 function updateDisplayMode() {

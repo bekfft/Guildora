@@ -2,6 +2,7 @@ import {
   Accessibility,
   Bell,
   Cable,
+  Bot,
   ChevronDown,
   ChevronUp,
   Eye,
@@ -25,6 +26,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useDesktop } from '../context/DesktopContext.jsx';
 import { api } from '../lib/api.js';
 import Modal from './Modal.jsx';
+import DeveloperSection from './DeveloperSection.jsx';
 import {
   AccountSection,
   ConnectionsSection,
@@ -44,7 +46,8 @@ const TABS = [
   { id: 'Erscheinungsbild', label: 'Erscheinungsbild', icon: Palette },
   { id: 'Barrierefreiheit', label: 'Barrierefreiheit', icon: Accessibility },
   { id: 'Sprache', label: 'Sprache & Region', icon: Languages },
-  { id: 'Verbindungen', label: 'Verbindungen', icon: Cable }
+  { id: 'Verbindungen', label: 'Verbindungen', icon: Cable },
+  { id: 'Entwickler', label: 'Entwickler', icon: Bot }
 ];
 
 function moveItem(items, index, direction) {
@@ -296,6 +299,7 @@ export default function SettingsModal({ onClose, onToast, initialTab = 'Mein Kon
             {settings && tab === 'Barrierefreiheit' && <PreferencesSection kind="accessibility" settings={settings} save={savePreferences} />}
             {settings && tab === 'Sprache' && <PreferencesSection kind="locale" settings={settings} save={savePreferences} />}
             {tab === 'Verbindungen' && <ConnectionsSection onToast={onToast} />}
+            {tab === 'Entwickler' && <DeveloperSection onToast={onToast} />}
             {tab === 'Über' && desktop?.isDesktop && (
               <div className="desktop-about settings-large-panel">
                 <p><strong>Guildora Desktop</strong><span>Version {desktop.version}</span></p>
