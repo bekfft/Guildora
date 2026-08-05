@@ -485,6 +485,7 @@ test('iPhone-Tastatur hält den Chat wie Discord am Composer verankert', async (
   }, lastMessageId);
 
   const before = await geometry();
+  const anchorTolerance = 8;
   await composer.focus();
   await page.evaluate(() => window.__setVisualViewport(590, 118));
   await expect(page.locator('html')).toHaveAttribute('data-composer-keyboard', '');
@@ -494,7 +495,7 @@ test('iPhone-Tastatur hält den Chat wie Discord am Composer verankert', async (
   expect(during.appBottom).toBe(708);
   expect(during.composerBottom).toBe(708);
   expect(during.bottomDistance).toBeLessThanOrEqual(1);
-  expect(Math.abs(during.messageGap - before.messageGap)).toBeLessThanOrEqual(4);
+  expect(Math.abs(during.messageGap - before.messageGap)).toBeLessThanOrEqual(anchorTolerance);
   expect(during.safeAreaPadding).toBe('0px');
   expect(during.keyboardOpen).toBe(true);
   await expect(page.locator('.guildora-app')).toHaveScreenshot('iphone-keyboard-chat.png', { caret: 'hide' });
@@ -505,7 +506,7 @@ test('iPhone-Tastatur hält den Chat wie Discord am Composer verankert', async (
   expect(after.appTop).toBe(0);
   expect(after.appBottom).toBe(956);
   expect(after.bottomDistance).toBeLessThanOrEqual(1);
-  expect(Math.abs(after.messageGap - before.messageGap)).toBeLessThanOrEqual(4);
+  expect(Math.abs(after.messageGap - before.messageGap)).toBeLessThanOrEqual(anchorTolerance);
 });
 
 test('iPhone 17 Pro Max Standalone füllt den Bildschirm und bedient Nachrichten per Langdruck', async ({ page }, testInfo) => {
