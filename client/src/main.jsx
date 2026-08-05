@@ -16,15 +16,23 @@ const standalonePreview = import.meta.env.DEV
 function updateAppViewport() {
   const layoutHeight = Math.max(window.innerHeight, document.documentElement.clientHeight);
   const visualHeight = window.visualViewport?.height || layoutHeight;
+  const iosStandalone = window.navigator.standalone === true;
+  const portrait = window.innerHeight >= window.innerWidth;
+  const deviceScreenHeight = portrait
+    ? Math.max(window.screen.width, window.screen.height)
+    : Math.min(window.screen.width, window.screen.height);
   const keyboardTarget = document.activeElement?.matches(
     'input, textarea, select, [contenteditable="true"]'
   );
   const keyboardOpen = keyboardTarget && layoutHeight - visualHeight > 120;
-  // iOS kann 100dvh im Home-Bildschirm-Modus oberhalb der Home-Indicator-Zone
-  // beenden. Die groessere Layout-/Visual-Viewport-Hoehe malt die App bis zur
-  // physischen Unterkante; die Safe-Area-Paddings halten Bedienelemente trotzdem
-  // oberhalb des Home Indicators. Nur bei offener Tastatur wird bewusst gekuerzt.
-  const viewportHeight = keyboardOpen ? visualHeight : Math.max(layoutHeight, visualHeight);
+  // Auf echten iOS-Home-Bildschirm-Apps koennen innerHeight, clientHeight und
+  // 100dvh gemeinsam oberhalb der Home-Indicator-Zone enden. screen.height ist
+  // dort die physische CSS-Pixel-Hoehe und schliesst diese sonst ungefuellte
+  // Zone ein. Safe-Area-Paddings halten die Bedienelemente weiterhin darueber.
+  const fullscreenHeight = iosStandalone
+    ? Math.max(layoutHeight, visualHeight, deviceScreenHeight)
+    : Math.max(layoutHeight, visualHeight);
+  const viewportHeight = keyboardOpen ? visualHeight : fullscreenHeight;
   document.documentElement.style.setProperty('--app-height', `${Math.round(viewportHeight)}px`);
 }
 

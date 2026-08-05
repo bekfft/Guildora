@@ -48,8 +48,11 @@ test('Standalone-Modus und iPhone-Safe-Areas werden im App-Layout berücksichtig
   assert.match(appSource, /\['\/app', '\/staff'\]\.some\(\(prefix\) => pathname\.startsWith\(prefix\)\)/);
   assert.match(appSource, /<MobileAppRouteSync \/>/);
   assert.match(mainSource, /Math\.max\(window\.innerHeight, document\.documentElement\.clientHeight\)/);
+  assert.match(mainSource, /const iosStandalone = window\.navigator\.standalone === true/);
+  assert.match(mainSource, /const deviceScreenHeight = portrait/);
+  assert.match(mainSource, /Math\.max\(layoutHeight, visualHeight, deviceScreenHeight\)/);
   assert.match(mainSource, /keyboardTarget && layoutHeight - visualHeight > 120/);
-  assert.match(mainSource, /const viewportHeight = keyboardOpen \? visualHeight : Math\.max\(layoutHeight, visualHeight\)/);
+  assert.match(mainSource, /const viewportHeight = keyboardOpen \? visualHeight : fullscreenHeight/);
   assert.match(mainSource, /setProperty\('--app-height', `\$\{Math\.round\(viewportHeight\)\}px`\)/);
   assert.doesNotMatch(mainSource, /removeProperty\('--app-height'\)/);
   assert.match(mainSource, /--app-height/);
