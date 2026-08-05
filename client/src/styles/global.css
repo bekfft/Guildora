@@ -1336,6 +1336,185 @@ html[data-mobile-app] .skip-link {
 }
 
 /* Geschützter App-Platzhalter */
+.app-boot-screen {
+  position: fixed;
+  z-index: 9000;
+  inset:
+    calc(var(--titlebar-height) + var(--safe-area-top))
+    var(--safe-area-right)
+    var(--safe-area-bottom)
+    var(--safe-area-left);
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  padding: clamp(22px, 5vw, 54px);
+  overflow: hidden;
+  color: #f7f7fb;
+  background:
+    radial-gradient(circle at 50% 42%, rgb(124 92 255 / 24%), transparent 36%),
+    linear-gradient(155deg, #17181d 0%, #202126 50%, #17181d 100%);
+  place-items: center;
+  isolation: isolate;
+  transition: opacity 280ms ease, filter 280ms ease;
+}
+
+html:is([data-display-mode="standalone"], [data-mobile-app]) .app-boot-screen {
+  inset: 0;
+  padding-top: calc(clamp(22px, 5vw, 54px) + var(--safe-area-top));
+  padding-right: calc(clamp(22px, 5vw, 54px) + var(--safe-area-right));
+  padding-bottom: calc(clamp(22px, 5vw, 54px) + var(--safe-area-bottom));
+  padding-left: calc(clamp(22px, 5vw, 54px) + var(--safe-area-left));
+}
+
+.app-boot-screen.is-complete {
+  opacity: 0;
+  filter: blur(4px);
+}
+
+.app-boot-screen__ambient,
+.app-boot-screen__ambient span {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.app-boot-screen__ambient span {
+  width: 34vw;
+  height: 34vw;
+  min-width: 260px;
+  min-height: 260px;
+  border-radius: 50%;
+  opacity: .18;
+  background: #7c5cff;
+  filter: blur(90px);
+  animation: boot-ambient 7s ease-in-out infinite alternate;
+}
+
+.app-boot-screen__ambient span:nth-child(1) { top: -18%; left: -8%; }
+.app-boot-screen__ambient span:nth-child(2) { inset: auto -12% -24% auto; animation-delay: -2.4s; background: #d05b9c; }
+.app-boot-screen__ambient span:nth-child(3) { inset: 30% auto auto 58%; width: 20vw; height: 20vw; animation-delay: -4.8s; opacity: .12; }
+
+.app-boot-screen__card {
+  position: relative;
+  display: flex;
+  width: min(100%, 470px);
+  align-items: center;
+  flex-direction: column;
+  animation: boot-card-in 520ms cubic-bezier(.2, .85, .2, 1) both;
+  text-align: center;
+}
+
+.app-boot-screen__logo {
+  position: relative;
+  display: grid;
+  width: 112px;
+  height: 112px;
+  margin-bottom: 24px;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 32px;
+  background: rgb(18 19 23 / 72%);
+  box-shadow: 0 26px 70px rgb(0 0 0 / 42%), 0 0 45px rgb(124 92 255 / 18%);
+  place-items: center;
+  backdrop-filter: blur(18px);
+  animation: boot-logo-float 2.8s ease-in-out infinite;
+}
+
+.app-boot-screen__logo .brand-logo {
+  width: 78px;
+  height: 78px;
+  object-fit: contain;
+  filter: drop-shadow(0 9px 16px rgb(0 0 0 / 32%));
+}
+
+.app-boot-screen__orbit {
+  position: absolute;
+  inset: -10px;
+  border: 1px solid rgb(169 156 255 / 25%);
+  border-radius: 38px;
+  animation: boot-orbit 3.8s linear infinite;
+}
+
+.app-boot-screen__orbit::after {
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #b7acff;
+  box-shadow: 0 0 16px #8f7fff;
+  content: "";
+}
+
+.app-boot-screen__copy > span,
+.app-boot-screen__tip small {
+  color: #a99cff;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .16em;
+}
+
+.app-boot-screen__copy h1 {
+  margin: 7px 0 5px;
+  font-size: clamp(25px, 5vw, 34px);
+  letter-spacing: -.035em;
+}
+
+.app-boot-screen__copy p {
+  margin: 0;
+  color: #aeb0b8;
+  font-size: 14px;
+}
+
+.app-boot-screen__progress {
+  position: relative;
+  width: min(100%, 310px);
+  height: 4px;
+  margin: 28px 0 24px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 9%);
+}
+
+.app-boot-screen__progress i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 42%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #6c5ce7, #aa9cff, #d05b9c);
+  box-shadow: 0 0 16px rgb(124 92 255 / 55%);
+  animation: boot-progress 1.45s cubic-bezier(.55, 0, .25, 1) infinite;
+}
+
+.app-boot-screen.is-complete .app-boot-screen__progress i {
+  width: 100%;
+  animation: none;
+}
+
+.app-boot-screen__tip {
+  min-height: 76px;
+  padding: 14px 18px;
+  border: 1px solid rgb(255 255 255 / 7%);
+  border-radius: 12px;
+  background: rgb(17 18 21 / 48%);
+  animation: boot-tip-in 320ms ease-out both;
+  backdrop-filter: blur(10px);
+}
+
+.app-boot-screen__tip p {
+  margin: 5px 0 0;
+  color: #c8cad1;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@keyframes boot-card-in { from { opacity: 0; transform: translateY(16px) scale(.975); } }
+@keyframes boot-tip-in { from { opacity: 0; transform: translateY(5px); } }
+@keyframes boot-logo-float { 50% { transform: translateY(-6px); } }
+@keyframes boot-orbit { to { transform: rotate(360deg); } }
+@keyframes boot-progress { from { transform: translateX(-115%); } to { transform: translateX(245%); } }
+@keyframes boot-ambient { to { transform: translate3d(8%, 6%, 0) scale(1.12); } }
+
 .route-loader {
   display: grid;
   min-height: var(--content-viewport-height);
@@ -1354,6 +1533,33 @@ html[data-mobile-app] .skip-link {
 }
 
 @keyframes route-loader-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 560px) {
+  .app-boot-screen__logo {
+    width: 96px;
+    height: 96px;
+    border-radius: 28px;
+  }
+
+  .app-boot-screen__logo .brand-logo {
+    width: 68px;
+    height: 68px;
+  }
+
+  .app-boot-screen__tip {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-boot-screen,
+  .app-boot-screen *,
+  .app-boot-screen *::before,
+  .app-boot-screen *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
 
 @media (prefers-contrast: more) {
   :root {

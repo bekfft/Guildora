@@ -106,6 +106,46 @@ test('zentrale App-Ansichten bleiben visuell stabil', async ({ page }, testInfo)
   await screenshot(page, 'settings.png');
 });
 
+test('Guildora-Startbildschirm wartet auf echte App-Daten und bleibt mobil vollständig', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-1440', 'Desktop und Mobile werden in einem kontrollierten Start gemeinsam geprüft.');
+  test.setTimeout(45_000);
+  await prepareAccount(page, testInfo, 'boot-screen');
+
+  let releaseGuildRequest;
+  const guildRequestGate = new Promise((resolve) => { releaseGuildRequest = resolve; });
+  await page.route('**/api/guilds/@me', async (route) => {
+    await guildRequestGate;
+    await route.continue();
+  });
+
+  await page.goto('/app/channels/@me');
+  const bootScreen = page.getByRole('status', { name: 'Guildora wird vorbereitet' });
+  await expect(bootScreen).toBeVisible();
+  await expect(bootScreen).toContainText('GUT ZU WISSEN');
+  await expect(bootScreen.locator('.brand-logo')).toBeVisible();
+  await expect(bootScreen).toHaveScreenshot('app-boot-desktop.png', { caret: 'hide' });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-app', '');
+  const mobileGeometry = await bootScreen.evaluate((screen) => {
+    const rect = screen.getBoundingClientRect();
+    return {
+      top: Math.round(rect.top), bottom: Math.round(rect.bottom),
+      width: Math.round(rect.width), bodyWidth: document.body.scrollWidth,
+      viewportWidth: document.documentElement.clientWidth
+    };
+  });
+  expect(mobileGeometry.top).toBe(0);
+  expect(mobileGeometry.bottom).toBe(844);
+  expect(mobileGeometry.width).toBe(390);
+  expect(mobileGeometry.bodyWidth).toBeLessThanOrEqual(mobileGeometry.viewportWidth);
+  await expect(bootScreen).toHaveScreenshot('app-boot-mobile.png', { caret: 'hide' });
+
+  releaseGuildRequest();
+  await expect(bootScreen).toBeHidden();
+  await expect(page.locator('.main-header')).toBeVisible();
+});
+
 test('Voice-Einstellungen enthalten auf Desktop und Mobile nur Geräte', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-1440', 'Desktop und Mobile werden gemeinsam geprüft.');
   await prepareAccount(page, testInfo, 'voice-devices');

@@ -10,6 +10,11 @@
   overflow: hidden;
   color: var(--text-primary);
   background: var(--bg-content);
+  animation: app-shell-in 300ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+@keyframes app-shell-in {
+  from { opacity: 0; filter: blur(3px); }
 }
 
 html:is([data-display-mode="standalone"], [data-mobile-app]) .guildora-app {
@@ -1459,6 +1464,7 @@ html:is([data-display-mode="standalone"], [data-mobile-app]) .guild-sidebar-head
   gap: 10px;
   color: var(--channel-idle);
   font-size: 14px;
+  animation: loading-content-in 220ms ease-out both;
 }
 
 .spin {
@@ -2109,6 +2115,11 @@ html:is([data-display-mode="standalone"], [data-mobile-app]) .user-panel {
   flex-direction: column;
   gap: 12px;
   padding: 28px;
+  animation: loading-content-in 220ms ease-out both;
+}
+
+@keyframes loading-content-in {
+  from { opacity: 0; transform: translateY(5px); }
 }
 
 .content-skeleton span,
@@ -2730,7 +2741,8 @@ html:is([data-display-mode="standalone"], [data-mobile-app]) .user-panel {
   padding: 20px;
   background: rgb(0 0 0 / 68%);
   place-items: center;
-  animation: modal-fade 150ms ease-out;
+  animation: modal-fade 180ms ease-out;
+  backdrop-filter: blur(5px);
 }
 
 .app-modal {
@@ -2743,7 +2755,7 @@ html:is([data-display-mode="standalone"], [data-mobile-app]) .user-panel {
   color: var(--text-primary);
   background: var(--bg-content);
   box-shadow: 0 25px 70px rgb(0 0 0 / 50%);
-  animation: modal-in 180ms ease-out;
+  animation: modal-in 240ms cubic-bezier(.2, .85, .2, 1);
 }
 
 html.is-desktop .modal-overlay {
@@ -2771,7 +2783,7 @@ html.is-desktop .modal-overlay {
 }
 
 @keyframes modal-fade { from { opacity: 0; } }
-@keyframes modal-in { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+@keyframes modal-in { from { opacity: 0; transform: translateY(16px) scale(.965); } }
 @keyframes modal-fade-out { to { opacity: 0; } }
 @keyframes modal-out { to { opacity: 0; transform: translateY(7px) scale(.98); } }
 
@@ -3382,6 +3394,14 @@ html.is-desktop .modal-overlay {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .guildora-app,
+  .content-skeleton,
+  .member-skeleton,
+  .discovery-skeleton,
+  .sidebar-loading,
+  .message-loading,
+  .engagement-loading,
+  .engagement-empty,
   .server-button,
   .guild-card,
   .app-navigation,
@@ -5277,6 +5297,14 @@ html.is-desktop .modal-overlay {
   justify-content: center;
   gap: 9px;
   color: var(--channel-idle);
+  animation: loading-content-in 220ms ease-out both;
+}
+
+.profile-modal-loading,
+.profile-settings-loading,
+.channel-permissions-loading,
+.insights-loading {
+  animation: loading-content-in 220ms ease-out both;
 }
 
 .engagement-empty {

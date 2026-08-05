@@ -8,6 +8,7 @@ import DiscoveryPage from '../app/DiscoveryPage.jsx';
 import DirectMessageView from '../app/DirectMessageView.jsx';
 import FriendsView from '../app/FriendsView.jsx';
 import ConnectionBanner from '../app/ConnectionBanner.jsx';
+import AppBootScreen from '../components/AppBootScreen.jsx';
 import InstallAppPrompt from '../app/InstallAppPrompt.jsx';
 import MainHeader from '../app/MainHeader.jsx';
 import MemberList from '../app/MemberList.jsx';
@@ -55,6 +56,11 @@ export default function AppPage() {
   const [members, setMembers] = useState([]);
   const [conversations, setConversations] = useState([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [initialConversationsReady, setInitialConversationsReady] = useState(false);
+  const [initialNotificationsReady, setInitialNotificationsReady] = useState(false);
+  const [bootVisible, setBootVisible] = useState(true);
+  const [bootCompleting, setBootCompleting] = useState(false);
+  const bootStartedAt = useRef(performance.now());
   const [membersVisible, setMembersVisible] = useState(
     () => !window.matchMedia('(max-width: 1024px)').matches
   );
@@ -82,6 +88,25 @@ export default function AppPage() {
   const isHome = location.pathname === '/app/channels/@me';
   const isDirect = location.pathname.startsWith('/app/channels/@me/') && Boolean(channelId);
   const focusMessageId = new URLSearchParams(location.search).get('message');
+  const routeDataReady = location.pathname !== '/app'
+    && (!guildId || guildId === '@me' || (!loadingDetails && Boolean(guildData)));
+  const initialAppDataReady = !guildsLoading
+    && initialConversationsReady
+    && initialNotificationsReady
+    && routeDataReady;
+
+  useEffect(() => {
+    if (!initialAppDataReady || !bootVisible) return undefined;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const minimumVisibleMs = reduceMotion ? 0 : 900;
+    const remaining = Math.max(0, minimumVisibleMs - (performance.now() - bootStartedAt.current));
+    const completeTimer = window.setTimeout(() => setBootCompleting(true), remaining);
+    const hideTimer = window.setTimeout(() => setBootVisible(false), remaining + (reduceMotion ? 0 : 320));
+    return () => {
+      window.clearTimeout(completeTimer);
+      window.clearTimeout(hideTimer);
+    };
+  }, [bootVisible, initialAppDataReady]);
 
   useEffect(() => {
     const app = appRef.current;
@@ -361,11 +386,14 @@ export default function AppPage() {
   useEffect(() => {
     api.notifications({ limit: 1 })
       .then((result) => setNotificationCount(result.unread_count))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setInitialNotificationsReady(true));
   }, []);
 
   useEffect(() => {
-    refreshConversations().catch(() => {});
+    refreshConversations()
+      .catch(() => {})
+      .finally(() => setInitialConversationsReady(true));
     const refresh = () => refreshConversations().catch(() => {});
     const notifyFriendRequest = ({ request } = {}) => {
       if (!request?.user) return;
@@ -641,6 +669,10 @@ export default function AppPage() {
     } catch (error) {
       showToast(error.message, 'error');
     }
+  }
+
+  if (bootVisible) {
+    return <AppBootScreen complete={bootCompleting} />;
   }
 
   return (

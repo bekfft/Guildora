@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { GuildProvider } from './context/GuildContext.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import AppBootScreen from './components/AppBootScreen.jsx';
 import DesktopTitlebar from './components/DesktopTitlebar.jsx';
 import DesktopToasts from './components/DesktopToasts.jsx';
 import SessionRecovery from './components/SessionRecovery.jsx';
@@ -43,7 +44,7 @@ function StaffRoute() {
 }
 
 function RouteFallback() {
-  return <main className="route-loader" role="status" aria-label="Guildora wird geladen"><span className="route-loader__spinner" /></main>;
+  return <AppBootScreen message="Guildora startet" detail="Die Oberfläche wird für dich vorbereitet." />;
 }
 
 function HomeRoute() {
