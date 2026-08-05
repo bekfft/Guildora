@@ -1,7 +1,7 @@
 import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
 import { db } from '../db/index.js';
 import { ApiError } from '../middleware/errorHandler.js';
-import { requireChannelPermission } from '../utils/channelPermissions.js';
+import { getChannelPermissions, requireChannelPermission } from '../utils/channelPermissions.js';
 import { requireNotTimedOut } from '../utils/moderation.js';
 
 function liveKitConfig() {
@@ -33,6 +33,28 @@ function liveKitHttpUrl(websocketUrl) {
 
 function voiceRoomName(guildId, channelId) {
   return `guildora-${guildId}-${channelId}`;
+}
+
+function participantResponse(participant, userId) {
+  let metadata = {};
+  try {
+    metadata = JSON.parse(participant.metadata || '{}');
+  } catch {
+    metadata = {};
+  }
+  const microphoneTracks = participant.tracks.filter((track) => track.source === 2);
+  const screenTracks = participant.tracks.filter((track) => track.source === 3);
+  return {
+    id: participant.identity,
+    name: participant.name || metadata.username || 'Unbekannt',
+    username: metadata.username || null,
+    avatar_url: metadata.avatarUrl || null,
+    is_local: participant.identity === userId,
+    is_speaking: false,
+    is_muted: microphoneTracks.length === 0 || microphoneTracks.every((track) => track.muted),
+    is_screen_sharing: screenTracks.some((track) => !track.muted),
+    connection_quality: 'unknown'
+  };
 }
 
 export async function getVoiceStatus(req, res) {
@@ -139,26 +161,42 @@ export async function getVoiceParticipants(req, res) {
   }
 
   return res.json({
-    participants: participants.map((participant) => {
-      let metadata = {};
-      try {
-        metadata = JSON.parse(participant.metadata || '{}');
-      } catch {
-        metadata = {};
-      }
-      const microphoneTracks = participant.tracks.filter((track) => track.source === 2);
-      const screenTracks = participant.tracks.filter((track) => track.source === 3);
-      return {
-        id: participant.identity,
-        name: participant.name || metadata.username || 'Unbekannt',
-        username: metadata.username || null,
-        avatar_url: metadata.avatarUrl || null,
-        is_local: participant.identity === req.userId,
-        is_speaking: false,
-        is_muted: microphoneTracks.length === 0 || microphoneTracks.every((track) => track.muted),
-        is_screen_sharing: screenTracks.some((track) => !track.muted),
-        connection_quality: 'unknown'
-      };
-    })
+    participants: participants.map((participant) => participantResponse(participant, req.userId))
   });
+}
+
+export async function getGuildVoiceParticipants(req, res) {
+  const membership = await db.get(
+    'SELECT 1 AS ok FROM guild_members WHERE guild_id = ? AND user_id = ?',
+    [req.params.guildId, req.userId]
+  );
+  if (!membership) throw new ApiError(403, 'NOT_MEMBER', 'Du bist kein Mitglied dieses Servers.');
+
+  const voiceChannels = await db.all(
+    "SELECT id FROM channels WHERE guild_id = ? AND type = 'voice' ORDER BY position, id",
+    [req.params.guildId]
+  );
+  const permissions = await Promise.all(voiceChannels.map(async (channel) => ({
+    channel,
+    permissions: await getChannelPermissions(channel.id, req.userId)
+  })));
+  const visibleChannels = permissions.filter((entry) => entry.permissions.viewChannel).map((entry) => entry.channel);
+  if (!visibleChannels.length) return res.json({ channels: {} });
+
+  const config = liveKitConfig();
+  if (!config) throw new ApiError(503, 'VOICE_UNAVAILABLE', 'Voice ist auf diesem Server noch nicht freigeschaltet.');
+  const roomService = new RoomServiceClient(liveKitHttpUrl(config.url), config.apiKey, config.apiSecret);
+  const rooms = visibleChannels.map((channel) => ({ channelId: channel.id, roomName: voiceRoomName(req.params.guildId, channel.id) }));
+
+  try {
+    const activeRooms = new Set((await roomService.listRooms(rooms.map((room) => room.roomName))).map((room) => room.name));
+    const channelEntries = await Promise.all(rooms.map(async ({ channelId, roomName }) => {
+      if (!activeRooms.has(roomName)) return [channelId, []];
+      const participants = await roomService.listParticipants(roomName);
+      return [channelId, participants.map((participant) => participantResponse(participant, req.userId))];
+    }));
+    return res.json({ channels: Object.fromEntries(channelEntries) });
+  } catch {
+    throw new ApiError(502, 'VOICE_PROVIDER_ERROR', 'Die Voice-Teilnehmer konnten nicht abgefragt werden.');
+  }
 }

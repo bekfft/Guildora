@@ -134,6 +134,7 @@ export const api = {
   channel: (id) => request(`/api/channels/${id}`),
   voiceStatus: () => request('/api/voice/status'),
   voiceParticipants: (channelId) => request(`/api/voice/channels/${channelId}/participants`),
+  guildVoiceParticipants: (guildId) => request(`/api/voice/guilds/${guildId}/participants`),
   voiceToken: (channelId) => request(`/api/voice/channels/${channelId}/token`, { method: 'POST' }),
   messages: (channelId, { before, around, limit = 50 } = {}) => {
     const query = new URLSearchParams({ limit: String(limit) });

@@ -286,6 +286,29 @@ test('Voice-Tokens sind kurzlebig, rechtegeprüft und nur für Sprachkanäle gü
   });
   assert.equal(outsider.status, 403);
 
+  const observerId = crypto.randomUUID();
+  await db.run(
+    `INSERT INTO users (id, email, username, display_name, password_hash, birthdate)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [observerId, 'voice-observer@example.de', 'voice.observer', 'Voice Observer', 'not-used', '1995-01-01']
+  );
+  await db.run(
+    'INSERT INTO guild_members (id, guild_id, user_id) VALUES (?, ?, ?)',
+    [crypto.randomUUID(), createdGuildId, observerId]
+  );
+  const defaultVoiceRole = await db.get('SELECT id FROM roles WHERE guild_id = ? AND is_default = ?', [createdGuildId, true]);
+  await db.run(
+    `INSERT INTO channel_role_permissions (channel_id, role_id, view_channel)
+     VALUES (?, ?, ?)`,
+    [createdVoiceChannelId, defaultVoiceRole.id, -1]
+  );
+  const hiddenVoicePresence = await request(`/api/voice/guilds/${createdGuildId}/participants`, {
+    cookie: `access_token=${signAccessToken(observerId)}`
+  });
+  assert.equal(hiddenVoicePresence.status, 200);
+  assert.deepEqual((await hiddenVoicePresence.json()).channels, {});
+  await db.run('DELETE FROM channel_role_permissions WHERE channel_id = ? AND role_id = ?', [createdVoiceChannelId, defaultVoiceRole.id]);
+
   const saved = {
     url: process.env.LIVEKIT_URL,
     key: process.env.LIVEKIT_API_KEY,
@@ -302,6 +325,10 @@ test('Voice-Tokens sind kurzlebig, rechtegeprüft und nur für Sprachkanäle gü
     `/api/voice/channels/${createdVoiceChannelId}/participants`,
     { cookie: authCookie }
   );
+  const unavailableGuildParticipants = await request(
+    `/api/voice/guilds/${createdGuildId}/participants`,
+    { cookie: `access_token=${signAccessToken(observerId)}` }
+  );
   process.env.LIVEKIT_URL = saved.url;
   process.env.LIVEKIT_API_KEY = saved.key;
   process.env.LIVEKIT_API_SECRET = saved.secret;
@@ -309,6 +336,8 @@ test('Voice-Tokens sind kurzlebig, rechtegeprüft und nur für Sprachkanäle gü
   assert.equal((await unavailable.json()).error.code, 'VOICE_UNAVAILABLE');
   assert.equal(unavailableParticipants.status, 503);
   assert.equal((await unavailableParticipants.json()).error.code, 'VOICE_UNAVAILABLE');
+  assert.equal(unavailableGuildParticipants.status, 503);
+  assert.equal((await unavailableGuildParticipants.json()).error.code, 'VOICE_UNAVAILABLE');
 });
 
 test('Bot-Plattform schützt Tokens, installiert Bots und verarbeitet Slash-Commands', async () => {

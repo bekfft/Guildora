@@ -31,6 +31,13 @@ test('Voice-Stage ist bedienbar, maximierbar und mobil sicher', () => {
   assert.match(css, /max-height: 68dvh/);
 });
 
+test('sichtbare Voice-Channels zeigen ihre Teilnehmer auch ohne eigenen Beitritt', () => {
+  assert.match(sidebar, /guildVoiceParticipants/);
+  assert.match(sidebar, /voicePresence\[channel\.id\]/);
+  assert.match(sidebar, /connectedHere \? voice\.participants : presence/);
+  assert.match(sidebar, /document\.visibilityState === 'hidden'/);
+});
+
 test('Entwicklerbereich darf auf iPhone nicht durch Codeblöcke verbreitert werden', () => {
   assert.match(css, /\.developer-settings \{ min-width: 0;/);
   assert.match(css, /\.developer-settings > \* \{ min-width: 0;/);

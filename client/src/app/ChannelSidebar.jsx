@@ -27,11 +27,13 @@ function voiceParticipantName(participant) {
   return participant.is_local ? `${participant.name} (Du)` : participant.name;
 }
 
-function VoiceParticipants({ voice, channelId }) {
-  if (voice.channel?.id !== channelId || !voice.participants.length) return null;
+function VoiceParticipants({ voice, channelId, presence = [] }) {
+  const connectedHere = voice.channel?.id === channelId;
+  const participants = connectedHere ? voice.participants : presence;
+  if (!participants.length) return null;
   return (
     <div className="voice-participant-list" aria-label="Teilnehmer im Sprachkanal">
-      {voice.participants.map((participant) => (
+      {participants.map((participant) => (
         <div className={`voice-participant ${participant.is_speaking ? 'is-speaking' : ''}`} key={participant.id}>
           <span className="voice-participant__avatar">
             {participant.avatar_url
@@ -41,7 +43,7 @@ function VoiceParticipants({ voice, channelId }) {
           <span>{voiceParticipantName(participant)}</span>
           {participant.is_muted && <MicOff size={14} aria-label="Stummgeschaltet" />}
           {participant.is_screen_sharing && <MonitorUp size={14} aria-label="Bildschirm wird geteilt" />}
-          {!participant.is_local && (
+          {connectedHere && !participant.is_local && (
             <input
               className="voice-participant-volume"
               type="range"
@@ -72,6 +74,7 @@ export default function ChannelSidebar({
   const [profileCardOpen, setProfileCardOpen] = useState(false);
   const [panelProfile, setPanelProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [voicePresence, setVoicePresence] = useState({});
   const contextMenuRef = useRef(null);
   const userPanelRef = useRef(null);
   const draggingChannelRef = useRef(null);
@@ -85,6 +88,37 @@ export default function ChannelSidebar({
     }
     setCollapsed(next);
   }, [guildData?.guild.id]);
+
+  useEffect(() => {
+    if (!guildData?.guild.id) {
+      setVoicePresence({});
+      return undefined;
+    }
+    let active = true;
+    const refresh = async () => {
+      if (document.visibilityState === 'hidden') return;
+      try {
+        const result = await api.guildVoiceParticipants(guildData.guild.id);
+        if (active) setVoicePresence(result.channels || {});
+      } catch (error) {
+        if (active && !['VOICE_UNAVAILABLE', 'VOICE_PROVIDER_ERROR'].includes(error.code)) onToast(error.message, 'error');
+      }
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 10_000);
+    const onVisibility = () => document.visibilityState === 'visible' && refresh();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [guildData?.guild.id, onToast]);
+
+  useEffect(() => {
+    if (!voice.channel?.id) return;
+    setVoicePresence((current) => ({ ...current, [voice.channel.id]: voice.participants }));
+  }, [voice.channel?.id, voice.participants]);
 
   useEffect(() => {
     if (!contextMenu) return undefined;
@@ -366,7 +400,7 @@ export default function ChannelSidebar({
                             <Settings size={16} />
                           </button>
                         )}
-                        <VoiceParticipants voice={voice} channelId={channel.id} />
+                        <VoiceParticipants voice={voice} channelId={channel.id} presence={voicePresence[channel.id]} />
                       </div>
                     ))}
                   </div>
@@ -443,7 +477,7 @@ export default function ChannelSidebar({
                               <Settings size={16} />
                             </button>
                           )}
-                          <VoiceParticipants voice={voice} channelId={channel.id} />
+                          <VoiceParticipants voice={voice} channelId={channel.id} presence={voicePresence[channel.id]} />
                         </div>
                       ))}
                     </div>

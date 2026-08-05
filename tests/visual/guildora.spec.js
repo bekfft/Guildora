@@ -132,6 +132,30 @@ test('Bot-Autorisierung bleibt auf Desktop und Mobile vollständig bedienbar', a
   await expect(page.getByRole('heading', { name: 'Bot autorisiert' })).toBeVisible();
 });
 
+test('sichtbare Voice-Channels zeigen Teilnehmer ohne eigenen Beitritt', async ({ page }, testInfo) => {
+  test.skip(!['desktop-1440', 'mobile-390'].includes(testInfo.project.name), 'Desktop und Mobile decken die Sidebar-Darstellung ab.');
+  const { guild } = await prepareAccount(page, testInfo, 'voice-presence');
+  const detailsResponse = await page.request.get(`/api/guilds/${guild.id}`);
+  expect(detailsResponse.ok()).toBeTruthy();
+  const details = await detailsResponse.json();
+  const voiceChannel = details.channels.find((channel) => channel.type === 'voice');
+  expect(voiceChannel).toBeTruthy();
+  await page.route(`**/api/voice/guilds/${guild.id}/participants`, (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      channels: {
+        [voiceChannel.id]: [{ id: 'visible-listener', name: 'Sichtbare Stimme', avatar_url: null, is_local: false, is_muted: false, is_screen_sharing: false }]
+      }
+    })
+  }));
+  await page.goto(`/app/channels/${guild.id}`);
+  const list = page.getByLabel('Teilnehmer im Sprachkanal');
+  await expect(list).toBeVisible();
+  await expect(list.getByText('Sichtbare Stimme')).toBeVisible();
+  await expect(page.getByRole('button', { name: `${voiceChannel.name} beitreten` })).not.toHaveClass(/is-active/);
+});
+
 test('Guildora-Startbildschirm wartet auf echte App-Daten und bleibt mobil vollständig', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-1440', 'Desktop und Mobile werden in einem kontrollierten Start gemeinsam geprüft.');
   test.setTimeout(45_000);
