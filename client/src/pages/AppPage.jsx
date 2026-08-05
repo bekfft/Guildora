@@ -24,6 +24,9 @@ import { clampSwipe, MOBILE_SWIPE_SETTLE_MS, resolveMobileSwipe } from '../lib/m
 import { socket } from '../lib/socket.js';
 import '../styles/app.css';
 
+const BOOT_MINIMUM_VISIBLE_MS = 1800;
+const BOOT_COMPLETION_HOLD_MS = 420;
+
 const CategorySettingsModal = lazy(() => import('../app/CategorySettingsModal.jsx'));
 const ChannelSettingsModal = lazy(() => import('../app/ChannelSettingsModal.jsx'));
 const GuildModal = lazy(() => import('../app/GuildModal.jsx'));
@@ -98,10 +101,10 @@ export default function AppPage() {
   useEffect(() => {
     if (!initialAppDataReady || !bootVisible) return undefined;
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const minimumVisibleMs = reduceMotion ? 0 : 900;
+    const minimumVisibleMs = reduceMotion ? 0 : BOOT_MINIMUM_VISIBLE_MS;
     const remaining = Math.max(0, minimumVisibleMs - (performance.now() - bootStartedAt.current));
     const completeTimer = window.setTimeout(() => setBootCompleting(true), remaining);
-    const hideTimer = window.setTimeout(() => setBootVisible(false), remaining + (reduceMotion ? 0 : 320));
+    const hideTimer = window.setTimeout(() => setBootVisible(false), remaining + (reduceMotion ? 0 : BOOT_COMPLETION_HOLD_MS));
     return () => {
       window.clearTimeout(completeTimer);
       window.clearTimeout(hideTimer);
