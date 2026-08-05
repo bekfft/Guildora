@@ -1,6 +1,7 @@
 import { LoaderCircle, Mic, Paperclip, Send, SmilePlus, Square, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
+import { bindComposerViewport } from '../lib/composerViewport.js';
 import { socket } from '../lib/socket.js';
 import { appendSelectedFiles, ATTACHMENT_ACCEPT, MessageAttachment, PendingAttachments } from './MessageAttachment.jsx';
 
@@ -113,6 +114,8 @@ export default function DirectMessageView({ conversation, currentUserId, onOpenP
   useEffect(() => {
     fitComposer(composer.current);
   }, [draft, conversation?.id]);
+
+  useEffect(() => bindComposerViewport(composer.current, scroller.current), [conversation?.id]);
 
   useEffect(() => () => {
     if (recordingTimerRef.current) window.clearInterval(recordingTimerRef.current);

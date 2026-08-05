@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
+import { bindComposerViewport } from '../lib/composerViewport.js';
 import { socket } from '../lib/socket.js';
 import { useGuildoraDialog } from '../context/GuildoraDialogContext.jsx';
 import { appendSelectedFiles, ATTACHMENT_ACCEPT, MessageAttachment, PendingAttachments } from './MessageAttachment.jsx';
@@ -155,6 +156,8 @@ export default function ChannelView({
   useEffect(() => {
     fitComposer(composerRef.current);
   }, [draft, channel?.id]);
+
+  useEffect(() => bindComposerViewport(composerRef.current, scrollerRef.current), [channel?.id]);
 
   useEffect(() => () => {
     if (recordingTimerRef.current) window.clearInterval(recordingTimerRef.current);

@@ -319,6 +319,85 @@ test('iOS Standalone erweitert einen verkürzten Layout-Viewport bis zum physisc
   });
 });
 
+test('iPhone-Tastatur hält den Chat wie Discord am Composer verankert', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-1440', 'Die virtuelle iOS-Tastatur wird einmal gezielt simuliert.');
+  await page.addInitScript(() => {
+    Object.defineProperty(Navigator.prototype, 'standalone', { configurable: true, get: () => true });
+    Object.defineProperty(Screen.prototype, 'width', { configurable: true, get: () => 440 });
+    Object.defineProperty(Screen.prototype, 'height', { configurable: true, get: () => 956 });
+    const simulatedViewport = new EventTarget();
+    let simulatedHeight = 956;
+    let simulatedOffsetTop = 0;
+    Object.defineProperties(simulatedViewport, {
+      height: { configurable: true, get: () => simulatedHeight },
+      offsetTop: { configurable: true, get: () => simulatedOffsetTop }
+    });
+    Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => simulatedViewport });
+    window.__setVisualViewport = (height, offsetTop) => {
+      simulatedHeight = height;
+      simulatedOffsetTop = offsetTop;
+      simulatedViewport.dispatchEvent(new Event('resize'));
+      simulatedViewport.dispatchEvent(new Event('scroll'));
+    };
+  });
+  const { guild, channel } = await prepareAccount(page, testInfo, 'iphone-keyboard');
+  let lastMessageId = '';
+  for (let index = 1; index <= 6; index += 1) {
+    const response = await page.request.post(`/api/channels/${channel.id}/messages`, {
+      data: { content: `Mobile Tastatur-Testnachricht ${index}: Der sichtbare Verlauf bleibt am Eingabefeld verankert. `.repeat(5), replyToId: null, attachmentIds: [] }
+    });
+    expect(response.ok()).toBeTruthy();
+    lastMessageId = (await response.json()).message.id;
+  }
+
+  await page.setViewportSize({ width: 440, height: 956 });
+  await page.goto(`/app/channels/${guild.id}/${channel.id}?standalone-preview=1`);
+  const composer = page.locator('.composer-shell textarea');
+  const lastMessage = page.locator(`[data-message-id="${lastMessageId}"]`);
+  await expect(lastMessage).toBeVisible();
+
+  const geometry = () => page.evaluate((messageId) => {
+    const app = document.querySelector('.guildora-app').getBoundingClientRect();
+    const composerArea = document.querySelector('.composer-area').getBoundingClientRect();
+    const message = document.querySelector(`[data-message-id="${messageId}"]`).getBoundingClientRect();
+    const scroller = document.querySelector('.messages-scroller');
+    return {
+      appTop: Math.round(app.top),
+      appBottom: Math.round(app.bottom),
+      composerTop: Math.round(composerArea.top),
+      composerBottom: Math.round(composerArea.bottom),
+      messageBottom: Math.round(message.bottom),
+      messageGap: Math.round(composerArea.top - message.bottom),
+      bottomDistance: Math.round(scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop),
+      safeAreaPadding: getComputedStyle(document.querySelector('.composer-area')).paddingBottom,
+      keyboardOpen: document.documentElement.hasAttribute('data-composer-keyboard')
+    };
+  }, lastMessageId);
+
+  const before = await geometry();
+  await composer.focus();
+  await page.evaluate(() => window.__setVisualViewport(590, 118));
+  await expect(page.locator('html')).toHaveAttribute('data-composer-keyboard', '');
+  const during = await geometry();
+
+  expect(during.appTop).toBe(118);
+  expect(during.appBottom).toBe(708);
+  expect(during.composerBottom).toBe(708);
+  expect(during.bottomDistance).toBeLessThanOrEqual(1);
+  expect(Math.abs(during.messageGap - before.messageGap)).toBeLessThanOrEqual(4);
+  expect(during.safeAreaPadding).toBe('0px');
+  expect(during.keyboardOpen).toBe(true);
+  await expect(page.locator('.guildora-app')).toHaveScreenshot('iphone-keyboard-chat.png', { caret: 'hide' });
+
+  await composer.evaluate((field) => field.blur());
+  await page.evaluate(() => window.__setVisualViewport(956, 0));
+  const after = await geometry();
+  expect(after.appTop).toBe(0);
+  expect(after.appBottom).toBe(956);
+  expect(after.bottomDistance).toBeLessThanOrEqual(1);
+  expect(Math.abs(after.messageGap - before.messageGap)).toBeLessThanOrEqual(4);
+});
+
 test('iPhone 17 Pro Max Standalone füllt den Bildschirm und bedient Nachrichten per Langdruck', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-1440', 'Der iPhone-Viewport wird einmal gezielt geprüft.');
   test.setTimeout(90_000);

@@ -12,6 +12,7 @@ const mainSource = fs.readFileSync(path.join(clientRoot, 'src', 'main.jsx'), 'ut
 const appSource = fs.readFileSync(path.join(clientRoot, 'src', 'App.jsx'), 'utf8');
 const channelView = fs.readFileSync(path.join(clientRoot, 'src', 'app', 'ChannelView.jsx'), 'utf8');
 const directMessageView = fs.readFileSync(path.join(clientRoot, 'src', 'app', 'DirectMessageView.jsx'), 'utf8');
+const composerViewport = fs.readFileSync(path.join(clientRoot, 'src', 'lib', 'composerViewport.js'), 'utf8');
 const globalCss = fs.readFileSync(path.join(clientRoot, 'src', 'styles', 'global.css'), 'utf8');
 const tokensCss = fs.readFileSync(path.join(clientRoot, 'src', 'styles', 'tokens.css'), 'utf8');
 const appCss = fs.readFileSync(path.join(clientRoot, 'src', 'styles', 'app.css'), 'utf8');
@@ -53,11 +54,16 @@ test('Standalone-Modus und iPhone-Safe-Areas werden im App-Layout berücksichtig
   assert.match(mainSource, /Math\.max\(layoutHeight, visualHeight, deviceScreenHeight\)/);
   assert.match(mainSource, /keyboardTarget && layoutHeight - visualHeight > 120/);
   assert.match(mainSource, /const viewportHeight = keyboardOpen \? visualHeight : fullscreenHeight/);
+  assert.match(mainSource, /const keyboardTop = keyboardOpen \? Math\.max\(0, visualViewport\?\.offsetTop \|\| 0\) : 0/);
   assert.match(mainSource, /setProperty\('--app-height', `\$\{Math\.round\(viewportHeight\)\}px`\)/);
+  assert.match(mainSource, /setProperty\('--app-top', `\$\{Math\.round\(keyboardTop\)\}px`\)/);
+  assert.match(mainSource, /toggleAttribute\('data-keyboard-open', keyboardOpen\)/);
+  assert.match(mainSource, /data-composer-keyboard/);
   assert.doesNotMatch(mainSource, /removeProperty\('--app-height'\)/);
   assert.match(mainSource, /--app-height/);
   assert.match(mainSource, /orientationchange/);
   assert.match(mainSource, /pageshow/);
+  assert.match(mainSource, /visualViewport\?\.addEventListener\('scroll', updateAppViewport\)/);
   assert.match(tokensCss, /--safe-area-top:\s*env\(safe-area-inset-top/);
   assert.match(tokensCss, /--safe-area-bottom:\s*env\(safe-area-inset-bottom/);
   assert.match(appCss, /calc\(var\(--titlebar-height\) \+ var\(--safe-area-top\)\)/);
@@ -69,7 +75,7 @@ test('Standalone-Modus und iPhone-Safe-Areas werden im App-Layout berücksichtig
   const composerViewportRule = cssRule(appCss, `${appViewportSelector} .composer-area`);
   assert.match(composerViewportRule, /padding-bottom:\s*var\(--safe-area-bottom\)[\s\S]*background:\s*var\(--bg-content\)/);
   assert.doesNotMatch(composerViewportRule, /border-radius:/);
-  assert.match(cssRule(appCss, `${appViewportSelector} .guildora-app`), /top:\s*0[\s\S]*height:\s*var\(--app-height\)/);
+  assert.match(cssRule(appCss, `${appViewportSelector} .guildora-app`), /top:\s*var\(--app-top, 0px\)[\s\S]*height:\s*var\(--app-height\)/);
   assert.match(cssRule(appCss, `${appViewportSelector} .app-main`), /grid-template-rows:\s*calc\(48px \+ var\(--safe-area-top\)\)/);
   assert.match(appCss, new RegExp(`${appViewportSelector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\.main-header,`));
   assert.match(cssRule(appCss, `${appViewportSelector} .member-list__header`), /padding-top:\s*var\(--safe-area-top\)/);
@@ -112,6 +118,13 @@ test('Mobile Vollbildansichten, Formulare und Composer bleiben in den sicheren B
   assert.match(appCss, /@media \(max-width: 900px\) \{\s*\.guildora-app,/);
   assert.match(channelView, /fitComposer\(composerRef\.current\)/);
   assert.match(directMessageView, /fitComposer\(composer\.current\)/);
+  assert.match(channelView, /bindComposerViewport\(composerRef\.current, scrollerRef\.current\)/);
+  assert.match(directMessageView, /bindComposerViewport\(composer\.current, scroller\.current\)/);
+  assert.match(composerViewport, /bottomDistance <= 96/);
+  assert.match(composerViewport, /scroller\.scrollHeight - scroller\.clientHeight - anchor\.bottomDistance/);
+  assert.match(composerViewport, /viewport\.addEventListener\('resize', restore\)/);
+  assert.match(composerViewport, /viewport\.addEventListener\('scroll', restore\)/);
+  assert.match(appCss, /html\[data-composer-keyboard\] \.composer-area\s*\{\s*padding-bottom:\s*0;/);
 });
 
 test('Mobile Nachrichtenaktionen erscheinen erst nach einem Langdruck', () => {

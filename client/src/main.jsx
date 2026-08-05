@@ -15,7 +15,8 @@ const standalonePreview = import.meta.env.DEV
 
 function updateAppViewport() {
   const layoutHeight = Math.max(window.innerHeight, document.documentElement.clientHeight);
-  const visualHeight = window.visualViewport?.height || layoutHeight;
+  const visualViewport = window.visualViewport;
+  const visualHeight = visualViewport?.height || layoutHeight;
   const iosStandalone = window.navigator.standalone === true;
   const portrait = window.innerHeight >= window.innerWidth;
   const deviceScreenHeight = portrait
@@ -25,6 +26,7 @@ function updateAppViewport() {
     'input, textarea, select, [contenteditable="true"]'
   );
   const keyboardOpen = keyboardTarget && layoutHeight - visualHeight > 120;
+  const keyboardTop = keyboardOpen ? Math.max(0, visualViewport?.offsetTop || 0) : 0;
   // Auf echten iOS-Home-Bildschirm-Apps koennen innerHeight, clientHeight und
   // 100dvh gemeinsam oberhalb der Home-Indicator-Zone enden. screen.height ist
   // dort die physische CSS-Pixel-Hoehe und schliesst diese sonst ungefuellte
@@ -34,6 +36,12 @@ function updateAppViewport() {
     : Math.max(layoutHeight, visualHeight);
   const viewportHeight = keyboardOpen ? visualHeight : fullscreenHeight;
   document.documentElement.style.setProperty('--app-height', `${Math.round(viewportHeight)}px`);
+  document.documentElement.style.setProperty('--app-top', `${Math.round(keyboardTop)}px`);
+  document.documentElement.toggleAttribute('data-keyboard-open', keyboardOpen);
+  document.documentElement.toggleAttribute(
+    'data-composer-keyboard',
+    Boolean(keyboardOpen && document.activeElement?.closest('.composer-area'))
+  );
 }
 
 function updateDisplayMode() {
@@ -54,6 +62,7 @@ window.addEventListener('resize', updateAppViewport);
 window.addEventListener('orientationchange', updateAppViewport);
 window.addEventListener('pageshow', updateAppViewport);
 window.visualViewport?.addEventListener('resize', updateAppViewport);
+window.visualViewport?.addEventListener('scroll', updateAppViewport);
 document.addEventListener('focusin', updateAppViewport);
 document.addEventListener('focusout', updateAppViewport);
 
